@@ -52,6 +52,8 @@ extension DictationController {
         startMultilingualDownloadIfWanted()
         phase = .preparingModel
         copied = false
+        preparationReportedProgress = false
+        preparingMultilingualParakeet = false
         modelPreparation = ModelPreparationProgress(
             fractionCompleted: 0,
             detail: String(localized: "Checking the speech model")
@@ -62,22 +64,20 @@ extension DictationController {
 
         Task {
             defer { backgroundTime.end() }
-            var candidateIsUltra = false
             do {
-                let candidate: any LocalTranscribing
-                if let preset {
-                    candidate = preset
-                } else {
-                    candidate = await transcriberFactory()
-                }
-                guard self.modelPrepGeneration == prepGen else { return }
-                engineName = candidate.displayName
-                candidateIsUltra = candidate is ParakeetUltraTranscriber
-                try await candidate.prepare { [weak self] progress in
-                    Task { @MainActor [weak self] in
-                        guard let self, self.modelPrepGeneration == prepGen else { return }
-                        self.modelPreparation = progress
-                    }
+                // Nothing before the first progress report can be waited on forever: a Speech
+                // call that never returns shows Try again instead of checking.
+                let sawProgress = ProgressReading()
+                let candidate = try await SpeechModelDeadline.run(
+                    preparationStallLimit,
+                    progress: { () -> Double? in sawProgress.value > 0 ? nil : 0 }
+                ) { [weak self] in
+                    guard let self else { throw CancellationError() }
+                    return try await self.prepareCandidate(
+                        preset,
+                        generation: prepGen,
+                        sawProgress: sawProgress
+                    )
                 }
                 guard self.modelPrepGeneration == prepGen else { return }
                 self.languageOffer = nil
@@ -87,7 +87,7 @@ extension DictationController {
                 self.keyboardBridge.setModelInstalled(true)
                 self.isModelReady = true
                 self.phase = .ready
-                if candidateIsUltra {
+                if self.preparingMultilingualParakeet {
                     self.multilingualParakeetLoaded()
                 }
                 self.publishKeyboardSnapshot()
@@ -97,7 +97,7 @@ extension DictationController {
                 self.syncMultilingualParakeet()
             } catch {
                 guard self.modelPrepGeneration == prepGen else { return }
-                if candidateIsUltra, fallbacksLeft > 0, !(error is CancellationError) {
+                if self.preparingMultilingualParakeet, fallbacksLeft > 0, !(error is CancellationError) {
                     // Parakeet Ultra didn't load: the engine Hex uses without it dictates, and
                     // Hex says why, with Try again.
                     self.multilingualParakeetFailedToLoad(error)
@@ -114,7 +114,10 @@ extension DictationController {
                 }
                 self.languageOffer = unavailable.flatMap { $0.automatic ? nil : $0.fallback }
                 self.preparationFailedInBackground = self.isInBackground && Self.isDownloadInterruption(error)
-                self.keyboardBridge.setModelInstalled(ParakeetTranscriber.hasCachedModel)
+                // The keyboard sends its next dictation to Hex only while one of Hex's engines can
+                // take it: one that prepared before, or Parakeet's files on disk. Apple Speech's
+                // asset belongs to iOS, so Parakeet's cache alone said no to every Apple user.
+                self.keyboardBridge.setModelInstalled(self.isModelReady || ParakeetTranscriber.hasCachedModel)
                 self.pendingHandoff = nil
                 self.phase = .failed(UserFacingError.message(for: error, context: .model))
                 self.publishKeyboardSnapshot()
@@ -122,6 +125,34 @@ extension DictationController {
                 self.syncMultilingualParakeet()
             }
         }
+    }
+
+    /// Resolves the engine and gets it ready, naming it before its model loads so the window
+    /// and the keyboard already say which one is coming. Throws `CancellationError` when a newer
+    /// preparation replaced this one before it picked.
+    private func prepareCandidate(
+        _ preset: (any LocalTranscribing)?,
+        generation: UInt64,
+        sawProgress: ProgressReading
+    ) async throws -> any LocalTranscribing {
+        let candidate: any LocalTranscribing
+        if let preset {
+            candidate = preset
+        } else {
+            candidate = await transcriberFactory()
+        }
+        guard modelPrepGeneration == generation else { throw CancellationError() }
+        engineName = candidate.displayName
+        preparingMultilingualParakeet = candidate is ParakeetUltraTranscriber
+        try await candidate.prepare { [weak self] progress in
+            sawProgress.value = 1
+            Task { @MainActor [weak self] in
+                guard let self, self.modelPrepGeneration == generation else { return }
+                self.preparationReportedProgress = true
+                self.modelPreparation = progress
+            }
+        }
+        return candidate
     }
 
     /// Parakeet V2 dictates and leaves no room to load Parakeet Ultra beside it (English
@@ -178,10 +209,17 @@ extension DictationController {
     }
 
     /// Picks up a download that iOS cut off while Hex was in the background; FluidAudio
-    /// resumes each file from the bytes it has.
+    /// resumes each file from the bytes it has. A preparation still waiting for its first
+    /// progress report starts over too: iOS may have suspended it inside a Speech call that
+    /// never answers.
     func appBecameActive() {
+        let wasInBackground = isInBackground
         isInBackground = false
         multilingualDownload.appBecameActive()
+        if wasInBackground, phase == .preparingModel, !preparationReportedProgress {
+            prepareModel()
+            return
+        }
         guard preparationFailedInBackground else { return }
         preparationFailedInBackground = false
         if case .failed = phase, !isModelReady {

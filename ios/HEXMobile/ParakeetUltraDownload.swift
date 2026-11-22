@@ -134,10 +134,10 @@ final class ParakeetUltraDownload {
         }
     }
 
-    /// Back in front: a download that stopped tries again at once, and one suspended long
-    /// enough for iOS to drop its connection starts a fresh one from where it is.
+    /// Back in front: a download that stopped tries again at once, and one iOS froze while
+    /// Hex was suspended starts a fresh connection from its `.partial` bytes. A suspended
+    /// transfer can lose its task without an error, so being back in front is what tells it.
     func appBecameActive() {
-        let away = backgroundedAt.map { Date().timeIntervalSince($0) } ?? 0
         backgroundedAt = nil
         endBackgroundTime()
         switch state {
@@ -145,7 +145,7 @@ final class ParakeetUltraDownload {
             restart()
         case .failed where failedForConnection:
             restart()
-        case .downloading where away > 25:
+        case .downloading:
             restart()
         default:
             break

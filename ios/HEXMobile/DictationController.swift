@@ -99,6 +99,9 @@ final class DictationController {
 
     private var jobGeneration: UInt64 = 0
     var modelPrepGeneration: UInt64 = 0
+    /// How long a preparation may run before its first progress report before Hex gives up:
+    /// a Speech call that never answers would otherwise check forever.
+    let preparationStallLimit: Duration
     private var activeCapture: ActiveCaptureSession?
     private var meterTask: Task<Void, Never>?
     private var transcriptionTask: Task<Void, Never>?
@@ -212,6 +215,11 @@ final class DictationController {
     var isInBackground = false
     /// A model download that failed while Hex was in the background, tried again on return.
     var preparationFailedInBackground = false
+    /// Whether the preparation now running has reported any progress, so a return to the
+    /// foreground only starts over one still in its silent first step.
+    var preparationReportedProgress = false
+    /// Whether the preparation now running picked Parakeet Ultra, for its failure path.
+    var preparingMultilingualParakeet = false
 
     init(
         audio: (any AudioManaging)? = nil,
@@ -232,7 +240,8 @@ final class DictationController {
         typingJournalSettings: TypingJournalSettings = TypingJournalSettings(),
         learnedDictationCorrections: (@MainActor (String?) -> [DictationCorrection])? = nil,
         languageSettings: LanguageSettings = LanguageSettings(),
-        multilingualDownload: ParakeetUltraDownload? = nil
+        multilingualDownload: ParakeetUltraDownload? = nil,
+        preparationStallLimit: Duration = .seconds(60)
     ) {
         let resolvedBridge = keyboardBridge ?? KeyboardBridge()
         let resolvedAudio = audio ?? SystemAudioManager()
@@ -243,6 +252,7 @@ final class DictationController {
         self.transcriber = initialTranscriber
         self.transcriberFactory = transcriberFactory ?? Self.defaultTranscriber
         self.multilingualDownload = multilingualDownload ?? ParakeetUltraDownload()
+        self.preparationStallLimit = preparationStallLimit
         self.cleaner = cleaner
         self.cleanupSettings = cleanupSettings
         self.customVocabularySettings = customVocabularySettings
@@ -411,7 +421,11 @@ final class DictationController {
             startRecording(copyToPasteboard: false)
         case .recording:
             finishRecording()
-        case .preparingModel, .requestingPermission, .transcribing:
+        case .preparingModel:
+            // Try again: a preparation that hangs would otherwise leave this doing nothing
+            // until its deadline ends it.
+            prepareModel()
+        case .requestingPermission, .transcribing:
             break
         }
     }

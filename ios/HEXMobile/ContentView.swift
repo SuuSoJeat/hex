@@ -85,6 +85,13 @@ struct ContentView: View {
             }
         }
         .task { keyboardSpeech.start { dictation.engineName } }
+        .onChange(of: scenePhase) { _, phase in
+            // A check the keyboard's model never answered starts over in front, and one that
+            // failed tries again; the app's own preparation resumes in HEXMobileApp.
+            if phase == .active {
+                keyboardSpeech.resumeOnForeground { dictation.engineName }
+            }
+        }
         .animation(HexMotion.reducedFade, value: openedFromKeyboard)
         .animation(HexMotion.reducedFade, value: onboardingPage == nil)
     }

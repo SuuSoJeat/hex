@@ -753,7 +753,12 @@ never at a launch by itself.
   (`DictationController.appleSpeechLanguage`). After Hex ended
   while loading Parakeet, the next launch waits for Set up instead of loading it
   again (`ParakeetLoadGuard`), and a Parakeet download that sits at one fraction
-  for 90 s ends with a message. **When a model won't install**
+  for 90 s ends with a message. A preparation whose first progress report
+  doesn't arrive within 60 s ends the same way ("The speech model didn't
+  respond. Try again."), with time iOS has Hex suspended not counted: Set up or
+  Try again starts it over, and coming back to the front starts over one still
+  waiting for that first report (`DictationController.prepareModel`,
+  `SpeechModelDeadline`). **When a model won't install**
   (`SpeechModelInstall`, shared by the app and in-keyboard dictation): Apple lists
   some languages whose `SpeechTranscriber` asset never arrives ("transcription.ru
   asset not found after attempted download"), so Hex then installs the same
@@ -772,7 +777,10 @@ never at a launch by itself.
   download English." and Dictate and the Hex key open Hex, which downloads it,
   until a model installs, a language is chosen, or a day passes
   (`SpeechModelNeedsHex`, `settings.dictationLanguage.keyboardNeedsHex`); a move
-  to another language keeps its own sentence. Reservations make room
+  to another language keeps its own sentence. The keyboard's own check has the
+  same 60 s deadline, and coming back to Hex starts over a check that failed or
+  never answered (`KeyboardSpeechPreparation`), so the Speech model row finishes
+  setup instead of saying "Preparing" forever. Reservations make room
   under `AssetInventory.maximumReservedLocales` by releasing others first. Only
   Hex's own error text reaches the app or keyboard (`HexDescribedError`); Apple's
   and other packages' descriptions go to logs, however readable.

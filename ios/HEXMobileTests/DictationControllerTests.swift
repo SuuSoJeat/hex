@@ -168,6 +168,27 @@ private actor UnpreparableTranscriber: LocalTranscribing {
     }
 }
 
+/// A transcriber whose preparation never answers and never reports progress, like a Speech
+/// call that never returns.
+private actor UnresponsiveTranscriber: LocalTranscribing {
+    nonisolated let displayName = "Apple Speech"
+    let languageName = "English"
+    private(set) var preparationCancelled = false
+
+    func prepare(progressHandler: @escaping @Sendable (ModelPreparationProgress) -> Void) async throws {
+        do {
+            try await Task.sleep(for: .seconds(3_600))
+        } catch {
+            preparationCancelled = true
+            throw error
+        }
+    }
+
+    func transcribe(_ audioURL: URL) async throws -> String {
+        throw CancellationError()
+    }
+}
+
 @MainActor
 private final class RecordingCleaner: TranscriptCleaning {
     var isAvailable = true
@@ -1476,6 +1497,62 @@ final class DictationControllerTests: XCTestCase {
         controller.appBecameActive()
         try await settle()
         XCTAssertEqual(made, 2, "once")
+    }
+
+    func testAPreparationThatNeverAnswersFailsInsteadOfCheckingForever() async throws {
+        let unresponsive = UnresponsiveTranscriber()
+        let bridge = KeyboardBridge(defaults: defaults)
+        let controller = DictationController(
+            audio: FakeAudioManager(),
+            keyboardBridge: bridge,
+            transcriber: unresponsive,
+            transcriberFactory: { unresponsive },
+            autoPrepareOnInit: false,
+            preparationStallLimit: .milliseconds(120)
+        )
+        controller.prepareModel()
+        XCTAssertEqual(controller.phase, .preparingModel)
+        XCTAssertEqual(controller.modelPreparation.detail, "Checking the speech model")
+
+        try await waitUntil(seconds: 2) {
+            if case .failed = controller.phase { true } else { false }
+        }
+        XCTAssertEqual(controller.phase, .failed("The speech model didn't respond. Try again."))
+        XCTAssertFalse(controller.isModelReady)
+        XCTAssertFalse(bridge.isModelInstalled, "nothing prepared, so the keyboard tries the next one here")
+
+        var cancelled = false
+        for _ in 0..<100 where !cancelled {
+            cancelled = await unresponsive.preparationCancelled
+            if !cancelled { try await Task.sleep(for: .milliseconds(10)) }
+        }
+        XCTAssertTrue(cancelled, "the preparation Hex gave up on is cancelled")
+    }
+
+    func testThePrimaryActionStartsAPreparationOverWhileItIsStillChecking() async throws {
+        let unresponsive = UnresponsiveTranscriber()
+        var made = 0
+        let controller = DictationController(
+            audio: FakeAudioManager(),
+            keyboardBridge: KeyboardBridge(defaults: defaults),
+            transcriber: unresponsive,
+            transcriberFactory: {
+                made += 1
+                return unresponsive
+            },
+            autoPrepareOnInit: false,
+            preparationStallLimit: .seconds(2)
+        )
+        controller.prepareModel()
+        try await settle()
+        XCTAssertEqual(made, 1)
+        XCTAssertEqual(controller.phase, .preparingModel)
+
+        controller.performPrimaryAction()
+        try await settle()
+        XCTAssertEqual(made, 2, "the primary action starts preparation over instead of doing nothing")
+        XCTAssertEqual(controller.phase, .preparingModel)
+        XCTAssertEqual(controller.modelPreparation.detail, "Checking the speech model")
     }
 
     func testAFailureWhileHexIsOpenWaitsForTryAgain() async throws {

@@ -25,6 +25,10 @@ final class KeyboardSpeechPreparation {
         case failed(String)
     }
 
+    /// How long a check may go without any progress before the row says it failed instead of
+    /// "Preparing" forever: a Speech call that never answers would otherwise never end.
+    static let checkStallLimit: Duration = .seconds(60)
+
     private(set) var state: State = OnboardingFixture.isSnapshot ? .ready : .checking {
         didSet {
             if case .downloading = state { downloads = true }
@@ -34,6 +38,8 @@ final class KeyboardSpeechPreparation {
     /// to Hex) doesn't count as half of onboarding's progress.
     private(set) var downloads = false
     @ObservationIgnored private var task: Task<Void, Never>?
+    /// Which check is current; one a retry replaced changes nothing when it answers late.
+    @ObservationIgnored private var generation = 0
 
     var isReady: Bool {
         state == .ready || state == .followsApp
@@ -44,14 +50,27 @@ final class KeyboardSpeechPreparation {
         guard !OnboardingFixture.isSnapshot else { return }
         if task != nil, !retry { return }
         if retry, isReady { return }
+        generation &+= 1
+        let currentGeneration = generation
         task?.cancel()
         state = .checking
-        task = Task { await run(appEngine: appEngine) }
+        task = Task { await run(appEngine: appEngine, generation: currentGeneration) }
     }
 
-    private func run(appEngine: @MainActor () -> String) async {
+    /// Back in front: a check that never answered starts over, and one that failed tries again.
+    /// A download already moving is left alone.
+    func resumeOnForeground(appEngine: @escaping @MainActor () -> String) {
+        switch state {
+        case .checking, .failed:
+            start(retry: true, appEngine: appEngine)
+        case .downloading, .followsApp, .ready:
+            break
+        }
+    }
+
+    private func run(appEngine: @MainActor () -> String, generation: Int) async {
         guard #available(iOS 26.0, *) else {
-            state = .followsApp
+            publish(.followsApp, generation: generation)
             return
         }
         // Launch decides Hex's engine in a task of its own; give it a moment to answer.
@@ -61,59 +80,93 @@ final class KeyboardSpeechPreparation {
         guard !Task.isCancelled else { return }
         // Parakeet Ultra (Experiments › Multilingual model): the Hex key hands its dictations to Hex.
         if appEngine() == "Apple Speech" || appEngine() == ParakeetUltraTranscriber.name {
-            state = .followsApp
+            publish(.followsApp, generation: generation)
             return
         }
         // Automatic can move on to another language once one won't install: try that one.
         for _ in 0..<3 {
-            guard await prepare() else { return }
+            let movedOn: Bool
+            do {
+                movedOn = try await check(generation: generation)
+            } catch is CancellationError {
+                return
+            } catch {
+                publish(.failed(UserFacingError.message(for: error, context: .model)), generation: generation)
+                return
+            }
+            guard movedOn else { return }
+        }
+    }
+
+    /// One language's check, watched: Speech calls that never answer end as
+    /// `SpeechModelUnresponsive` instead of leaving the row on "Preparing".
+    @available(iOS 26.0, *)
+    private func check(generation: Int) async throws -> Bool {
+        let reported = ProgressReading()
+        return try await SpeechModelDeadline.run(
+            Self.checkStallLimit,
+            progress: { () -> Double? in reported.value > 0 ? nil : 0 }
+        ) { [weak self] in
+            guard let self else { throw CancellationError() }
+            return await self.prepare(reported: reported, generation: generation)
         }
     }
 
     /// One language's model. Returns true when Automatic moved on and the next one should be tried.
     @available(iOS 26.0, *)
-    private func prepare() async -> Bool {
+    private func prepare(reported: ProgressReading, generation: Int) async -> Bool {
         let settings = LanguageSettings()
         guard let language = await AppleSpeechLanguages.resolve(settings: settings) else {
             // Speech lists nothing here: the keyboard hands its dictations to Hex.
-            handOffToHex(settings)
+            handOffToHex(settings, generation: generation)
             return false
         }
         if await AppleSpeechAssets.steps.status(language) == .installed {
             settings.clearKeyboardNeedsHex()
-            state = .ready
+            publish(.ready, generation: generation)
             return false
         }
-        state = .downloading(0)
+        publish(.downloading(0), generation: generation)
         do {
             _ = try await AppleSpeechAssets.install(
                 language,
                 settings: settings,
                 log: { print("keyboard speech: \($0)") },
                 progress: { fraction in
+                    reported.value = 1
                     Task { @MainActor [weak self] in
-                        guard let self, case .downloading = self.state else { return }
+                        guard let self,
+                              generation == self.generation,
+                              case .downloading = self.state else { return }
                         self.state = .downloading(fraction)
                     }
                 }
             )
             guard !Task.isCancelled else { return false }
-            state = .ready
+            publish(.ready, generation: generation)
         } catch is CancellationError {
         } catch let unavailable as SpeechModelUnavailable where unavailable.reason == .notOnThisIPhone {
             if unavailable.fallback != nil, unavailable.automatic { return true }
             // Apple has no model for it on this iPhone: the keyboard hands its dictations to
             // Hex, as it would after its own first try, so the Hex key works from the start.
-            handOffToHex(settings)
+            handOffToHex(settings, generation: generation)
         } catch {
-            state = .failed(UserFacingError.message(for: error, context: .model))
+            publish(.failed(UserFacingError.message(for: error, context: .model)), generation: generation)
         }
         return false
     }
 
+    /// `state` for the current check only: one a retry replaced changes nothing when it
+    /// answers late.
+    private func publish(_ next: State, generation: Int) {
+        guard generation == self.generation else { return }
+        state = next
+    }
+
     /// The Hex key opens Hex, which dictates with its own model (KeyboardViewController reads
     /// keyboardNeedsHex); marked again at each launch, as the mark lasts a day.
-    private func handOffToHex(_ settings: LanguageSettings) {
+    private func handOffToHex(_ settings: LanguageSettings, generation: Int) {
+        guard generation == self.generation else { return }
         settings.markKeyboardNeedsHex()
         state = .followsApp
         // A download that ended in the handoff isn't part of onboarding's progress either.

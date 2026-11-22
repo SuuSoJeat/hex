@@ -2087,6 +2087,16 @@
         }
       }
     },
+    "The speech model didn't respond. Try again." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "语音模型没有响应。请重试。"
+          }
+        }
+      }
+    },
     "Not enough memory for the speech model." : {
       "localizations" : {
         "zh-Hans" : {
