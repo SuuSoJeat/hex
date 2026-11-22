@@ -1,11 +1,16 @@
 import Foundation
 
-/// Prefix completion for the Khmer text immediately before the caret.
+/// Prefix completion and conservative spelling correction for Khmer text before the caret.
 struct KhmerAutocomplete: Sendable {
     struct Candidate: Equatable, Sendable {
         let word: String
         /// The exact UTF-16 suffix to append to the text the user has already entered.
         let suffix: String
+    }
+
+    struct Correction: Equatable, Sendable {
+        let typed: String
+        let replacement: String
     }
 
     private struct Entry: Sendable {
@@ -17,6 +22,20 @@ struct KhmerAutocomplete: Sendable {
     private static let minimumPrefixLength = 2
     private static let contextLength = 96
     private static let coeng: UInt16 = 0x17D2
+
+    // Orthographic examples from Table 5 of Kong et al., Khmer Spellchecking: A Holistic Approach
+    // (https://arxiv.org/pdf/2511.09812#page=6). The ចំណុច example is from Chuon Nath's Khmer
+    // dictionary, discussed in https://www.thmeythmey.com/index.php/detail/38623 and
+    // https://www.thmeythmey.com/detail/80744.
+    private static let reviewedMisspellings = [
+        "សមាគុមន៍": "សមាគម",
+        "ទន់ភ្លុន": "ទន់ភ្លន់",
+        "កូមារភាព": "កុមារភាព",
+        "បុំផ្ទុះ": "បំផ្ទុះ",
+        "ចំនុច": "ចំណុច",
+        "សមត្ថិភាព": "សមត្ថភាព",
+    ].map { (units: Array($0.key.utf16), fix: Correction(typed: $0.key, replacement: $0.value)) }
+
     private let entries: [Entry]
     private let longestWord: Int
 
@@ -80,17 +99,50 @@ struct KhmerAutocomplete: Sendable {
                     return completions(for: prefix, from: first, limit: limit)
                 }
             }
-            let lastEnd = min(start + longestWord, lastStart)
-            guard start < lastEnd else { continue }
-            for end in (start + 1)...lastEnd where Self.isBoundary(end, in: run) {
-                let spelling = run[start..<end]
-                let index = lowerBound(of: spelling)
-                if index < entries.count, entries[index].units.elementsEqual(spelling) {
-                    wordStarts[end] = true
-                }
-            }
+            markWordEnds(from: start, in: run, into: &wordStarts)
         }
         return []
+    }
+
+    /// Returns a reviewed correction at an established Khmer word boundary. A full reading
+    /// made of dictionary words takes precedence, including a compound typed without spaces.
+    func correction(beforeInput: String?) -> Correction? {
+        guard let beforeInput else { return nil }
+        let tail = beforeInput.utf16.reversed().prefix(Self.contextLength + 1)
+        let run = Array(tail.prefix(while: Self.isWordUnit).reversed())
+        guard let first = run.first, Self.beginsWord(first), run.count <= Self.contextLength else { return nil }
+        if let separator = tail.dropFirst(run.count).first,
+           !Self.isSpellingBoundary(separator) { return nil }
+
+        let candidates = Self.reviewedMisspellings.compactMap { units, fix -> (start: Int, fix: Correction)? in
+            guard run.suffix(units.count).elementsEqual(units), contains(Array(fix.replacement.utf16)[...]) else {
+                return nil
+            }
+            return (run.count - units.count, fix)
+        }
+        guard !candidates.isEmpty else { return nil }
+
+        var wordStarts = Array(repeating: false, count: run.count + 1)
+        wordStarts[0] = true
+        for start in run.indices where wordStarts[start] {
+            markWordEnds(from: start, in: run, into: &wordStarts)
+        }
+        guard !wordStarts[run.count] else { return nil }
+        let reachable = candidates.filter { wordStarts[$0.start] }
+        return reachable.count == 1 ? reachable.first?.fix : nil
+    }
+
+    private func markWordEnds(from start: Int, in run: [UInt16], into wordStarts: inout [Bool]) {
+        let lastEnd = min(start + longestWord, wordStarts.count - 1)
+        guard start < lastEnd else { return }
+        for end in (start + 1)...lastEnd where end == run.count || Self.isBoundary(end, in: run) {
+            if contains(run[start..<end]) { wordStarts[end] = true }
+        }
+    }
+
+    private func contains(_ spelling: ArraySlice<UInt16>) -> Bool {
+        let index = lowerBound(of: spelling)
+        return index < entries.count && entries[index].units.elementsEqual(spelling)
     }
 
     private func completions(for prefix: ArraySlice<UInt16>, from first: Int, limit: Int) -> [Candidate] {
@@ -128,5 +180,12 @@ struct KhmerAutocomplete: Sendable {
     private static func isBoundary(_ index: Int, in run: [UInt16]) -> Bool {
         let previous = run[index - 1]
         return beginsWord(run[index]) && previous != coeng && previous != 0x200C && previous != 0x200D
+    }
+
+    private static func isSpellingBoundary(_ unit: UInt16) -> Bool {
+        switch unit {
+        case 0x200B, 0x17D4...0x17D6, 0x17D8...0x17DA: return true
+        default: return Unicode.Scalar(unit).map(CharacterSet.whitespacesAndNewlines.contains) ?? false
+        }
     }
 }

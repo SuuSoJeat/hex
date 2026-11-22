@@ -2930,10 +2930,8 @@ final class FullKeyboardSettingsTests: XCTestCase {
 
         XCTAssertFalse(settings.khmerismNoColors)
         XCTAssertFalse(settings.khmerismNoSuperscripts)
-        XCTAssertFalse(settings.khmerAutocomplete)
         XCTAssertFalse(FullKeyboardSettings(defaults: nil).khmerismNoColors)
         XCTAssertFalse(FullKeyboardSettings(defaults: nil).khmerismNoSuperscripts)
-        XCTAssertFalse(FullKeyboardSettings(defaults: nil).khmerAutocomplete)
 
         settings.khmerismNoColors = true
         XCTAssertTrue(FullKeyboardSettings(defaults: defaults).khmerismNoColors)
@@ -2943,13 +2941,6 @@ final class FullKeyboardSettingsTests: XCTestCase {
         settings.khmerismNoColors = false
         XCTAssertTrue(FullKeyboardSettings(defaults: defaults).khmerismNoSuperscripts)
         XCTAssertFalse(FullKeyboardSettings(defaults: defaults).khmerismNoColors)
-        XCTAssertFalse(FullKeyboardSettings(defaults: defaults).khmerAutocomplete)
-
-        settings.khmerAutocomplete = true
-        XCTAssertTrue(FullKeyboardSettings(defaults: defaults).khmerAutocomplete)
-        XCTAssertTrue(FullKeyboardSettings(defaults: defaults).khmerismNoSuperscripts)
-        XCTAssertFalse(FullKeyboardSettings(defaults: defaults).khmerismNoColors)
-        XCTAssertEqual(defaults.object(forKey: "experiments.khmerAutocomplete") as? Bool, true)
     }
 
     /// The experiment is off until its switch is turned on, and it keeps its App Group key.

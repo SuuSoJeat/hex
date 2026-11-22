@@ -85,9 +85,6 @@ final class FullKeyboardEngine {
     /// types the key's own); then the cell under the finger is the one.
     private var accentOpenCell: Int?
     private(set) var suggestions: [KeyboardSuggestion] = []
-    var isKhmerAutocompleteEnabled = false {
-        didSet { if isKhmerAutocompleteEnabled != oldValue { refreshSuggestions() } }
-    }
     private var khmerAutocomplete: KhmerAutocomplete?
     private(set) var khmerAutocompleteLoad: Task<Void, Never>?
 
@@ -341,8 +338,8 @@ final class FullKeyboardEngine {
 
     func refreshSuggestions() {
         syncLearning()
-        // Prepare the bundled index off the typing path, once an opted-in Khmer layout opens.
-        if isKhmerAutocompleteEnabled, layout.language == .khmer, khmerAutocompleteLoad == nil {
+        // Prepare the Khmer word list off the typing path.
+        if layout.language == .khmer, khmerAutocompleteLoad == nil {
             khmerAutocompleteLoad = Task { [weak self] in
                 let index = await Task.detached(priority: .utility) { KhmerAutocomplete.bundled }.value
                 self?.khmerAutocomplete = index
@@ -354,7 +351,7 @@ final class FullKeyboardEngine {
             next = displayed(swipeSuggestions)
         } else {
             autocorrect.decoderTaps = currentTokenTaps
-            let usualSuggestions = displayed(offeringRevert(autocorrect.suggestions(
+            let usualSuggestions = autocorrect.suggestions(
                 beforeInput: stripBefore,
                 field: field,
                 autocorrectionType: target.autocorrectionType,
@@ -365,8 +362,8 @@ final class FullKeyboardEngine {
                     hasText: target.hasText,
                     language: layout.language
                 )
-            )))
-            next = usualSuggestions.isEmpty ? khmerCompletions() : usualSuggestions
+            )
+            next = displayed(offeringRevert(usualSuggestions.isEmpty ? khmerSuggestionChoices() : usualSuggestions))
         }
         if next != suggestions {
             suggestions = next
@@ -376,14 +373,25 @@ final class FullKeyboardEngine {
     }
 
     func acceptSuggestion(_ suggestion: KeyboardSuggestion) {
-        if suggestion.kind == .khmerCompletion {
-            // Read the live prefix before appending, in case the caret or field has changed.
-            guard suggestions.contains(suggestion), khmerCompletions(live: true).contains(suggestion) else {
+        switch suggestion.kind {
+        case .khmerCompletion, .khmerKeepLiteral, .khmerCorrection:
+            // Check the live prefix again if typing or moving the caret changed it.
+            guard suggestions.contains(suggestion), khmerSuggestionChoices(live: true).contains(suggestion) else {
                 refreshSuggestions()
                 return
             }
-            insert(suggestion.replacement, source: "khmer_completion")
+            switch suggestion.kind {
+            case .khmerCompletion:
+                insert(suggestion.replacement, source: "khmer_completion")
+            case .khmerKeepLiteral:
+                autocorrect.suppressAndKeep(suggestion.replacement)
+                refreshSuggestions()
+            default:
+                _ = applyKhmerCorrection(ending: "")
+            }
             return
+        default:
+            break
         }
         // `typeHeldSpace` asks `spacePending`, so the record stays until the pick's own insert
         // replaces it; every delete below counts the token in the host's text (`textBefore`).
@@ -448,15 +456,102 @@ final class FullKeyboardEngine {
         insertPicked(suggestion.replacement)
     }
 
-    private func khmerCompletions(live: Bool = false) -> [KeyboardSuggestion] {
-        guard isKhmerAutocompleteEnabled, layout.language == .khmer,
-              let index = khmerAutocomplete,
-              TypingJournal.allows(field: field, target: target), target.isSecureTextEntry != true,
-              (target.selectedText ?? "").isEmpty,
-              !KhmerAutocomplete.startsWithWordText(target.documentContextAfterInput) else { return [] }
-        return index.suggestions(beforeInput: live ? textBefore : typingContext).map {
+    private var allowsKhmerSuggestions: Bool {
+        layout.language == .khmer && TypingJournal.allows(field: field, target: target)
+            && target.isSecureTextEntry != true && (target.selectedText ?? "").isEmpty
+            && !KhmerAutocomplete.startsWithWordText(target.documentContextAfterInput)
+    }
+
+    private func khmerSuggestionChoices(live: Bool = false) -> [KeyboardSuggestion] {
+        guard let index = khmerAutocomplete, allowsKhmerSuggestions else { return [] }
+        let before = live ? textBefore : typingContext
+        if let correction = khmerCorrection(before: before) {
+            return [
+                KeyboardSuggestion(displayText: "“\(correction.typed)”", replacement: correction.typed, kind: .khmerKeepLiteral),
+                KeyboardSuggestion(displayText: correction.replacement, replacement: correction.replacement, kind: .khmerCorrection),
+            ]
+        }
+        return index.suggestions(beforeInput: before).map {
             KeyboardSuggestion(displayText: $0.word, replacement: $0.suffix, kind: .khmerCompletion)
         }
+    }
+
+    private func khmerCorrection(before: String?) -> KhmerAutocomplete.Correction? {
+        guard autocorrect.isEnabled, let correction = khmerAutocomplete?.correction(beforeInput: before),
+              !autocorrect.suppressedInSession.contains(correction.typed),
+              !autocorrect.learnedWords.contains(correction.typed) else { return nil }
+        return correction
+    }
+
+    private func insertKhmerKeyText(_ text: String, source: String) {
+        if (text == " " || Self.khmerWordEnders.contains(text)), applyKhmerCorrection(ending: text) { return }
+        insert(text, source: source)
+    }
+
+    private static let khmerWordEnders = Set(wordEnders.map { String($0) }).union(["។", "៕", "៖"])
+
+    @discardableResult
+    private func applyKhmerCorrection(ending: String) -> Bool {
+        guard allowsKhmerSuggestions, let before = textBefore, before == typingContext,
+              let correction = khmerCorrection(before: before),
+              let prefix = removeKhmerSuffix(correction.typed, from: before) else {
+            return false
+        }
+
+        let inserted = correction.replacement + ending
+        rememberTypingContext(before: prefix, inserted: inserted)
+        target.insertText(inserted)
+        typingLog?.edit("autocorrect", [
+            TypingLogField("from", .string(correction.typed)),
+            TypingLogField("to", .string(correction.replacement)),
+            TypingLogField("deleted", .string(correction.typed)),
+            TypingLogField("inserted", .string(inserted)),
+        ])
+        autocorrect.recordAppliedCorrection(
+            original: correction.typed, corrected: correction.replacement, anchor: prefix + correction.replacement,
+            changes: [.init(from: correction.typed, to: correction.replacement, language: .khmer)]
+        )
+        learning?.record(.autocorrected, typed: correction.typed, final: correction.replacement, language: KeyboardLanguage.khmer.rawValue)
+        tokenTaps.removeAll()
+        finishedWord = nil
+        swipedWord = nil
+        lastSpaceAt = nil
+        didEdit()
+        return true
+    }
+
+    /// UIKit can delete one Khmer scalar where Swift sees a whole character. Stop at the
+    /// exact word boundary, checking each step against the original text before the caret.
+    private func removeKhmerSuffix(_ suffix: String, from before: String) -> String? {
+        let original = Array(before.utf16)
+        guard original.suffix(suffix.utf16.count).elementsEqual(suffix.utf16) else { return nil }
+        let boundary = original.count - suffix.utf16.count
+        var end = original.count
+        var previous = before
+        while end > boundary {
+            target.deleteBackward()
+            let reported = textBefore
+            guard reported != nil || !target.hasText || target.documentContextAfterInput?.isEmpty == false else { return nil }
+            let live = reported ?? ""
+            guard !live.utf16.elementsEqual(previous.utf16) else { return nil }
+            let length = live.utf16.count
+            if length < end, live.utf16.elementsEqual(original.prefix(length)) {
+                end = length
+            } else {
+                // A fixed-size host context may reveal more of the text on the left.
+                let matches = (max(1, boundary)..<end).filter {
+                    length >= $0 && live.utf16.suffix($0).elementsEqual(original.prefix($0))
+                }
+                guard matches.count == 1, let match = matches.first else { return nil }
+                end = match
+            }
+            if end < boundary {
+                target.insertText(String(decoding: original.dropFirst(end), as: UTF16.self))
+                return nil
+            }
+            previous = live
+        }
+        return previous
     }
 
     /// Types an emoji from the emoji panel: no spacing or autocorrect around it.
@@ -574,7 +669,7 @@ final class FullKeyboardEngine {
         touch.committed = true
         touch.heldAlternate = alternate
         touches[id] = touch
-        insert(alternate, source: "khmerism_hold")
+        insertKhmerKeyText(alternate, source: "khmerism_hold")
         onChange?()
         return true
     }
@@ -983,7 +1078,7 @@ final class FullKeyboardEngine {
     private func commitCharacter(_ key: KeyboardKey, at point: CGPoint, down: CGPoint? = nil) {
         guard let character = key.character else { return }
         if layout.language == .khmer {
-            insert(isUppercase ? key.shifted ?? character : character, source: "key")
+            insertKhmerKeyText(isUppercase ? key.shifted ?? character : character, source: "key")
             return
         }
         if typeHangul(character) {
@@ -1174,8 +1269,18 @@ final class FullKeyboardEngine {
     /// the space or mark delete took, as Apple's bubble puts it back; space then keeps it.
     /// Learn how I type and Adaptive touch take it as an undone autocorrection.
     private func revertCorrection() {
-        guard let correction = autocorrect.revertibleCorrection(before: textBefore) else {
+        let before = textBefore
+        guard let correction = autocorrect.revertibleCorrection(before: before) else {
             return refreshSuggestions()
+        }
+        let isKhmer = correction.changes.contains { $0.language == .khmer }
+        let prefix: String?
+        if isKhmer {
+            guard let before, before == typingContext,
+                  let remaining = removeKhmerSuffix(correction.corrected, from: before) else { return refreshSuggestions() }
+            prefix = remaining
+        } else {
+            prefix = before.map { String($0.dropLast(correction.corrected.count)) }
         }
         autocorrect.forgetCorrection()
         typingLog?.edit("autocorrect_undo", [
@@ -1183,12 +1288,9 @@ final class FullKeyboardEngine {
             TypingLogField("inserted", .string(correction.original)),
             TypingLogField("src", .string("strip")),
         ])
-        rememberTypingContext(
-            before: textBefore.map { String($0.dropLast(correction.corrected.count)) },
-            inserted: correction.original
-        )
-        for _ in 0..<correction.corrected.count {
-            target.deleteBackward()
+        rememberTypingContext(before: prefix, inserted: correction.original)
+        if !isKhmer {
+            for _ in 0..<correction.corrected.count { target.deleteBackward() }
         }
         tokenTaps.removeAll()
         finishedWord = nil
@@ -1222,7 +1324,7 @@ final class FullKeyboardEngine {
     /// `point` is where the space bar was tapped, as on the unsplit keyboard.
     private func typeSpace(at point: CGPoint? = nil) {
         if layout.language == .khmer {
-            insert(" ", source: "key")
+            insertKhmerKeyText(" ", source: "key")
             return
         }
         commitHangulComposition()

@@ -1017,11 +1017,13 @@ never at a launch by itself.
   switches languages with the standard swipe. Emoji opens Hex's picker. The five
   letter rows use Hex's key height and corner radius, with teal, green and rose
   keys in light and dark. The background and press colors follow the keyboard theme.
+  The suggestion strip offers up to three offline completions. Tap one to append the
+  missing characters. **Settings › Keyboard › Autocorrect** enables correction for
+  known Khmer typos on Space and closing punctuation. Tap the quoted spelling to keep
+  it, or backspace over the delimiter to see the original spelling in the strip.
   Under **Settings › Experiments › Khmerism**, **No colors** uses the keyboard theme
   for every key, and **No superscripts** hides the small corner labels while keeping
-  hold-to-type. **Autocomplete** offers up to three offline completions in the
-  suggestion strip. Tap a suggestion to append the missing Khmer characters, with
-  spacing left to you. Each switch is off by default.
+  hold-to-type. Both switches are off by default.
 - **Layout per language (Settings › Keyboard › Languages › Layout):** each language the keys
   show (every chosen one, Automatic's while none is, and only the first of English and
   Español together) gets a menu of the layouts Apple's Keyboard Layout list offers for it

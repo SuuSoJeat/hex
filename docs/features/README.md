@@ -2925,14 +2925,16 @@ iOS prototype (`HEXMobile`) -> Record/transcribe/copy and keyboard handoff
 │   as entered, including coeng (្), and the host handles backspace. The five-row
 │   letter plane stays joined on the unfolded Duo. Checks: `KhmerKeyboardLanguageTests`,
 │   `KeyboardLayoutTests`, `FullKeyboardEngineTests`.
+│   The suggestion strip offers up to three offline completions from a bundled
+│   SIL/Keyman dictionary. Tap one to append the missing characters. With Autocorrect
+│   on, the strip offers the original and corrected spellings for known typos and
+│   applies the correction on Space or closing punctuation. Backspace removes that
+│   delimiter and the strip offers the original spelling again. Checks:
+│   `KhmerAutocompleteTests`, `FullKeyboardEngineTests`.
 │   Settings › Experiments › Khmerism (off by default, App Group, `FullKeyboardSettingsTests`)
 │   ├── No colors (`experiments.khmerismNoColors`) → every cap uses the keyboard theme
-│   ├── No superscripts (`experiments.khmerismNoSuperscripts`) → hide corner labels,
-│   │   center the main glyph, and keep hold-to-type and its pop-up
-│   └── Autocomplete (`experiments.khmerAutocomplete`) → up to three ranked Khmer
-│       completions in the strip from a bundled SIL/Keyman dictionary. Tapping one
-│       appends the missing characters at the caret. It works offline and respects
-│       Hide word suggestions. Checks: `KhmerAutocompleteTests`, `FullKeyboardEngineTests`.
+│   └── No superscripts (`experiments.khmerismNoSuperscripts`) → hide corner labels,
+│       center the main glyph, and keep hold-to-type and its pop-up
 ├── Korean keyboard (두벌식) (off by default, `experiments.koreanKeyboard`): Settings ›
 │   Experiments adds 한국어 to Settings › Keyboard › Languages, typed on the standard two-set
 │   rows (ㅂㅈㄷㄱㅅㅛㅕㅑㅐㅔ / ㅁㄴㅇㄹㅎㅗㅓㅏㅣ / ㅋㅌㅊㅍㅠㅜㅡ, shift's ㅃㅉㄸㄲㅆ and ㅒㅖ, no

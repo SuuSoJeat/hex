@@ -231,15 +231,12 @@ final class FullKeyboardEngineTests: XCTestCase {
         XCTAssertEqual(engine.layout.layer, .numbers)
     }
 
-    func testKhmerAutocompleteIsOptInAndAppendsOnlyTheMissingScalars() async throws {
+    func testKhmerAutocompleteWorksWithAutocorrectOffAndAppendsOnlyTheMissingScalars() async throws {
         engine.language = .khmer
         engine.autocorrect.isEnabled = false
+        await engine.khmerAutocompleteLoad?.value
         for character in ["ក", "ម", "្"] { tap(.character(character)) }
         XCTAssertEqual(target.text, "កម្")
-        XCTAssertTrue(engine.suggestions.isEmpty)
-
-        engine.isKhmerAutocompleteEnabled = true
-        await engine.khmerAutocompleteLoad?.value
         let completion = try XCTUnwrap(engine.suggestions.first)
         XCTAssertEqual(completion.kind, .khmerCompletion)
         XCTAssertEqual(completion.displayText, "កម្ពុជា")
@@ -254,7 +251,6 @@ final class FullKeyboardEngineTests: XCTestCase {
 
     func testKhmerAutocompleteConditionsAndStalePicks() async throws {
         engine.language = .khmer
-        engine.isKhmerAutocompleteEnabled = true
         await engine.khmerAutocompleteLoad?.value
         target.insertText("កម្")
         engine.textDidChange()
@@ -290,6 +286,78 @@ final class FullKeyboardEngineTests: XCTestCase {
         engine.textDidChange()
         XCTAssertEqual(target.documentContextBeforeInput, "កម្")
         XCTAssertTrue(engine.suggestions.isEmpty, "The caret is inside a Khmer word")
+    }
+
+    func testKhmerAutocorrectOnSpaceAndRevert() async throws {
+        engine.language = .khmer
+        await engine.khmerAutocompleteLoad?.value
+        target.insertText("ចំនុច")
+        engine.textDidChange()
+        XCTAssertEqual(engine.suggestions.map(\.displayText), ["“ចំនុច”", "ចំណុច"])
+        XCTAssertEqual(engine.suggestions.map(\.willAutoReplace), [false, true])
+
+        tap(.space)
+        XCTAssertEqual(target.text, "ចំណុច ")
+        engine.deleteBackward()
+        let revert = try XCTUnwrap(engine.suggestions.first)
+        XCTAssertEqual(revert.kind, .revert)
+        engine.acceptSuggestion(revert)
+        XCTAssertEqual(target.text, "ចំនុច")
+        tap(.space)
+        XCTAssertEqual(target.text, "ចំនុច ")
+    }
+
+    func testKhmerAutocorrectReplacesAndRevertsWhenHostDeletesScalars() async throws {
+        target = KhmerScalarDeletingTarget(text: "ខ្ញុំចំនុច")
+        engine = FullKeyboardEngine(target: target, autocorrect: AutocorrectEngine(learnedWords: LearnedWordsStore(defaults: defaults)))
+        engine.language = .khmer
+        await engine.khmerAutocompleteLoad?.value
+
+        tap(.space)
+        XCTAssertEqual(target.text, "ខ្ញុំចំណុច ")
+        engine.deleteBackward()
+        let revert = try XCTUnwrap(engine.suggestions.first)
+        XCTAssertEqual(revert.kind, .revert)
+        engine.acceptSuggestion(revert)
+        XCTAssertEqual(target.text, "ខ្ញុំចំនុច")
+    }
+
+    func testKhmerAutocorrectOnPunctuationAndExplicitPick() async throws {
+        engine.language = .khmer
+        await engine.khmerAutocompleteLoad?.value
+        target.insertText("ចំនុច")
+        engine.textDidChange()
+        tap(.shift)
+        tap(.character("ំ"))
+        XCTAssertEqual(target.text, "ចំណុច។")
+
+        target.insertText("ចំនុច")
+        engine.textDidChange()
+        let correction = try XCTUnwrap(engine.suggestions.first(where: \.willAutoReplace))
+        engine.acceptSuggestion(correction)
+        XCTAssertEqual(target.text, "ចំណុច។ចំណុច")
+    }
+
+    func testKhmerAutocorrectHonorsKeepAndTheAutocorrectSwitch() async throws {
+        engine.language = .khmer
+        await engine.khmerAutocompleteLoad?.value
+        engine.autocorrect.isEnabled = false
+        target.insertText("ចំនុច")
+        engine.textDidChange()
+        XCTAssertFalse(engine.suggestions.contains(where: \.willAutoReplace))
+        tap(.space)
+        XCTAssertEqual(target.text, "ចំនុច ")
+
+        engine.autocorrect.isEnabled = true
+        target.insertText("ចំនុច")
+        engine.textDidChange()
+        let keep = try XCTUnwrap(engine.suggestions.first)
+        XCTAssertEqual(keep.kind, .khmerKeepLiteral)
+        engine.acceptSuggestion(keep)
+        XCTAssertEqual(target.text, "ចំនុច ចំនុច")
+        XCTAssertFalse(engine.suggestions.contains(where: \.willAutoReplace))
+        tap(.space)
+        XCTAssertEqual(target.text, "ចំនុច ចំនុច ")
     }
 
     func testDoubleTapShiftLocks() {
@@ -3868,6 +3936,16 @@ extension FullKeyboardEngineTests {
         XCTAssertEqual(AdaptiveTouchStatus.current(settings: settings, fullAccessConfirmed: true), .learning(taps: 240))
         settings.summary = (900, false)
         XCTAssertEqual(AdaptiveTouchStatus.current(settings: settings, fullAccessConfirmed: true), .learning(taps: 400))
+    }
+}
+
+/// Matches the UIKit host that removes Khmer combining marks one scalar at a time.
+@MainActor
+private final class KhmerScalarDeletingTarget: FixtureTextTarget {
+    override func deleteBackward() {
+        guard let cluster = documentContextBeforeInput?.last else { return }
+        super.deleteBackward()
+        super.insertText(String(String(cluster).unicodeScalars.dropLast()))
     }
 }
 

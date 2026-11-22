@@ -621,7 +621,9 @@ final class KeyboardStripView: UIView {
                 // third-party keyboard, and cut short there it read as squashed.
                 let textW = incoming.truncatedRect?.width ?? (incoming.text as NSString).size(withAttributes: incoming.attributes).width
                 let arrowRoom = suggestion?.kind == .revert ? Self.revertArrowSize + Self.revertArrowGap : 0
-                let chipH = chipHeight ?? max(22, bounds.height - 2 * pillInset)
+                let normalHeight = chipHeight ?? max(22, bounds.height - 2 * pillInset)
+                let needsKhmerMarkRoom = incoming.text.utf16.contains { (0x1780...0x17FF).contains($0) }
+                let chipH = needsKhmerMarkRoom ? min(bounds.height, max(26, normalHeight)) : normalHeight
                 let chipW = min(bounds.width, textW + arrowRoom + 2 * Self.chipPadding)
                 let midY = textCenterY ?? bounds.height * 0.5
                 let chip = CGRect(
