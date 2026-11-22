@@ -480,6 +480,7 @@ final class TypingLogger {
         case .letters: "letters"
         case .numbers: "numbers"
         case .symbols: "symbols"
+        case .emoji: "emoji"
         }
     }
 

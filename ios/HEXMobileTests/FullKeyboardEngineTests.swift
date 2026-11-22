@@ -114,6 +114,95 @@ final class FullKeyboardEngineTests: XCTestCase {
         XCTAssertEqual(target.text, "ABcDe")
     }
 
+    func testKhmerismShiftStaysSelectedUntilShiftOrKhmerIsTapped() throws {
+        target.autocapitalizationType = .sentences
+        engine.language = .khmer
+        engine.configureForField()
+        let key = try XCTUnwrap(engine.layout.key(.character("ហ")))
+        XCTAssertEqual(engine.displayLabel(for: key), "ហ")
+        tap(.shift)
+        XCTAssertEqual(engine.displayLabel(for: key), "១")
+        tap(key.kind)
+        tap(.space)
+        engine.textDidChange()
+        tap(key.kind)
+        XCTAssertEqual(target.text, "១ ១")
+        tap(.layerSwitch(.letters))
+        tap(key.kind)
+        XCTAssertEqual(target.text, "១ ១ហ")
+    }
+
+    func testKhmerismCornerSwipeUsesStartingKeyAndPreservesUnicodeScalars() throws {
+        engine.language = .khmer
+        tap(.character("ក"))
+        let coeng = KeyKind.character("\u{17D2}")
+        let key = try XCTUnwrap(engine.layout.key(coeng))
+        XCTAssertEqual(engine.displayLabel(for: key), "\u{17D2}")
+        tap(coeng)
+        tap(.character("រ"))
+        XCTAssertEqual(target.text.unicodeScalars.map(\.value), [0x1780, 0x17D2, 0x179A])
+
+        let start = point(.character("ក"))
+        let above = CGPoint(x: start.x, y: start.y - 35)
+        engine.touchBegan(id: 10, at: start)
+        engine.touchMoved(id: 10, to: above)
+        engine.touchEnded(id: 10, at: above)
+        XCTAssertTrue(target.text.hasSuffix("៩"))
+
+        tap(.shift)
+        engine.touchBegan(id: 11, at: start)
+        engine.touchEnded(id: 11, at: above)
+        XCTAssertTrue(target.text.hasSuffix("៩ក"))
+        engine.touchBegan(id: 12, at: start)
+        engine.touchMoved(id: 12, to: above)
+        engine.touchCancelled(id: 12)
+        XCTAssertTrue(target.text.hasSuffix("៩ក"))
+
+        let unassigned = point(.character("ទ"))
+        engine.touchBegan(id: 13, at: unassigned)
+        engine.touchEnded(id: 13, at: CGPoint(x: unassigned.x, y: unassigned.y - 30))
+        XCTAssertTrue(target.text.hasSuffix("៩កឩ"), "a key with no corner still types its main character")
+        engine.touchBegan(id: 14, at: start)
+        engine.touchEnded(id: 14, at: CGPoint(x: start.x, y: start.y - engine.khmerismSwipeDistance + 1))
+        XCTAssertTrue(target.text.hasSuffix("៩កឩ៩"))
+    }
+
+    func testKhmerismNumbersAndSymbolsStaySelectedAndTypeLiterally() {
+        engine.language = .khmer
+        tap(.layerSwitch(.numbers))
+        tap(.character("០"))
+        tap(.space)
+        tap(.space)
+        XCTAssertEqual(engine.layout.layer, .numbers)
+        tap(.layerSwitch(.symbols))
+        tap(.character("៘"))
+        tap(.returnKey)
+        XCTAssertEqual(target.text, "០  ៘\n")
+        XCTAssertEqual(engine.layout.layer, .symbols)
+        tap(.layerSwitch(.letters))
+        XCTAssertEqual(engine.layout.layer, .letters)
+        XCTAssertFalse(engine.isUppercase)
+    }
+
+    func testKhmerismEmojiPageReturnsToBaseAndStaysWithinKhmer() {
+        engine.language = .khmer
+        engine.showsEmoji = true
+        tap(.shift)
+        tap(.layerSwitch(.emoji))
+        XCTAssertEqual(engine.layout.layer, .emoji)
+        tap(.character("🇰🇭"))
+        tap(.shift)
+        XCTAssertEqual(engine.layout.layer, .emoji)
+        tap(.layerSwitch(.letters))
+        XCTAssertEqual(engine.layout.layer, .letters)
+        XCTAssertFalse(engine.isUppercase)
+        XCTAssertEqual(target.text, "🇰🇭")
+        tap(.layerSwitch(.emoji))
+        engine.language = .english
+        XCTAssertEqual(engine.layout.layer, .letters)
+        XCTAssertNil(engine.layout.key(.character("🇰🇭")))
+    }
+
     func testDoubleTapShiftLocks() {
         tap(.shift)
         now += 0.1
@@ -1894,7 +1983,12 @@ final class FullKeyboardEngineTests: XCTestCase {
             // Russian and Ukrainian have no Latin letters: press their own а and hold their own
             // е (Ukrainian's ʼ, its only key with long-press options); Greek its α and ε; Korean
             // its ㅂ (Hangul holds nothing).
-            let first = language == .korean ? "ㅂ" : language == .greek ? "α" : language.isLatin ? "a" : "а"
+            let first: String = switch language {
+            case .khmer: "ហ"
+            case .korean: "ㅂ"
+            case .greek: "α"
+            default: language.isLatin ? "a" : "а"
+            }
             for (id, kind) in [KeyKind.character(first), .space, .delete].enumerated() {
                 let key = view.engine.layout.key(kind)!
                 let sample = TypingLogTouchSample(point: CGPoint(x: key.frame.midX, y: key.frame.midY), timestamp: 0)
@@ -1911,16 +2005,18 @@ final class FullKeyboardEngineTests: XCTestCase {
             case .czech: "r"
             case .greek: "ε"
             case .korean: "ㅂ"
+            case .khmer: "ហ"
             default: "e"
             }
             view.debugHoldAccent(held, selectIndex: 1)
             counts[language] = asked
         }
         XCTAssertGreaterThanOrEqual(counts[.english] ?? 0, 4, "three keys and an accent step")
-        for language in KeyboardLanguage.allCases where language != .korean {
+        for language in KeyboardLanguage.allCases where language != .korean && language != .khmer {
             XCTAssertEqual(counts[language], counts[.english], "\(language.rawValue) haptics")
         }
         XCTAssertEqual(counts[.korean] ?? 0, 3, "three keys, and no held accents")
+        XCTAssertEqual(counts[.khmer] ?? 0, 3, "three keys, and no held accents")
     }
 
     /// TestFlight: "Cannot hear the iOS typing sound when using your keyboard." Every key asks
