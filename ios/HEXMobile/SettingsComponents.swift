@@ -283,6 +283,10 @@ enum SettingsSnapshotFixture {
         keyboard.spatialAutocorrect = true
         keyboard.germanSpatialAutocorrect = on
         keyboard.koreanKeyboard = on
+        keyboard.dvorakPunctuation = on
+        keyboard.commaPeriodKeys = on
+        keyboard.quickAccents = on
+        keyboard.emojiShortcodes = on
         keyboard.emojiLettersUnderEmojiKey = on
         keyboard.keyboardThemesEnabled = false
         keyboard.keyboardTheme = .automatic
@@ -291,6 +295,7 @@ enum SettingsSnapshotFixture {
         keyboard.haptics = true
         keyboard.emoji = true
         keyboard.swipeTyping = true
+        keyboard.swipeMoreLanguages = on
         let emojiUsage = EmojiUsageStore()
         emojiUsage.clear()
         if on {
@@ -306,11 +311,14 @@ enum SettingsSnapshotFixture {
         CustomVocabularySettings().isEnabled = on
         CustomVocabularySettings().terms = on ? ["OpenCode", "SwiftUI", "TestFlight"] : []
         DictationTranslationSettings().isEnabled = on
+        LiveDictationSettings().showsPreview = true
+        LiveDictationSettings().typesIntoField = on
         DictationTranslationSettings().targetLanguage = "ja"
         TypingJournalSettings().isEnabled = on
         TypingJournalSettings().learnsPerLanguage = on
         TypingLogSettings().isEnabled = on
         HinglishSettings().isEnabled = on
+        GreeklishSettings().isEnabled = on
         TwoLanguageDictationSettings().isEnabled = on
         AdaptiveTouchSettings().isEnabled = on
         // Settings scenes skip preparing a model, so this only draws the switch.

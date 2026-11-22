@@ -248,6 +248,13 @@ struct FullKeyboardSnapshotStage: View {
             : Color(red: 0xF5 / 255, green: 0xF6 / 255, blue: 0xF8 / 255)
         let darkKeyboard = darkApp || darkField
         let backdrop = FullKeyboardPalette(isDark: darkKeyboard).backdrop
+        let metrics = KeyboardMetrics.for(
+            .portrait, phoneSize: phoneSize, numberRow: FullKeyboardSettings().numberRow,
+            language: Self.layout, layer: layer
+        )
+        let searchHeight = state == "emoji-search" ? metrics.stripHeight : 0
+        // `--short-by 20` simulates a host that gives the keyboard less height, as in Spotlight.
+        let shortBy = Self.argument(after: "--short-by").flatMap(Double.init).map { CGFloat($0) } ?? 0
         return VStack(spacing: 0) {
             Spacer()
             Text(draft)
@@ -263,11 +270,7 @@ struct FullKeyboardSnapshotStage: View {
                 .padding(.horizontal, 14)
                 .padding(.bottom, 10)
             FullKeyboardFixture(state: state, draft: draft, darkKeyboard: darkKeyboard)
-                .frame(height: KeyboardLayout.height(
-                    for: .portrait, phoneSize: phoneSize,
-                    numberRow: FullKeyboardSettings().numberRow, language: Self.layout, layer: layer
-                )
-                    + (state == "emoji-search" ? KeyboardMetrics.portrait.stripHeight : 0))
+                .frame(height: metrics.totalHeight + searchHeight - shortBy)
                 .background(Color(uiColor: backdrop).ignoresSafeArea(edges: .bottom))
         }
         .background(canvas.ignoresSafeArea())
@@ -339,8 +342,6 @@ private struct FullKeyboardFixture: UIViewRepresentable {
         }
 
         DictationLanguageFixture.apply(to: model)
-        // `--typing-log-mark`: Record typing logs is recording this field.
-        model.isLoggingTyping = ProcessInfo.processInfo.arguments.contains("--typing-log-mark")
         let view = FullKeyboardView(model: model, target: context.coordinator.target)
         if FullKeyboardSnapshotStage.layout == .khmer { view.emojiOverride = true }
         if state.hasPrefix("emoji") {
@@ -363,6 +364,8 @@ private struct FullKeyboardFixture: UIViewRepresentable {
 
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
             switch state {
+            case "paste-notice":
+                view.showAllowPasteHint()
             case "pressed":
                 view.debugPress("g")
             case "accents":
@@ -401,6 +404,28 @@ private struct FullKeyboardFixture: UIViewRepresentable {
                 view.engine.touchEnded(id: 903, at: center(of: .shift, in: view))
             case "inserted":
                 view.didInsertDictation("should be home by 7:30. Start without me.")
+            // The bar's other states, set on the strip directly: a revert, Paste, Paste dictation,
+            // Code from Messages (with and without a copied code) and the two-thumb selection.
+            case "strip-revert":
+                view.stripView.update(suggestions: [
+                    KeyboardSuggestion(displayText: "teh", replacement: "teh", kind: .revert),
+                    KeyboardSuggestion(displayText: "then", replacement: "then", kind: .secondary),
+                    KeyboardSuggestion(displayText: "tech", replacement: "tech", kind: .secondary),
+                ], showsUndo: false, statusText: nil)
+            case "strip-two":
+                view.stripView.update(suggestions: [
+                    KeyboardSuggestion(displayText: "\u{201C}lol\u{201D}", replacement: "lol", kind: .keepLiteral),
+                    KeyboardSuggestion(displayText: "lot", replacement: "lot", kind: .secondary),
+                ], showsUndo: false, statusText: nil)
+            case "strip-paste":
+                view.stripView.update(suggestions: [], showsUndo: false, statusText: nil, clipboard: .paste)
+            case "strip-paste-dictation":
+                view.stripView.update(suggestions: [], showsUndo: false, statusText: nil, clipboard: .dictation)
+            case "strip-code":
+                view.stripView.update(suggestions: [], showsUndo: false, statusText: nil, clipboard: .code(canPaste: true))
+            case "strip-selection":
+                view.stripView.isHidden = true
+                view.selectionStrip.update(TrackpadSelectionSession.Presentation(phase: .actions, before: "Running 10 ", selected: "min late", after: ", home by"), canUseClipboard: true)
             case "emoji":
                 view.debugOpenEmoji()
             case "emoji-search":

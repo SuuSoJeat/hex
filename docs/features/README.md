@@ -1892,6 +1892,7 @@ Hex checks the release service            // maintain.updates
 ├── macOS location not replaceable (read-only, translocated, root-owned) -> Download update (DMG)
 ├── Package manager (pacman, Nix) -> its command, once it serves another version
 ├── Source build, test build -> never checks
+├── `HEX_X86_BASELINE=ivybridge` source build (2012 floor) -> source build: never checks; official artifacts target x86-64-v3
 └── Failure -> keep the running version, back off, Check for updates retries
 
 Check for updates pressed (footer, menu bar, app menu)   // maintain.update-feedback (#1120)
@@ -2895,11 +2896,23 @@ Windows `hex app` -> one tray process, Rune window // dev.rune-ui-windows
 ├── Modes app icons: the executable's first icon (PrivateExtractIconsW)
 └── Not yet: custom caption
 iOS prototype (`HEXMobile`) -> Record/transcribe/copy and keyboard handoff
+├── Speech model preparation: launch dictates with Apple Speech on iOS 26 (an OS
+│   asset, no app download) or Parakeet V2; a preparation that says nothing for 30 s, or
+│   nothing new for 120 s, ends as "The speech model isn't ready. Try again." (time iOS
+│   has Hex suspended doesn't count), so "Checking the speech model" cannot stay at 0%
+│   forever. Apple's reservation and asset status are watched at 60 s the same way, a
+│   reservation or release that never answers is forgotten, and a keyboard check that
+│   hangs counts no strike toward Hex's handoff. The keyboard's own check has its own 30 s
+│   limit, retries after a real background trip, and a late answer can't reopen it. Unit
+│   tests only (`DictationControllerTests`, `SpeechModelInstallTests`,
+│   `AppleSpeechAssetReservationsTests`); no physical iPhone run checks either deadline.
 ├── Experiments: Full keyboard, Apple Intelligence cleanup, Custom vocabulary,
-│   Hinglish, Two-language dictation, Adaptive touch, German spatial autocorrect,
-│   Korean keyboard (두벌식), ABC under the emoji key, Keyboard themes (Black, White,
-│   Navy, Forest, Ember), Two-thumb selection, Delete swiped words letter by letter,
-│   Hide word suggestions, Join the keyboard when unfolded, Learn each language separately
+│   Hinglish, Greeklish, Two-language dictation, Adaptive touch, German spatial autocorrect,
+│   Swipe typing in more languages, Korean keyboard (두벌식), Dvorak punctuation keys, Comma
+│   and period keys, Quick accents, Emoji shortcodes, ABC under the emoji key, Keyboard
+│   themes (Black, White, Navy, Forest, Ember), Two-thumb selection, Delete swiped words
+│   letter by letter, Hide word suggestions, Join the keyboard when unfolded, Learn each
+│   language separately
 ├── Full keyboard's languages (Settings › Keyboard › Languages, with Full chosen): one or
 │   more layouts, the space bar names the current one and a slide switches letters, accents
 │   and autocorrect, and the input mode reports the language typing
@@ -3012,6 +3025,23 @@ iOS prototype (`HEXMobile`) -> Record/transcribe/copy and keyboard handoff
 │   host that removes one code point per call (some Devanagari and Thai clusters) can leave
 │   fragments. Off, a second finger is ignored exactly as before.
 │   Unit tests only: no CI compiles the iOS targets, and no physical iPhone run checks it
+├── Swipe typing in more languages (off by default, `experiments.swipeMoreLanguages`): with
+│   Settings › Keyboard › Swipe typing on, a swipe reads the layout language's own word list
+│   wherever one is bundled, not only English and Spanish: also French (France), Polish, and
+│   German while Spatial autocorrect and German spatial autocorrect are on. A language with
+│   no typing model keeps a drag as a slide to another key. Off, only English and Spanish
+│   swipe, exactly as before.
+│   Gaps:
+│   - A word with ß (German) or œ/æ (French) has no key, so a swipe drops it from its
+│     candidates ("groß", "Straße", "cœur").
+│   - A swiped German noun goes in lowercase: the noun capitalisation applies to tapped
+│     words only.
+│   - French and Polish have no language-specific never-suggest rows (only the shared
+│     ones), so a swipe's top reading isn't filtered for language-specific offensive words
+│     there.
+│   - The decoder's parameters are tuned on English and Spanish, so French, Polish and
+│     German accuracy is unmeasured.
+│   Unit tests only: no CI compiles the iOS targets, and no physical iPhone run checks it
 ├── Delete swiped words letter by letter (off by default, `experiments.swipeDeleteLetterByLetter`):
 │   right after a swipe, delete acts as anywhere else and takes one character, instead of the
 │   whole swiped word and the space the swipe added before it (#2321). The swipe's record
@@ -3034,6 +3064,64 @@ iOS prototype (`HEXMobile`) -> Record/transcribe/copy and keyboard handoff
 │   when the globe shows, space after them, return from m). Apple's Split Keyboard
 │   preference can't be read by a keyboard extension. Off, the split keyboard is unchanged.
 │   Unit tests only: no CI compiles the iOS targets, and no physical iPhone run checks it
+├── Dvorak punctuation keys (off by default, `experiments.dvorakPunctuation`): English's Dvorak
+│   letters gain comma and period ahead of P on row 1, whose nine keys narrow to start at the
+│   left margin and end at the same delete key, and a semicolon just left of the space bar,
+│   a letter wide (`referenceW`), only where the bar still holds a letter-wide space; on the
+│   Duo's split keyboard only the left half takes the two punctuation keys, on a pitch narrowed
+│   so the half keeps its right edge (its top-row keys are narrower than the right half's), and
+│   the semicolon takes from the left space bar, which keeps ending where it did. They type
+│   < > : with a shift you press or caps lock; auto-capitalization leaves the comma. A URL or
+│   email field keeps its own `.` key rather than a second key of the same kind. With the
+│   experiment off, every layout is key for key the one it was; a docked iPad keeps Apple's own
+│   rows. Adaptive touch learns the narrower key plane apart from Apple's Dvorak.
+│   Unit tests only (`KeyboardLayoutTests`, `FullKeyboardEngineTests`): no CI compiles the iOS
+│   targets, and no physical iPhone run checks it
+├── Comma and period keys (off by default, `experiments.commaPeriodKeys`): a comma just left
+│   of the space bar and a period just right of it, both a letter wide, on an iPhone's letters
+│   page in a plain text field. On the joined keyboard the comma starts where the bar used to
+│   start and the period ends where it used to end, the bar moving inward at both ends; on the
+│   Duo's split keyboard the comma takes from the left half's bar and the period from the right
+│   half's, each bar keeping its inner edge. Neither is added unless the bar still holds a
+│   letter-wide space after them (on an upright iPhone showing both the globe and emoji keys
+│   with the Hex key beside space there isn't room, so they're skipped). They type `,` and
+│   `.` with shift on too. The 123 and #+= pages, a URL or email field (which keeps its own
+│   `.`), an iPad, and English's Dvorak letters while Dvorak punctuation already puts both on
+│   row 1 are unchanged; off, every layout is key for key the one it was.
+│   Unit tests only (`KeyboardLayoutTests`, `FullKeyboardEngineTests`): no CI compiles the iOS
+│   targets, and no physical iPhone run checks it
+├── Quick accents (off by default, `experiments.quickAccents`): a held letter's callout opens
+│   on the language's preferred accent (`KeyboardLanguage.quickAccentPrimaries`: Spanish o →
+│   ó, English e → é, Italian a → à, capitals via the callout's own mapping), else the first
+│   variant after the key's own where it has no entry, found where the arrangement put it, so
+│   letting go in place types it. The cell under the finger at opening (`accentOpenCell`) is
+│   remembered, so the preselection stands until the finger moves into another cell, where
+│   sliding picks that one as before; letting go far below still cancels, and another key
+│   going down while the callout is held commits the preselection. Letters only: the 123 and
+│   #+= pages' held symbols, and the mark keys ˇ and ʼ, keep the key's own selected. Off, the
+│   callout opens on the key's own, as before.
+│   Unit tests only (`FullKeyboardEngineTests`): no CI compiles the iOS targets, and no
+│   physical iPhone run checks it
+├── Emoji shortcodes (off by default, `experiments.emojiShortcodes`): in a plain text field
+│   that takes emoji (the emoji key shows), with autocorrect on and secure entry off, while
+│   the full keyboard's text before the cursor ends in a colon and a name after whitespace or
+│   at the start of the field (":pizza": the first character a letter or digit, at least two
+│   letters or digits, then only a-z, 0-9, "_", "+" and "-", case-insensitive), the strip
+│   shows up to three emoji the bundled index names (`EmojiShortcode`, over `EmojiLibrary`
+│   and scripts/build-emoji-data.py's data) instead of its words: an exact name or alias
+│   first, then the names and keywords the token starts, one per family; your emoji use breaks
+│   exact ties and moves prefix matches up. A tap takes the whole token back and types the
+│   emoji with its skin tone, counted like one from the panel; typing the closing ":" of a
+│   name typed in full (":pizza:") types the emoji instead. The emoji search, fields with
+│   autocorrect off and secure fields get neither. No match leaves the strip and typing as
+│   they were, a colon inside a word ("abc:pizza") is not a token, and off, nothing changes.
+│   The setting is in the App Group, and without Full Access it reads off. Only names the
+│   index weighs as names or aliases complete: ":heart:", ":joy:" and ":tada:" are keywords
+│   in the data and stay text, and ":smile:" completes to 😊, its first alias, not 😄; adding
+│   them needs more aliases and a regenerated index, which scripts/build-emoji-data.py can't
+│   make from the repo alone (Unicode's emoji-test.txt 18.0 and CLDR 49 are not in the repo).
+│   Unit tests only (`EmojiShortcodeTests`): no CI compiles the iOS targets, and no physical
+│   iPhone run checks it
 ├── Learn each language separately (off by default, `experiments.learnPerLanguage`):
 │   every typing correction and dictation fix is tagged with the language it was typed
 │   or dictated in; on, the keys learn a language's typos and rejections from that

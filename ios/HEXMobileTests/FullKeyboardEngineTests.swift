@@ -754,6 +754,180 @@ final class FullKeyboardEngineTests: XCTestCase {
         XCTAssertEqual(engine.shift.state, .locked)
     }
 
+    /// Settings › Experiments › Dvorak punctuation keys: on English's Dvorak letters the three
+    /// keys type `<`, `>` and `:` while shift is on, their keycaps and pop-ups read so, one-shot
+    /// shift turns off after one as it does for a letter, and caps lock keeps them shifted.
+    func testDvorakPunctuationTypesShiftedSymbols() throws {
+        engine.width = 402
+        engine.letterLayout = .dvorak
+        XCTAssertNil(engine.layout.key(.character(",")), "off: Apple's seven-letter row 1")
+        engine.dvorakPunctuation = true
+        XCTAssertEqual(engine.layout.letters, .dvorak)
+        let comma = try XCTUnwrap(engine.layout.key(.character(",")))
+        let period = try XCTUnwrap(engine.layout.key(.character(".")))
+        let semicolon = try XCTUnwrap(engine.layout.key(.character(";")))
+        XCTAssertEqual(comma.shifted, "<")
+        XCTAssertEqual(period.shifted, ">")
+        XCTAssertEqual(semicolon.shifted, ":")
+        XCTAssertEqual(comma.row, 0)
+        XCTAssertEqual(period.row, 0)
+        XCTAssertEqual(semicolon.row, 3)
+        XCTAssertEqual(engine.keycapLabel(for: comma), ",")
+        XCTAssertEqual(engine.displayLabel(for: comma), ",")
+        XCTAssertEqual(engine.keycapLabel(for: semicolon), ";")
+        tap(.shift)
+        XCTAssertEqual(engine.keycapLabel(for: comma), "<")
+        XCTAssertEqual(engine.displayLabel(for: comma), "<")
+        XCTAssertEqual(engine.keycapLabel(for: period), ">")
+        XCTAssertEqual(engine.displayLabel(for: period), ">")
+        XCTAssertEqual(engine.keycapLabel(for: semicolon), ":")
+        XCTAssertEqual(engine.displayLabel(for: semicolon), ":")
+        tap(.character(","))
+        XCTAssertEqual(target.text, "<")
+        XCTAssertEqual(engine.shift.state, .off, "one-shot, as after a letter")
+        XCTAssertEqual(engine.keycapLabel(for: comma), ",")
+        tap(.character("."))
+        tap(.character(";"))
+        XCTAssertEqual(target.text, "<.;")
+        tap(.shift)
+        now += 0.1
+        tap(.shift)
+        XCTAssertEqual(engine.shift.state, .locked)
+        tap(.character(","))
+        tap(.character("."))
+        tap(.character(";"))
+        XCTAssertEqual(target.text, "<.;<>:")
+        XCTAssertEqual(engine.shift.state, .locked, "caps lock stays on")
+        XCTAssertEqual(engine.keycapLabel(for: semicolon), ":")
+        // The narrower row 1 is its own key plane for Adaptive touch: what it learns stays there.
+        let punctuation = try XCTUnwrap(AdaptiveTouchGeometry(layout: engine.layout)).key
+        engine.dvorakPunctuation = false
+        XCTAssertNotEqual(try XCTUnwrap(AdaptiveTouchGeometry(layout: engine.layout)).key, punctuation)
+    }
+
+    /// Settings › Experiments › Dvorak punctuation keys: a URL or email field already has its own
+    /// `.` key on the bottom row, so its Dvorak row 1 stays Apple's rather than have two keys
+    /// that type the same character, while the semicolon still joins the space bar.
+    func testDvorakPunctuationKeepsFieldsOwnPeriodKey() throws {
+        engine.width = 402
+        engine.letterLayout = .dvorak
+        engine.dvorakPunctuation = true
+        for keyboardType in [UIKeyboardType.URL, .emailAddress] {
+            target.keyboardType = keyboardType
+            engine.configureForField()
+            XCTAssertNotEqual(engine.layout.field, .text, "\(keyboardType.rawValue)")
+            XCTAssertEqual(engine.layout.keys.filter { $0.kind == .character(".") }.count, 1, "the field's own . only")
+            XCTAssertNil(engine.layout.key(.character(",")), "row 1 stays Apple's")
+            XCTAssertEqual(engine.layout.key(.character("."))?.row, 3)
+            XCTAssertEqual(engine.layout.key(.character(";"))?.shifted, ":")
+            XCTAssertEqual(engine.layout.key(.character(";"))?.row, 3)
+        }
+    }
+
+    /// Settings › Experiments › Dvorak punctuation keys: auto-capitalization's shift types no
+    /// symbols — a comma at a sentence's start stays a comma, and its keycap reads so — while a
+    /// shift you press, or caps lock, types `<`, and the semicolon `:`.
+    func testDvorakPunctuationFollowsAUserShiftNotAutoCapitalization() throws {
+        engine.width = 402
+        engine.letterLayout = .dvorak
+        engine.dvorakPunctuation = true
+        target.autocapitalizationType = .sentences
+        engine.configureForField()
+        let comma = try XCTUnwrap(engine.layout.key(.character(",")))
+        XCTAssertEqual(engine.shift.state, .on, "the field's first sentence")
+        XCTAssertFalse(engine.shift.isUserShift)
+        XCTAssertEqual(engine.keycapLabel(for: comma), ",")
+        XCTAssertEqual(engine.displayLabel(for: comma), ",")
+        tap(.character(","))
+        XCTAssertEqual(target.text, ",")
+        XCTAssertEqual(engine.shift.state, .off)
+
+        type("ok. ")
+        XCTAssertEqual(target.text, ",ok. ")
+        XCTAssertEqual(engine.shift.state, .on, "after a sentence")
+        XCTAssertFalse(engine.shift.isUserShift)
+        tap(.character(","))
+        XCTAssertEqual(target.text, ",ok. ,")
+
+        tap(.shift)
+        XCTAssertTrue(engine.shift.isUserShift)
+        XCTAssertEqual(engine.keycapLabel(for: comma), "<")
+        tap(.character(","))
+        XCTAssertEqual(target.text, ",ok. ,<")
+        XCTAssertEqual(engine.shift.state, .off, "one-shot")
+
+        tap(.shift)
+        now += 0.1
+        tap(.shift)
+        XCTAssertEqual(engine.shift.state, .locked)
+        XCTAssertTrue(engine.shift.isUserShift)
+        XCTAssertEqual(engine.keycapLabel(for: comma), "<")
+        tap(.character(";"))
+        XCTAssertEqual(target.text, ",ok. ,<:")
+    }
+
+    /// Settings › Experiments › Comma and period keys: the flag rebuilds the layout with a comma
+    /// just left of the space bar and a period just right of it, which type themselves (shift
+    /// leaves them as they are), and only on an iPhone's letters page in a text field.
+    func testCommaAndPeriodKeysTypeByTheSpaceBar() throws {
+        engine.width = 402
+        XCTAssertFalse(engine.layout.commaPeriodKeys)
+        XCTAssertNil(engine.layout.key(.character(",")))
+        XCTAssertNil(engine.layout.key(.character(".")))
+        engine.commaPeriodKeys = true
+        XCTAssertTrue(engine.layout.commaPeriodKeys)
+        let comma = try XCTUnwrap(engine.layout.key(.character(",")))
+        let period = try XCTUnwrap(engine.layout.key(.character(".")))
+        let space = try XCTUnwrap(engine.layout.key(.space))
+        XCTAssertEqual(comma.row, 3)
+        XCTAssertEqual(period.row, 3)
+        XCTAssertNil(comma.shifted)
+        XCTAssertNil(period.shifted)
+        let gap = engine.layout.metrics.gap
+        XCTAssertEqual(comma.frame.maxX + gap, space.frame.minX, accuracy: 0.001)
+        XCTAssertEqual(space.frame.maxX + gap, period.frame.minX, accuracy: 0.001)
+        XCTAssertEqual(engine.keycapLabel(for: comma), ",")
+        XCTAssertEqual(engine.displayLabel(for: period), ".")
+        tap(.character(","))
+        XCTAssertEqual(target.text, ",")
+        tap(.character("."))
+        XCTAssertEqual(target.text, ",.")
+        tap(.shift)
+        XCTAssertEqual(engine.keycapLabel(for: comma), ",", "no shifted symbols")
+        XCTAssertEqual(engine.displayLabel(for: period), ".")
+        tap(.character(","))
+        tap(.character("."))
+        XCTAssertEqual(target.text, ",.,.")
+        XCTAssertEqual(engine.shift.state, .off, "one-shot, as after any character")
+
+        // The 123 page keeps its own punctuation row, so neither key sits on its bottom row.
+        tap(.layerSwitch(.numbers))
+        XCTAssertNil(engine.layout.keys.first { $0.row == 3 && $0.kind == .character(",") })
+        XCTAssertNil(engine.layout.keys.first { $0.row == 3 && $0.kind == .character(".") })
+        tap(.layerSwitch(.letters))
+        for keyboardType in [UIKeyboardType.URL, .emailAddress] {
+            target.keyboardType = keyboardType
+            engine.configureForField()
+            XCTAssertNotEqual(engine.layout.field, .text, "\(keyboardType.rawValue)")
+            XCTAssertNil(engine.layout.key(.character(",")), "no comma key")
+            XCTAssertEqual(engine.layout.keys.filter { $0.kind == .character(".") }.count, 1, "the field's own .")
+            XCTAssertEqual(engine.layout.key(.character("."))?.row, 3)
+        }
+        target.keyboardType = .default
+        engine.configureForField()
+        engine.pad = .docked(.mini)
+        XCTAssertFalse(engine.layout.commaPeriodKeys)
+        XCTAssertNil(engine.layout.keys.first { $0.row == 3 && $0.kind == .character(",") }, "an iPad keeps Apple's bottom row")
+        XCTAssertNil(engine.layout.keys.first { $0.row == 3 && $0.kind == .character(".") })
+        XCTAssertEqual(engine.layout.key(.character(","))?.row, 2, "the docked iPad's own pair")
+        engine.pad = nil
+        engine.letterLayout = .dvorak
+        engine.dvorakPunctuation = true
+        XCTAssertFalse(engine.layout.commaPeriodKeys, "Dvorak punctuation already has both on row 1")
+        XCTAssertEqual(engine.layout.key(.character(","))?.row, 0)
+        XCTAssertEqual(engine.layout.key(.character(";"))?.row, 3)
+    }
+
     func testHoldNumbersSlideToADigitAndLetGo() {
         down(1, .layerSwitch(.numbers))
         XCTAssertEqual(engine.layout.layer, .numbers)
@@ -952,6 +1126,86 @@ final class FullKeyboardEngineTests: XCTestCase {
         XCTAssertEqual(engine.shift.state, .off)
     }
 
+    /// Settings › Experiments › Quick accents: a held letter's callout opens on its language's
+    /// preferred accent (Spanish O's ó, though the callout lists ö first), so letting go where
+    /// it opened types it, sliding into another cell still picks that one, and another key
+    /// going down commits the preselection too. Letting go far below still cancels. Off, the
+    /// key's own stays selected, as before.
+    func testQuickAccentsOpensOnTheMainAccentAndTypesItOnRelease() {
+        engine.language = .spanish
+        XCTAssertFalse(FullKeyboardSettings(defaults: defaults).quickAccents, "off by default")
+        engine.quickAccentsEnabled = true
+
+        down(1, .character("o"))
+        XCTAssertTrue(engine.openAccentMenuIfEligible(forTouch: 1))
+        XCTAssertEqual(engine.activeAccentMenu?.selectedOption, "ó", "o's preferred accent, not the callout's ö")
+        // A finger that hasn't left the cell it opened over leaves the preselection alone.
+        engine.touchMoved(id: 1, to: point(.character("o")))
+        XCTAssertEqual(engine.activeAccentMenu?.selectedOption, "ó")
+        up(1, .character("o"))
+        XCTAssertEqual(target.text, "ó")
+
+        // Sliding into another cell still picks it.
+        down(2, .character("e"))
+        XCTAssertTrue(engine.openAccentMenuIfEligible(forTouch: 2))
+        let menu = try! XCTUnwrap(engine.activeAccentMenu)
+        XCTAssertEqual(menu.selectedOption, "é")
+        let cell = menu.cellFrames[menu.options.firstIndex(of: "è")!]
+        engine.touchMoved(id: 2, to: CGPoint(x: cell.midX, y: cell.midY))
+        engine.touchEnded(id: 2, at: CGPoint(x: cell.midX, y: cell.midY))
+        XCTAssertEqual(target.text, "óè")
+
+        // Another key going down while the callout is held commits what it preselected.
+        down(3, .character("a"))
+        XCTAssertTrue(engine.openAccentMenuIfEligible(forTouch: 3))
+        down(4, .character("b"))
+        up(4, .character("b"))
+        up(3, .character("a"))
+        XCTAssertEqual(target.text, "óèáb")
+
+        // Capitals use the callout's own uppercase mapping.
+        tap(.shift)
+        down(5, .character("a"))
+        XCTAssertTrue(engine.openAccentMenuIfEligible(forTouch: 5))
+        XCTAssertEqual(engine.activeAccentMenu?.selectedOption, "Á")
+        up(5, .character("a"))
+        XCTAssertEqual(target.text, "óèábÁ")
+
+        engine.quickAccentsEnabled = false
+        down(6, .character("a"))
+        XCTAssertTrue(engine.openAccentMenuIfEligible(forTouch: 6))
+        XCTAssertEqual(engine.activeAccentMenu?.selectedOption, "a", "off: the key's own, as before")
+        up(6, .character("a"))
+        XCTAssertEqual(target.text, "óèábÁa")
+
+        // English e picks é too, though its callout lists ë first.
+        engine.language = .english
+        engine.quickAccentsEnabled = true
+        down(7, .character("e"))
+        XCTAssertTrue(engine.openAccentMenuIfEligible(forTouch: 7))
+        XCTAssertEqual(engine.activeAccentMenu?.selectedOption, "é")
+        up(7, .character("e"))
+        XCTAssertEqual(target.text, "óèábÁaé")
+
+        // Letting go far below still cancels the preselection, typing nothing.
+        engine.language = .spanish
+        let o = point(.character("o"))
+        down(8, .character("o"))
+        XCTAssertTrue(engine.openAccentMenuIfEligible(forTouch: 8))
+        XCTAssertEqual(engine.activeAccentMenu?.selectedOption, "ó")
+        engine.touchEnded(id: 8, at: CGPoint(x: o.x, y: o.y + FullKeyboardEngine.accentCancelDrop + 5))
+        XCTAssertNil(engine.activeAccentMenu)
+        XCTAssertEqual(target.text, "óèábÁaé")
+
+        // The 123 page's held symbols keep the key's own selected.
+        tap(.layerSwitch(.numbers))
+        down(9, .character("1"))
+        XCTAssertTrue(engine.openAccentMenuIfEligible(forTouch: 9))
+        XCTAssertEqual(engine.activeAccentMenu?.selectedOption, "1")
+        up(9, .character("1"))
+        XCTAssertEqual(target.text, "óèábÁaé1")
+    }
+
     func testSpacebarTrackpadMovesCaretWithoutInsertingSpace() {
         type("helo")
         let spaceStart = point(.space)
@@ -1146,7 +1400,7 @@ final class FullKeyboardEngineTests: XCTestCase {
         view.switchLanguage(by: 1)
         XCTAssertEqual(view.engine.language, .polish)
         XCTAssertEqual(view.plane.spaceLabel, "Polski")
-        XCTAssertNil(view.engine.autocorrect.decoder, "no Polish typing model: the dictionary engine")
+        XCTAssertEqual(view.engine.autocorrect.decoder?.model.language, "pl", "Polish reads its own typing model")
         XCTAssertEqual(settings.keyboardDictationLanguage(), "pl-PL")
         XCTAssertEqual(picked, [], "Automatic already follows")
         var id = 400
@@ -1905,8 +2159,8 @@ final class FullKeyboardEngineTests: XCTestCase {
         XCTAssertNotNil(engine.layout.key(.character("ü")))
     }
 
-    /// Spatial autocorrect has English and Spanish models only: Italian falls back to the
-    /// dictionary engine in Italian, never to the English model.
+    /// Spatial autocorrect has English, Spanish and French models only: Italian falls back to
+    /// the dictionary engine in Italian, never to the English model, and French reads its own.
     func testSpatialAutocorrectNeverUsesAnotherLanguagesModel() {
         let settings = FullKeyboardSettings()
         let wasOn = settings.spatialAutocorrect
@@ -1918,9 +2172,15 @@ final class FullKeyboardEngineTests: XCTestCase {
         view.languageOverride = .italian
         XCTAssertEqual(view.engine.autocorrect.language, .italian)
         XCTAssertNil(view.engine.autocorrect.decoder)
-        // Nor do Russian, Serbian (Latin) and French; nor do English's or Spanish's
-        // next-letter odds move French targets (AZERTY's letters aren't theirs).
-        for language in [KeyboardLanguage.russian, .ukrainian, .greek, .polish, .romanian, .serbianLatin, .french, .frenchCanadian, .frenchSwiss] {
+        // Nor do Russian, Serbian (Latin), and Canada's and Switzerland's French, which have no
+        // model of their own yet; nor do English's or Spanish's next-letter odds move their
+        // targets. French (France) and Polish read their own models, for the decoder and the letter odds.
+        for (language, code) in [(KeyboardLanguage.french, "fr"), (.polish, "pl")] {
+            view.languageOverride = language
+            XCTAssertEqual(view.engine.autocorrect.decoder?.model.language, code)
+            XCTAssertEqual(view.engine.letterOdds?.language, code)
+        }
+        for language in [KeyboardLanguage.russian, .ukrainian, .greek, .romanian, .serbianLatin, .frenchCanadian, .frenchSwiss] {
             view.languageOverride = language
             XCTAssertEqual(view.engine.autocorrect.language, language)
             XCTAssertNil(view.engine.autocorrect.decoder, "\(language)")
@@ -2378,24 +2638,19 @@ final class FullKeyboardEngineTests: XCTestCase {
             let panel = HexKeyRecordingPanel(loudness: { -62 })
             defer { panel.tearDown() }
             panel.hexOnLeading = onLeft
-            panel.showsLoggingMark = true
             panel.frame = CGRect(x: 0, y: 0, width: 393, height: 44)
             panel.layoutIfNeeded()
             let done = try XCTUnwrap(panel.subviews.first { $0.accessibilityLabel == "Done" })
             let cancel = try XCTUnwrap(panel.subviews.first { $0.accessibilityLabel == "Cancel dictation" })
             let well = try XCTUnwrap(panel.subviews.first { $0.subviews.contains(panel.scope) })
-            let mark = try XCTUnwrap(panel.subviews.first { $0 is TypingLogMarkView })
             if onLeft {
                 XCTAssertEqual(done.frame.minX, KeyboardMetrics.portrait.side, accuracy: 0.5)
                 XCTAssertLessThan(done.frame.maxX, cancel.frame.minX)
                 XCTAssertLessThan(cancel.frame.maxX, well.frame.minX)
-                XCTAssertGreaterThan(mark.frame.minX, well.frame.midX, "the mark at the well's far end")
-                XCTAssertLessThanOrEqual(well.frame.minX + panel.scope.frame.maxX, mark.frame.minX)
             } else {
                 XCTAssertEqual(done.frame.maxX, 393 - KeyboardMetrics.portrait.side, accuracy: 0.5)
                 XCTAssertLessThan(cancel.frame.maxX, done.frame.minX)
                 XCTAssertLessThan(well.frame.maxX, cancel.frame.minX)
-                XCTAssertLessThan(mark.frame.maxX, well.frame.midX)
             }
         }
     }
@@ -2952,6 +3207,26 @@ final class FullKeyboardEngineTests: XCTestCase {
         XCTAssertEqual(field.text, "kubectl")
     }
 
+    /// Record typing logs: a word of someone's own in capitals took a swiped word's place.
+    /// "HELO" from Contacts outranks the model's "hello" (rarer in its books than your own words
+    /// cost), and "THE" takes the place of "the"; the swipe types "hello" and "the", the strip
+    /// offers "HELO", and caps lock still swipes it.
+    func testASwipeTypesTheOrdinaryWordAndOffersYourWordInCapitals() throws {
+        let (field, plane) = try swipeKeyboard()
+        plane.engine.autocorrect.loadLexiconEntries([("HELO", "HELO"), ("THE", "THE")])
+        swipe("hello", on: plane)
+        XCTAssertEqual(field.text, "hello")
+        XCTAssertTrue(plane.engine.suggestions.contains { $0.replacement == "HELO" }, "offered in the strip")
+        swipe("the", on: plane)
+        XCTAssertEqual(field.text, "hello the")
+        let (locked, capsKeys) = try swipeKeyboard()
+        capsKeys.engine.autocorrect.loadLexiconEntries([("HELO", "HELO")])
+        tap(.shift, on: capsKeys)
+        tap(.shift, on: capsKeys)
+        swipe("hello", on: capsKeys)
+        XCTAssertEqual(locked.text, "HELO", "caps lock")
+    }
+
     private func sample(_ point: CGPoint) -> TypingLogTouchSample {
         TypingLogTouchSample(point: point, timestamp: 0)
     }
@@ -3364,7 +3639,7 @@ final class FullKeyboardEngineTests: XCTestCase {
     }
 
     func testASwipedWordFollowsSpacingAndPunctuationAsApplesDoes() {
-        for (before, after) in [("Hi.", "Hi. "), ("(", "("), ("¿", "¿"), ("say \"", "say \""), ("3", "3 "), ("x\n", "x\n")] {
+        for (before, after) in [("Hi.", "Hi. "), ("(", "("), ("¿", "¿"), ("say \"", "say \""), ("3", "3 "), ("x\n", "x\n"), ("Look \u{FFFC}", "Look \u{FFFC}")] {
             XCTAssertEqual(SwipeTyping.needsSpace(before: before), after != before, before)
         }
         XCTAssertFalse(SwipeTyping.needsSpace(before: ""))
@@ -3464,8 +3739,8 @@ final class FullKeyboardEngineTests: XCTestCase {
         plane.engine.acceptSuggestion(pick)
         swipe("the", on: plane)
         swipe("bell", on: plane)
+        swipe("rang", on: plane)
         tap(.delete, on: plane)
-        swipe("bell", on: plane)
         swipe("will", on: plane)
         XCTAssertEqual(field.text, "hello \(pick.replacement) the bell will", "after a pick and a delete")
         tap(.layerSwitch(.numbers), on: plane)
@@ -3522,6 +3797,63 @@ final class FullKeyboardEngineTests: XCTestCase {
         tap(.character("s"), on: plane)
         tap(.delete, on: plane)
         XCTAssertEqual(field.text, "hell people ", "only right after the swipe; the space a tap brought stays")
+    }
+
+    /// Record typing logs: "two" swiped three times running for "yep", each deleted, while the
+    /// strip offered "yep". A word taken back right after its swipe isn't the next swipe's word
+    /// at that place: its next reading goes in, and the strip may still offer the word. Every
+    /// word taken back there counts; a letter typed in between forgets them; a swipe that reads
+    /// only as that word still types it; deleting it letter by letter takes it back too.
+    func testASwipeRightAfterItsWordWasDeletedTypesTheNextReading() throws {
+        func swipe(_ readings: [String], on plane: KeyboardKeyPlaneView) {
+            let key = plane.engine.layout.key(.character("t"))!
+            plane.engine.touchBegan(id: 93, at: CGPoint(x: key.frame.midX, y: key.frame.midY))
+            plane.engine.beginSwipe(touchID: 93)
+            plane.engine.endSwipe(typing: readings, points: 12, decodeTime: 0.001)
+        }
+        let readings = ["two", "yep", "tip"]
+        let (field, plane) = try swipeKeyboard("so")
+        swipe(readings, on: plane)
+        XCTAssertEqual(field.text, "so two")
+        tap(.delete, on: plane)
+        swipe(readings, on: plane)
+        XCTAssertEqual(field.text, "so yep", "the next reading")
+        XCTAssertTrue(plane.engine.suggestions.contains { $0.replacement == "two" }, "still offered in the strip")
+        tap(.delete, on: plane)
+        swipe(readings, on: plane)
+        XCTAssertEqual(field.text, "so tip", "neither word taken back here")
+        tap(.delete, on: plane)
+        tap(.character("a"), on: plane)
+        tap(.delete, on: plane)
+        swipe(readings, on: plane)
+        XCTAssertEqual(field.text, "so two", "a letter typed in between forgets them")
+        tap(.delete, on: plane)
+        swipe(["two"], on: plane)
+        XCTAssertEqual(field.text, "so two", "the only reading still goes in")
+
+        let (letters, keys) = try swipeKeyboard("so")
+        keys.engine.deletesSwipedWordsLetterByLetter = true
+        swipe(readings, on: keys)
+        for _ in 0..<4 { tap(.delete, on: keys) }
+        XCTAssertEqual(letters.text, "so")
+        swipe(readings, on: keys)
+        XCTAssertEqual(letters.text, "so yep", "every character the swipe typed taken out")
+        for _ in 0..<3 { tap(.delete, on: keys) }
+        XCTAssertEqual(letters.text, "so ")
+        swipe(readings, on: keys)
+        XCTAssertEqual(letters.text, "so tip", "or just its letters")
+    }
+
+    /// The same through the decoder: the same path swiped again after its word was deleted
+    /// types the reading the strip offered beside it.
+    func testTheSamePathSwipedAgainAfterADeleteTypesTheStripsReading() throws {
+        let (field, plane) = try swipeKeyboard()
+        swipe("hello", on: plane)
+        XCTAssertEqual(field.text, "hello")
+        let next = try XCTUnwrap(plane.engine.swipedWord?.alternatives.first)
+        tap(.delete, on: plane)
+        swipe("hello", on: plane)
+        XCTAssertEqual(field.text, next)
     }
 
     /// Settings › Experiments › Delete swiped words letter by letter (off by default): right
@@ -3689,6 +4021,69 @@ final class FullKeyboardEngineTests: XCTestCase {
         XCTAssertEqual(view.plane.swipe?.model.language, "es")
     }
 
+    /// Settings › Experiments › Swipe typing in more languages (off by default): on, a swipe
+    /// works in every language with a typing model, not only English and Spanish; off, French
+    /// keeps a drag as a slide to another key, as before.
+    func testSwipeTypingInMoreLanguagesFollowsTheLanguageSwitch() {
+        let settings = FullKeyboardSettings()
+        let wasMore = settings.swipeMoreLanguages
+        defer { settings.swipeMoreLanguages = wasMore }
+        let languages = LanguageSettings(defaults: defaults)
+        languages.keyboardLanguages = [.english, .french, .polish]
+
+        settings.swipeMoreLanguages = false
+        let off = FullKeyboardView(model: KeyboardViewModel(), target: target)
+        off.swipeOverride = true
+        off.languageOverride = .french
+        XCTAssertNil(off.plane.swipe, "off, French keeps a drag as a slide to another key")
+
+        settings.swipeMoreLanguages = true
+        let on = FullKeyboardView(model: KeyboardViewModel(), target: target)
+        on.languageSettings = languages
+        on.swipeOverride = true
+        XCTAssertEqual(on.engine.language, .english)
+        XCTAssertEqual(on.plane.swipe?.model.language, "en")
+        on.switchLanguage(by: 1)
+        XCTAssertEqual(on.engine.language, .french)
+        XCTAssertEqual(on.plane.swipe?.model.language, "fr")
+        on.switchLanguage(by: 1)
+        XCTAssertEqual(on.engine.language, .polish)
+        XCTAssertEqual(on.plane.swipe?.model.language, "pl")
+    }
+
+    /// German's swipe still waits on its own model: Swipe typing in more languages adds it only
+    /// with Spatial autocorrect and German spatial autocorrect on, as Spatial autocorrect does.
+    func testSwipeTypingInMoreLanguagesKeepsGermansModelGate() {
+        let settings = FullKeyboardSettings()
+        let wasMore = settings.swipeMoreLanguages
+        let wasSpatial = settings.spatialAutocorrect
+        let wasGerman = settings.germanSpatialAutocorrect
+        defer {
+            settings.swipeMoreLanguages = wasMore
+            settings.spatialAutocorrect = wasSpatial
+            settings.germanSpatialAutocorrect = wasGerman
+        }
+        settings.swipeMoreLanguages = true
+        settings.spatialAutocorrect = true
+        settings.germanSpatialAutocorrect = false
+        let withoutGerman = FullKeyboardView(model: KeyboardViewModel(), target: target)
+        withoutGerman.swipeOverride = true
+        withoutGerman.languageOverride = .german
+        XCTAssertNil(withoutGerman.plane.swipe, "the German experiment is off")
+
+        settings.germanSpatialAutocorrect = true
+        let german = FullKeyboardView(model: KeyboardViewModel(), target: target)
+        german.swipeOverride = true
+        german.languageOverride = .german
+        XCTAssertEqual(german.plane.swipe?.model.language, "de")
+
+        settings.spatialAutocorrect = false
+        let withoutSpatial = FullKeyboardView(model: KeyboardViewModel(), target: target)
+        withoutSpatial.swipeOverride = true
+        withoutSpatial.languageOverride = .german
+        XCTAssertNil(withoutSpatial.plane.swipe, "Spatial autocorrect is off")
+    }
+
     /// The input mode's language (`UIInputViewController.primaryLanguage`), which Apple
     /// documents as superseding the Info.plist's en-US: the keyboard reports the language
     /// resolved before the controller attaches, and each space-bar switch.
@@ -3720,14 +4115,14 @@ final class FullKeyboardEngineTests: XCTestCase {
             XCTAssertEqual(view.globeButton.actions(forTarget: view, forControlEvent: event), ["globeTouch:with:"])
         }
         for phase: UITouch.Phase in [.began, .moved, .ended, .cancelled] {
-            XCTAssertTrue(FullKeyboardView.passesGlobeTouch(phase: phase, onKey: true, leftKey: false, appleKeyboardSplits: false))
+            XCTAssertTrue(InputModeListTouch.passes(phase: phase, onKey: true, leftKey: false, appleKeyboardSplits: false))
         }
-        XCTAssertFalse(FullKeyboardView.passesGlobeTouch(phase: .ended, onKey: true, leftKey: false, appleKeyboardSplits: true), "a tap")
-        XCTAssertTrue(FullKeyboardView.passesGlobeTouch(phase: .began, onKey: true, leftKey: false, appleKeyboardSplits: true))
-        XCTAssertTrue(FullKeyboardView.passesGlobeTouch(phase: .moved, onKey: false, leftKey: true, appleKeyboardSplits: true))
-        XCTAssertTrue(FullKeyboardView.passesGlobeTouch(phase: .ended, onKey: false, leftKey: true, appleKeyboardSplits: true), "lifting over the list picks")
-        XCTAssertTrue(FullKeyboardView.passesGlobeTouch(phase: .ended, onKey: true, leftKey: true, appleKeyboardSplits: true))
-        XCTAssertTrue(FullKeyboardView.passesGlobeTouch(phase: .cancelled, onKey: true, leftKey: false, appleKeyboardSplits: true))
+        XCTAssertFalse(InputModeListTouch.passes(phase: .ended, onKey: true, leftKey: false, appleKeyboardSplits: true), "a tap")
+        XCTAssertTrue(InputModeListTouch.passes(phase: .began, onKey: true, leftKey: false, appleKeyboardSplits: true))
+        XCTAssertTrue(InputModeListTouch.passes(phase: .moved, onKey: false, leftKey: true, appleKeyboardSplits: true))
+        XCTAssertTrue(InputModeListTouch.passes(phase: .ended, onKey: false, leftKey: true, appleKeyboardSplits: true), "lifting over the list picks")
+        XCTAssertTrue(InputModeListTouch.passes(phase: .ended, onKey: true, leftKey: true, appleKeyboardSplits: true))
+        XCTAssertTrue(InputModeListTouch.passes(phase: .cancelled, onKey: true, leftKey: false, appleKeyboardSplits: true))
     }
 
     func testOnlyTheEnglishAndSpanishLayoutsSwipe() {
@@ -3860,15 +4255,61 @@ final class KeyboardClipboardTests: XCTestCase {
 
     func testAPasteThatAskedPointsToTheSettingAFewTimes() {
         let tracker = KeyboardClipboardTracker(defaults: defaults)
+        XCTAssertFalse(tracker.needsAllowPasteSetting)
         XCTAssertFalse(tracker.shouldPointToAllowPaste(readDuration: 0.01, refused: false), "Allow: iOS didn't ask")
+        XCTAssertFalse(tracker.needsAllowPasteSetting)
         for _ in 0..<KeyboardClipboardTracker.allowPasteHintLimit {
             XCTAssertTrue(tracker.shouldPointToAllowPaste(readDuration: 1.2, refused: false))
+            XCTAssertTrue(tracker.needsAllowPasteSetting)
         }
         XCTAssertFalse(
             KeyboardClipboardTracker(defaults: defaults).shouldPointToAllowPaste(readDuration: 1.2, refused: false),
             "after a few, Ask is left alone: someone may want it"
         )
+        XCTAssertTrue(tracker.needsAllowPasteSetting, "Hex's app page still remembers iOS prompted")
         XCTAssertTrue(tracker.shouldPointToAllowPaste(readDuration: 0.01, refused: true), "refused: the chip did nothing, always say why")
+    }
+
+    func testSilentCrossAppPasteClearsAllowPasteSettingButOwnCopyDoesNot() {
+        let pasteboard = UIPasteboard.withUniqueName()
+        defer { UIPasteboard.remove(withName: pasteboard.name) }
+        let tracker = KeyboardClipboardTracker(defaults: defaults)
+
+        XCTAssertTrue(tracker.shouldPointToAllowPaste(readDuration: 1.1, refused: false))
+        XCTAssertTrue(tracker.needsAllowPasteSetting)
+
+        // Hex's own copy never prompts iOS, so pasting it fast doesn't prove Allow is on.
+        pasteboard.string = "from hex"
+        tracker.markOwnedCopy(pasteboard: pasteboard)
+        tracker.recordSilentPaste(pasteboard: pasteboard)
+        XCTAssertTrue(tracker.needsAllowPasteSetting)
+
+        // A copy from another app pasted without prompting proves Paste from Other Apps is Allow.
+        pasteboard.string = "from opencode"
+        tracker.recordSilentPaste(pasteboard: pasteboard)
+        XCTAssertFalse(tracker.needsAllowPasteSetting)
+
+        // Dismissing hides the app banner until iOS prompts again.
+        XCTAssertTrue(tracker.shouldPointToAllowPaste(readDuration: 0.01, refused: true))
+        XCTAssertTrue(tracker.needsAllowPasteSetting)
+        tracker.dismissAllowPasteSetting()
+        XCTAssertFalse(tracker.needsAllowPasteSetting)
+    }
+
+    @MainActor
+    func testAllowPasteStripNoticeOpensPasteSettings() {
+        let model = KeyboardViewModel()
+        var opened: [URL] = []
+        model.onOpenURL = { opened.append($0) }
+        let view = FullKeyboardView(model: model, target: FixtureTextTarget())
+
+        XCTAssertNil(view.allowPasteNotice)
+        view.showAllowPasteHint()
+        XCTAssertEqual(view.allowPasteNotice, KeyboardClipboardTracker.allowPasteNotice)
+
+        view.stripView.onOpenNotice?()
+        XCTAssertNil(view.allowPasteNotice, "tapping Settings clears the strip notice")
+        XCTAssertEqual(opened, [KeyboardLaunchRequest.pasteSettings.url])
     }
 
     func testCodeFromMessagesNeedsApplesKeyboard() {
@@ -3878,7 +4319,7 @@ final class KeyboardClipboardTests: XCTestCase {
         func offer(appleKeyboard: Bool) -> KeyboardClipboardOffer? {
             tracker.offer(
                 textContentType: .oneTimeCode, keyboardType: .numberPad, autocorrectionType: .default, fieldIsEmpty: true,
-                hasFullAccess: true, hasAppleKeyboard: { appleKeyboard }, pasteboard: pasteboard
+                hasFullAccess: true, appleKeyboardRoute: { _ in appleKeyboard ? .next : nil }, pasteboard: pasteboard
             )
         }
         XCTAssertEqual(offer(appleKeyboard: true), .code(canPaste: false))
@@ -3889,7 +4330,7 @@ final class KeyboardClipboardTests: XCTestCase {
         XCTAssertEqual(
             tracker.offer(
                 textContentType: nil, keyboardType: .default, autocorrectionType: .default, fieldIsEmpty: true,
-                hasFullAccess: true, hasAppleKeyboard: { XCTFail("asked outside a code field"); return true }, pasteboard: pasteboard
+                hasFullAccess: true, appleKeyboardRoute: { _ in XCTFail("asked outside a code field"); return .next }, pasteboard: pasteboard
             ),
             .paste
         )
@@ -3904,7 +4345,7 @@ final class KeyboardClipboardTests: XCTestCase {
         func offer(canSwitch: Bool) -> KeyboardClipboardOffer? {
             tracker.offer(
                 textContentType: .oneTimeCode, keyboardType: .numberPad, autocorrectionType: .default, fieldIsEmpty: true,
-                hasFullAccess: true, canSwitchKeyboard: canSwitch, hasAppleKeyboard: { true }, pasteboard: pasteboard
+                hasFullAccess: true, canSwitchKeyboard: canSwitch, appleKeyboardRoute: { _ in .next }, pasteboard: pasteboard
             )
         }
         XCTAssertEqual(offer(canSwitch: true), .code(canPaste: false))
@@ -3927,7 +4368,7 @@ final class KeyboardClipboardTests: XCTestCase {
         ) -> KeyboardClipboardOffer? {
             tracker.offer(
                 textContentType: .oneTimeCode, keyboardType: keyboardType, autocorrectionType: autocorrection, fieldIsEmpty: empty,
-                hasFullAccess: true, hasAppleKeyboard: { true }, pasteboard: pasteboard
+                hasFullAccess: true, appleKeyboardRoute: { _ in .next }, pasteboard: pasteboard
             )
         }
         XCTAssertNil(offer(.default, .default), "a chat box with nothing copied: suggestions")
@@ -3950,6 +4391,45 @@ final class KeyboardClipboardTests: XCTestCase {
         XCTAssertFalse(KeyboardInputModes.hasAppleKeyboard([hex, emoji]))
         XCTAssertFalse(KeyboardInputModes.hasAppleKeyboard([hex]))
         XCTAssertFalse(KeyboardInputModes.hasAppleKeyboard([hex, hex, emoji]), "another third-party keyboard gets no code either")
+    }
+
+    /// TestFlight build 126: in Safari's one-time-code field the switch landed on Emoji or another
+    /// third-party keyboard about half the time; on a number pad it always reached Apple's. Where
+    /// it could miss, the chip opens iOS's keyboard list instead.
+    func testCodeFromMessagesOpensTheListWhereTheSwitchCouldMissApplesKeyboard() {
+        typealias Mode = KeyboardInputModes.Mode
+        let english = Mode(primaryLanguage: "en-US", className: "UIKeyboardInputMode")
+        let french = Mode(primaryLanguage: "fr-FR", className: "UIKeyboardInputMode")
+        let hex = Mode(primaryLanguage: "en-US", className: "UIKeyboardExtensionInputMode")
+        let other = Mode(primaryLanguage: "en-US", className: "UIKeyboardExtensionInputMode")
+        let emoji = Mode(primaryLanguage: "emoji", className: "UIKeyboardInputMode")
+        for modes in [[english, hex], [hex, english], [english, french, hex]] {
+            XCTAssertEqual(KeyboardInputModes.route(modes, numberPad: false), .next)
+            XCTAssertEqual(KeyboardInputModes.route(modes, numberPad: true), .next)
+        }
+        for modes in [[english, emoji, hex], [hex, emoji, english], [hex, other, english], [english, hex, other]] {
+            XCTAssertEqual(KeyboardInputModes.route(modes, numberPad: false), .list)
+            XCTAssertEqual(KeyboardInputModes.route(modes, numberPad: true), .next)
+        }
+        XCTAssertNil(KeyboardInputModes.route([hex, emoji], numberPad: true))
+
+        let pasteboard = UIPasteboard.withUniqueName()
+        defer { UIPasteboard.remove(withName: pasteboard.name) }
+        let tracker = KeyboardClipboardTracker(defaults: defaults)
+        func offer(_ keyboardType: UIKeyboardType, fullAccess: Bool = true) -> KeyboardClipboardOffer? {
+            tracker.offer(
+                textContentType: .oneTimeCode, keyboardType: keyboardType, autocorrectionType: .yes, fieldIsEmpty: true,
+                hasFullAccess: fullAccess, appleKeyboardRoute: { numberPad in
+                    KeyboardInputModes.route([english, emoji, hex], numberPad: numberPad)
+                }, pasteboard: pasteboard
+            )
+        }
+        XCTAssertEqual(offer(.default), .code(canPaste: false, opensList: true), "Safari's field with Emoji on")
+        XCTAssertEqual(offer(.numberPad), .code(canPaste: false))
+        XCTAssertEqual(offer(.default, fullAccess: false), .code(canPaste: false, opensList: true), "needs no Full Access")
+        pasteboard.string = "482913"
+        XCTAssertEqual(offer(.default), .code(canPaste: true, opensList: true))
+        XCTAssertEqual(offer(.numberPad, fullAccess: false), .code(canPaste: false), "no Paste without Full Access")
     }
 }
 

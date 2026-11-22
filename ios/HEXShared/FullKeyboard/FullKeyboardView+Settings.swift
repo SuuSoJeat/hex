@@ -41,4 +41,27 @@ extension FullKeyboardView {
         engine.joinsUnfoldedKeyboard = joins
         setNeedsLayout()
     }
+
+    /// Settings › Experiments › Dvorak punctuation keys: English's Dvorak letters gain comma,
+    /// period and semicolon keys. No row changes height, so the host is asked for nothing.
+    func syncDvorakPunctuation() {
+        let on = FullKeyboardSettings().dvorakPunctuation
+        guard engine.dvorakPunctuation != on else { return }
+        plane.cancelAllTouches()
+        dismissStyleMenu()
+        engine.dvorakPunctuation = on
+        setNeedsLayout()
+    }
+
+    /// Settings › Experiments › Comma and period keys: a comma and a period join the space bar
+    /// on an iPhone's letters page in a text field. No row changes height, so the host is asked
+    /// for nothing.
+    func syncCommaPeriodKeys() {
+        let on = FullKeyboardSettings().commaPeriodKeys
+        guard engine.commaPeriodKeys != on else { return }
+        plane.cancelAllTouches()
+        dismissStyleMenu()
+        engine.commaPeriodKeys = on
+        setNeedsLayout()
+    }
 }
