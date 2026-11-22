@@ -263,7 +263,7 @@ final class KeyboardLayoutTests: XCTestCase {
                 layouts.append(KeyboardLayout(width: 801, layer: layer, field: field, showsGlobe: true, showsEmoji: true, posture: .unfoldedWide, windowInset: 75))
             }
         }
-        for language in KeyboardLanguage.allCases {
+        for language in KeyboardLanguage.allCases where language != .khmer {
             layouts.append(KeyboardLayout(width: 801, language: language, posture: .unfoldedWide, windowInset: 75))
         }
         for layout in layouts {
@@ -426,7 +426,7 @@ final class KeyboardLayoutTests: XCTestCase {
             let emoji = layout.key(.emoji).flatMap { $0.row == 3 && layout.metrics.keyHeight >= 40 ? $0 : nil }
             var emojiSlot: CGRect?
             var rowTop = area.minY
-            for row in 0..<4 {
+            for row in 0..<layout.metrics.keyRowCount {
                 var keys = layout.keys.filter { $0.row == row }.sorted { $0.hitFrame.minX < $1.hitFrame.minX }
                 if row == 3, let emoji, let i = keys.firstIndex(where: { $0.kind == .emoji }) {
                     let slot = CGRect(x: keys[i - 1].hitFrame.maxX, y: rowTop, width: keys[i + 1].hitFrame.minX - keys[i - 1].hitFrame.maxX, height: area.maxY - rowTop)
@@ -496,6 +496,65 @@ final class KeyboardLayoutTests: XCTestCase {
                 XCTAssertGreaterThanOrEqual(balloon.bubble.width, key.frame.width)
             }
         }
+    }
+
+    func testKhmerismLaysOutEveryPageWithFiveRowsAndReachableControls() {
+        let screens: [(CGFloat, KeyboardOrientation, KeyboardPhoneSize, KeyboardPosture, CGFloat, KeyboardPadPlacement?)] = [
+            (320, .portrait, .regular, .phone, 0, .floating),
+            (375, .portrait, .homeButton, .phone, 0, nil),
+            (440, .portrait, .large, .phone, 0, nil),
+            (667, .landscape, .homeButton, .phone, 0, nil),
+            (452, .portrait, .regular, .cover, 7, nil),
+            (801, .portrait, .regular, .unfoldedWide, 75, nil),
+            (744, .portrait, .regular, .phone, 0, .docked(.mini)),
+        ]
+        for (width, orientation, phoneSize, posture, windowInset, pad) in screens {
+            for (layer, pages) in zip(layers, [KhmerismLayout.base, KhmerismLayout.numbers, KhmerismLayout.symbols]) {
+                let layout = KeyboardLayout(
+                    width: width, orientation: orientation, layer: layer, showsGlobe: true, showsEmoji: true,
+                    language: .khmer, posture: posture, windowInset: windowInset, phoneSize: phoneSize, pad: pad,
+                    numberRow: true
+                )
+                let label = "\(width) \(layer)"
+                XCTAssertFalse(layout.isSplit, label)
+                XCTAssertFalse(layout.hasNumberRow, label)
+                XCTAssertEqual(layout.totalHeight, KeyboardLayout.height(
+                    for: orientation, posture: posture, phoneSize: phoneSize, pad: pad, language: .khmer
+                ), accuracy: 0.001, label)
+                XCTAssertEqual(layout.bottomRowIndex, 4, label)
+                XCTAssertEqual(layout.key(.layerSwitch(.letters))?.label, "ខ្មែរ", label)
+                XCTAssertEqual(layout.key(.globe)?.row, 4, label)
+                XCTAssertEqual(layout.key(.emoji)?.row, 4, label)
+                XCTAssertEqual(layout.key(.returnKey)?.row, 4, label)
+                XCTAssertEqual(layout.key(.delete)?.row, 3, label)
+                let pageKey: KeyKind = layer == .letters ? .shift : .layerSwitch(layer == .numbers ? .symbols : .numbers)
+                XCTAssertEqual(layout.key(pageKey)?.row, 3, label)
+                for (row, page) in pages.enumerated() {
+                    XCTAssertEqual(letters(layout, row: row), page.map(\.text), label)
+                    let rowKeys = layout.keys.filter { $0.row == row }
+                    XCTAssertEqual(rowKeys.first?.hitFrame.minX, 0, label)
+                    XCTAssertEqual(rowKeys.last?.hitFrame.maxX ?? -1, width, accuracy: 0.001, label)
+                    for (left, right) in zip(rowKeys, rowKeys.dropFirst()) {
+                        XCTAssertEqual(left.hitFrame.maxX, right.hitFrame.minX, accuracy: 0.001, label)
+                    }
+                    for key in rowKeys {
+                        XCTAssertGreaterThan(key.frame.width, 20, "\(label) \(key.label)")
+                        XCTAssertEqual(layout.hitTest(CGPoint(x: key.frame.midX, y: key.frame.midY)), key, label)
+                    }
+                }
+            }
+        }
+    }
+
+    func testKhmerismFitsFiveRowsIntoAShorterView() {
+        let full = KeyboardLayout(width: 375, language: .khmer, phoneSize: .homeButton)
+        let height = full.totalHeight - 30
+        let short = KeyboardLayout(width: 375, language: .khmer, phoneSize: .homeButton, availableHeight: height)
+        XCTAssertEqual(short.totalHeight, height, accuracy: 0.001)
+        XCTAssertEqual(short.stripFrame, full.stripFrame)
+        XCTAssertEqual(short.key(.space)?.hitFrame.maxY ?? 0, height, accuracy: 0.001)
+        XCTAssertEqual(short.keys.map(\.kind), full.keys.map(\.kind))
+        XCTAssertTrue(short.keys.allSatisfy { $0.frame.maxY < height })
     }
 
     func testAccentMenusClampInwardAcrossEveryWidth() {
@@ -722,6 +781,7 @@ final class KeyboardLayoutTests: XCTestCase {
             .czech: [.own, .qwerty],
             .hungarian: [.own, .qwerty],
             .korean: [.own],
+            .khmer: [.own],
         ]
         for language in KeyboardLanguage.allCases {
             XCTAssertEqual(language.letterLayouts, offered[language], "\(language)")
@@ -2108,7 +2168,7 @@ final class KeyboardLayoutTests: XCTestCase {
             )
         }
         // Every language's rows fit the mini, upright and turned, and the 11- and 13-inch use them.
-        for language in KeyboardLanguage.allCases {
+        for language in KeyboardLanguage.allCases where language != .khmer {
             for letters in language.letterLayouts {
                 for (width, orientation, pad) in [(744.0, KeyboardOrientation.portrait, KeyboardPadPlacement.docked(.mini)), (1133, .landscape, .docked(.mini)), (834, .portrait, .docked(.medium)), (1376, .landscape, .docked(.large))] {
                     let layout = KeyboardLayout(width: width, orientation: orientation, showsGlobe: true, language: language, letters: letters, pad: pad)
@@ -2193,8 +2253,10 @@ final class KeyboardLayoutTests: XCTestCase {
                 continue
             }
             XCTAssertEqual(key.maxX, layout.width - layout.metrics.side, accuracy: 0.001, describe(layout))
-            XCTAssertEqual(key.width, (layout.orientation == .landscape ? 1.61 : 1.679) * (layout.width - 2 * layout.metrics.side - 10 * layout.metrics.gap) / 11.236, accuracy: 0.001, describe(layout))
-            XCTAssertEqual(layout.keys.filter { $0.row == 3 }.max { $0.frame.maxX < $1.frame.maxX }?.kind, .dismiss, describe(layout))
+            if layout.language != .khmer {
+                XCTAssertEqual(key.width, (layout.orientation == .landscape ? 1.61 : 1.679) * (layout.width - 2 * layout.metrics.side - 10 * layout.metrics.gap) / 11.236, accuracy: 0.001, describe(layout))
+            }
+            XCTAssertEqual(layout.keys.filter { $0.row == layout.bottomRowIndex }.max { $0.frame.maxX < $1.frame.maxX }?.kind, .dismiss, describe(layout))
         }
         for layout in everyPortraitLayout() + landscapeLayouts() + duoLayouts() {
             XCTAssertNil(layout.key(.dismiss), describe(layout))
@@ -2207,7 +2269,7 @@ final class KeyboardLayoutTests: XCTestCase {
         for layout in padLayouts() {
             let area = layout.touchAreaFrame
             var rowTop = area.minY
-            for row in 0..<4 {
+            for row in 0..<layout.metrics.keyRowCount {
                 let targets = layout.keys.filter { $0.row == row }.sorted { $0.hitFrame.minX < $1.hitFrame.minX }
                     .filter { !($0.kind == .emoji && row == 3) }.map(\.hitFrame)
                 XCTAssertEqual(targets.first?.minX, 0, describe(layout))
@@ -2255,7 +2317,7 @@ final class KeyboardLayoutTests: XCTestCase {
                 }
                 pair(layer) { KeyboardLayout(width: width, layer: $1, field: .email, showsGlobe: true, numberRow: $0) }
             }
-            for language in KeyboardLanguage.allCases {
+            for language in KeyboardLanguage.allCases where language != .khmer {
                 pair { KeyboardLayout(width: width, layer: $1, language: language, numberRow: $0) }
                 for letters in language.letterLayouts.dropFirst() {
                     pair { KeyboardLayout(width: width, layer: $1, language: language, letters: letters, numberRow: $0) }

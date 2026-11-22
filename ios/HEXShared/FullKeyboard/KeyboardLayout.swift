@@ -47,6 +47,9 @@ nonisolated struct KeyboardKey: Equatable, Sendable {
     /// What the key types with shift instead of its character: the docked iPad's two-symbol
     /// keys (, and !, . and ?), which show both (`KeyboardLayout.padPairs`).
     var shifted: String?
+    /// Khmerism's swipe-up output on each letter layer.
+    var alternate: String?
+    var shiftedAlternate: String?
 
     var character: String? {
         if case .character(let text) = kind { return text }
@@ -225,6 +228,8 @@ nonisolated struct KeyboardMetrics: Equatable, Sendable {
     /// Settings › Keyboard › Number row: the keycap height of the row of 1 to 0 above row 1
     /// (`withNumberRow()`), with a row gap under it; 0 without it.
     var numberRowHeight: CGFloat = 0
+    /// Khmerism uses four character rows above the footer.
+    var keyRowCount: Int = 4
 
     /// The suggestion strip is Apple's predictive bar from the top of its suggestion pill down.
     /// Apple's bar is 44 pt from its panel's edge, the pill around a suggested word starts 6 pt
@@ -455,12 +460,17 @@ nonisolated struct KeyboardMetrics: Equatable, Sendable {
         phoneSize: KeyboardPhoneSize = .regular,
         pad: KeyboardPadPlacement? = nil,
         numberRow: Bool = false,
-        joinsUnfoldedKeyboard: Bool = false
+        joinsUnfoldedKeyboard: Bool = false,
+        language: KeyboardLanguage = .english
     ) -> KeyboardMetrics {
-        let rows = letterRows(
+        var rows = letterRows(
             orientation, innerWidth: innerWidth, posture: posture, windowInset: windowInset,
-            phoneSize: phoneSize, pad: pad, joinsUnfoldedKeyboard: joinsUnfoldedKeyboard
+            phoneSize: phoneSize, pad: pad, joinsUnfoldedKeyboard: joinsUnfoldedKeyboard || language == .khmer
         )
+        if language == .khmer {
+            rows.keyRowCount = 5
+            return rows
+        }
         return numberRow && pad == nil ? rows.withNumberRow() : rows
     }
 
@@ -572,7 +582,7 @@ nonisolated struct KeyboardMetrics: Equatable, Sendable {
             bottomRowTrim: bottomRowTrim, bottomRowReturnColumn: bottomRowReturnColumn,
             bottomRowLeadColumn: bottomRowLeadColumn,
             modifierLetterRatio: modifierLetterRatio, pad: pad, accentCellWidth: accentCellWidth,
-            numberRowHeight: numberRowHeight
+            numberRowHeight: numberRowHeight, keyRowCount: keyRowCount
         )
     }
 
@@ -585,7 +595,7 @@ nonisolated struct KeyboardMetrics: Equatable, Sendable {
     func fitted(toHeight height: CGFloat) -> KeyboardMetrics {
         let keys = height - stripArea
         guard height < totalHeight - 0.5, keys >= keysArea / 2 else { return self }
-        let scale = (keys - keysTop - keysBottom + bottomRowTrim) / (4 * keyHeight + 3 * rowGap + numberRowPitch)
+        let scale = (keys - keysTop - keysBottom + bottomRowTrim) / (keysArea - keysTop - keysBottom + bottomRowTrim)
         return KeyboardMetrics(
             side: side, gap: gap, rowGap: rowGap * scale, keyHeight: keyHeight * scale,
             stripTop: stripTop, stripHeight: stripHeight, stripBottom: stripBottom,
@@ -593,14 +603,16 @@ nonisolated struct KeyboardMetrics: Equatable, Sendable {
             bottomRowTrim: bottomRowTrim, bottomRowReturnColumn: bottomRowReturnColumn,
             bottomRowLeadColumn: bottomRowLeadColumn,
             modifierLetterRatio: modifierLetterRatio, pad: pad, accentCellWidth: accentCellWidth,
-            numberRowHeight: numberRowHeight * scale
+            numberRowHeight: numberRowHeight * scale, keyRowCount: keyRowCount
         )
     }
 
     var stripArea: CGFloat { stripTop + stripHeight + stripBottom }
-    /// Row 4's keycap height.
+    /// The footer's keycap height.
     var bottomRowHeight: CGFloat { keyHeight - bottomRowTrim }
-    var keysArea: CGFloat { keysTop + numberRowPitch + 4 * keyHeight + 3 * rowGap + keysBottom - bottomRowTrim }
+    var keysArea: CGFloat {
+        keysTop + numberRowPitch + CGFloat(keyRowCount) * keyHeight + CGFloat(keyRowCount - 1) * rowGap + keysBottom - bottomRowTrim
+    }
     var totalHeight: CGFloat { stripArea + keysArea }
 }
 
@@ -703,10 +715,19 @@ nonisolated struct KeyboardLayout: Equatable, Sendable {
         let innerWidth = width - 2 * self.horizontalInset
         var metrics = KeyboardMetrics.for(
             orientation, innerWidth: innerWidth, posture: posture, windowInset: windowInset, phoneSize: phoneSize, pad: pad,
-            numberRow: numberRow, joinsUnfoldedKeyboard: joinsUnfoldedKeyboard
+            numberRow: numberRow, joinsUnfoldedKeyboard: joinsUnfoldedKeyboard, language: language
         )
         if let availableHeight { metrics = metrics.fitted(toHeight: availableHeight) }
         self.metrics = metrics
+        if language == .khmer {
+            self.keys = Self.buildKhmerismKeys(
+                width: width, metrics: metrics, layer: layer, field: field, inset: self.horizontalInset,
+                showsGlobe: showsGlobe, showsEmoji: showsEmoji, hexPlacement: self.hexPlacement
+            )
+            self.split = nil
+            self.padLetterWidth = nil
+            return
+        }
         if metrics.pad?.isDocked == true {
             padLetterWidth = Self.padLetterWidth(innerWidth: innerWidth, metrics: metrics, layer: layer, language: language, letters: letters)
             self.keys = Self.buildPadKeys(
@@ -751,6 +772,7 @@ nonisolated struct KeyboardLayout: Equatable, Sendable {
     }
 
     var isSplit: Bool { split != nil }
+    var bottomRowIndex: Int { metrics.keyRowCount - 1 }
 
     /// The Duo folded draws Apple's key labels smaller: its 123 is 70 px wide there against
     /// Hex's 80 at 2.95 px per point (iOS 27.2), 0.875 of Hex's upright iPhone size, the same
@@ -771,9 +793,10 @@ nonisolated struct KeyboardLayout: Equatable, Sendable {
         posture: KeyboardPosture = .phone,
         phoneSize: KeyboardPhoneSize = .regular,
         pad: KeyboardPadPlacement? = nil,
-        numberRow: Bool = false
+        numberRow: Bool = false,
+        language: KeyboardLanguage = .english
     ) -> CGFloat {
-        KeyboardMetrics.for(orientation, posture: posture, phoneSize: phoneSize, pad: pad, numberRow: numberRow).totalHeight
+        KeyboardMetrics.for(orientation, posture: posture, phoneSize: phoneSize, pad: pad, numberRow: numberRow, language: language).totalHeight
     }
 
     /// `KeyboardKey.row` for Settings › Keyboard › Number row's digits (row 1 is 0, the strip's
@@ -870,6 +893,9 @@ nonisolated struct KeyboardLayout: Equatable, Sendable {
     var characterWidth: CGFloat {
         if isSplit { return SplitGeometry.keyWidth }
         if let padLetterWidth { return padLetterWidth }
+        if language == .khmer {
+            return Self.letterWidth(innerWidth: width - 2 * horizontalInset, metrics: metrics, columns: 11)
+        }
         if layer == .letters, letters == .dvorak {
             return Self.dvorakLetterWidth(innerWidth: width - 2 * horizontalInset, metrics: metrics)
         }
