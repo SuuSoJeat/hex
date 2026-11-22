@@ -1018,9 +1018,11 @@ never at a launch by itself.
   letter rows use Hex's key height and corner radius, with teal, green and rose
   keys in light and dark. The background and press colors follow the keyboard theme.
   The suggestion strip offers up to three offline completions. Tap one to append the
-  missing characters. **Settings › Keyboard › Autocorrect** enables correction for
-  known Khmer typos on Space and closing punctuation. Tap the quoted spelling to keep
-  it, or backspace over the delimiter to see the original spelling in the strip.
+  missing characters. **Settings › Keyboard › Autocorrect** enables offline Khmer
+  spelling suggestions. Space and closing punctuation apply documented fixes and
+  unambiguous repairs of doubled dependent vowel signs. Tap other dictionary guesses
+  to use them. Tap the quoted spelling to keep it, or backspace over the delimiter
+  after an automatic correction to see the original spelling in the strip.
   Under **Settings › Experiments › Khmerism**, **No colors** uses the keyboard theme
   for every key, and **No superscripts** hides the small corner labels while keeping
   hold-to-type. Both switches are off by default.

@@ -322,6 +322,40 @@ final class FullKeyboardEngineTests: XCTestCase {
         XCTAssertEqual(target.text, "ខ្ញុំចំនុច")
     }
 
+    func testKhmerDictionaryAutocorrectRemovesADoubledVowelAfterAKnownWord() async throws {
+        engine.language = .khmer
+        await engine.khmerAutocompleteLoad?.value
+        target.insertText("ខ្ញុំសាាលា")
+        engine.textDidChange()
+        let correction = try XCTUnwrap(engine.suggestions.first(where: \.willAutoReplace))
+        XCTAssertEqual(correction.displayText, "សាលា")
+
+        tap(.space)
+        XCTAssertEqual(target.text, "ខ្ញុំសាលា ")
+        engine.deleteBackward()
+        let revert = try XCTUnwrap(engine.suggestions.first)
+        XCTAssertEqual(revert.kind, .revert)
+        engine.acceptSuggestion(revert)
+        XCTAssertEqual(target.text, "ខ្ញុំសាាលា")
+    }
+
+    func testKhmerDictionarySpellingGuessRequiresATap() async throws {
+        engine.language = .khmer
+        await engine.khmerAutocompleteLoad?.value
+        target.insertText("កមពុជា")
+        engine.textDidChange()
+        let suggestion = try XCTUnwrap(engine.suggestions.first { $0.kind == .khmerCorrection(autoReplace: false) })
+        XCTAssertEqual(suggestion.displayText, "កម្ពុជា")
+        XCTAssertFalse(suggestion.willAutoReplace)
+
+        tap(.space)
+        engine.acceptSuggestion(suggestion)
+        XCTAssertEqual(target.text, "កមពុជា ")
+        engine.deleteBackward()
+        engine.acceptSuggestion(suggestion)
+        XCTAssertEqual(target.text, "កម្ពុជា")
+    }
+
     func testKhmerAutocorrectOnPunctuationAndExplicitPick() async throws {
         engine.language = .khmer
         await engine.khmerAutocompleteLoad?.value

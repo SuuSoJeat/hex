@@ -386,8 +386,10 @@ final class FullKeyboardEngine {
             case .khmerKeepLiteral:
                 autocorrect.suppressAndKeep(suggestion.replacement)
                 refreshSuggestions()
+            case .khmerCorrection:
+                _ = applyKhmerCorrection(ending: "", explicitlyPicked: true)
             default:
-                _ = applyKhmerCorrection(ending: "")
+                break
             }
             return
         default:
@@ -468,7 +470,10 @@ final class FullKeyboardEngine {
         if let correction = khmerCorrection(before: before) {
             return [
                 KeyboardSuggestion(displayText: "“\(correction.typed)”", replacement: correction.typed, kind: .khmerKeepLiteral),
-                KeyboardSuggestion(displayText: correction.replacement, replacement: correction.replacement, kind: .khmerCorrection),
+                KeyboardSuggestion(
+                    displayText: correction.replacement, replacement: correction.replacement,
+                    kind: .khmerCorrection(autoReplace: correction.automaticallyApplies)
+                ),
             ]
         }
         return index.suggestions(beforeInput: before).map {
@@ -491,9 +496,10 @@ final class FullKeyboardEngine {
     private static let khmerWordEnders = Set(wordEnders.map { String($0) }).union(["។", "៕", "៖"])
 
     @discardableResult
-    private func applyKhmerCorrection(ending: String) -> Bool {
+    private func applyKhmerCorrection(ending: String, explicitlyPicked: Bool = false) -> Bool {
         guard allowsKhmerSuggestions, let before = textBefore, before == typingContext,
               let correction = khmerCorrection(before: before),
+              explicitlyPicked || correction.automaticallyApplies,
               let prefix = removeKhmerSuffix(correction.typed, from: before) else {
             return false
         }
@@ -506,12 +512,16 @@ final class FullKeyboardEngine {
             TypingLogField("to", .string(correction.replacement)),
             TypingLogField("deleted", .string(correction.typed)),
             TypingLogField("inserted", .string(inserted)),
+            TypingLogField("picked", .bool(explicitlyPicked)),
         ])
         autocorrect.recordAppliedCorrection(
             original: correction.typed, corrected: correction.replacement, anchor: prefix + correction.replacement,
             changes: [.init(from: correction.typed, to: correction.replacement, language: .khmer)]
         )
-        learning?.record(.autocorrected, typed: correction.typed, final: correction.replacement, language: KeyboardLanguage.khmer.rawValue)
+        learning?.record(
+            explicitlyPicked ? .picked : .autocorrected,
+            typed: correction.typed, final: correction.replacement, language: KeyboardLanguage.khmer.rawValue
+        )
         tokenTaps.removeAll()
         finishedWord = nil
         swipedWord = nil

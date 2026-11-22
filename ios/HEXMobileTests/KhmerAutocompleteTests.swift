@@ -93,7 +93,7 @@ final class KhmerAutocompleteTests: XCTestCase {
 
     func testCorrectionsPreserveValidWordsAndJoinedReadings() throws {
         let model = try XCTUnwrap(KhmerAutocomplete.bundled)
-        for spelling in ["និង", "នឹង", "កាយរឹទ្ធិ", "រោកសញ្ញា", "សុខសាន្ត", "សួស្តីី"] {
+        for spelling in ["និង", "នឹង", "កាយរឹទ្ធិ", "រោកសញ្ញា", "សុខសាន្ត", "សលា"] {
             XCTAssertNil(model.correction(beforeInput: spelling))
         }
 
@@ -101,5 +101,44 @@ final class KhmerAutocompleteTests: XCTestCase {
         XCTAssertNil(joinedWords.correction(beforeInput: "ចំនុច"))
         let missingTarget = KhmerAutocomplete(wordlist: "ខ្ញុំ\t100")
         XCTAssertNil(missingTarget.correction(beforeInput: "ចំនុច"))
+    }
+
+    func testDictionaryCorrectionsRankSingleEditsForAnExplicitPick() throws {
+        let model = try XCTUnwrap(KhmerAutocomplete.bundled)
+        for (typed, replacement) in [("កមពុជា", "កម្ពុជា"), ("ប្រទសេ", "ប្រទេស"), ("ខ្មរ", "ខ្មែរ")] {
+            let expected = KhmerAutocomplete.Correction(typed: typed, replacement: replacement, automaticallyApplies: false)
+            XCTAssertEqual(model.correction(beforeInput: typed), expected)
+        }
+        XCTAssertEqual(
+            model.correction(beforeInput: "ខ្ញុំកមពុជា"),
+            .init(typed: "កមពុជា", replacement: "កម្ពុជា", automaticallyApplies: false)
+        )
+
+        let oneWord = KhmerAutocomplete(wordlist: "កម្ពុជា\t90")
+        XCTAssertEqual(
+            oneWord.correction(beforeInput: "កម្ពុកជា"),
+            .init(typed: "កម្ពុកជា", replacement: "កម្ពុជា", automaticallyApplies: false)
+        )
+        XCTAssertEqual(
+            oneWord.correction(beforeInput: "កម្ពុសា"),
+            .init(typed: "កម្ពុសា", replacement: "កម្ពុជា", automaticallyApplies: false)
+        )
+    }
+
+    func testDictionaryAutomaticallyRepairsAnUnambiguousDoubledVowel() throws {
+        let model = try XCTUnwrap(KhmerAutocomplete.bundled)
+        for (typed, replacement) in [("សាាលា", "សាលា"), ("កម្ពុុជា", "កម្ពុជា"), ("ជាា", "ជា")] {
+            XCTAssertEqual(model.correction(beforeInput: typed), .init(typed: typed, replacement: replacement))
+        }
+        XCTAssertEqual(model.correction(beforeInput: "សួស្តីី"), .init(typed: "ស្តីី", replacement: "ស្តី"))
+        XCTAssertEqual(model.correction(beforeInput: "ខ្ញុំបានទៅសាាលា"), .init(typed: "សាាលា", replacement: "សាលា"))
+        XCTAssertNil(model.correction(beforeInput: "សាាាលា"))
+    }
+
+    func testDictionaryPreservesUnfinishedPrefixesAndMixedScriptIdentifiers() throws {
+        let model = try XCTUnwrap(KhmerAutocomplete.bundled)
+        for spelling in ["កម្", "កម្ពុជ", "កមពុជា្", "កមពុជា។", "កម្ពុ\u{200C}ជា", "Nameកមពុជា", "@សាាលា", "ឝ្ឞ្សកមពុជា"] {
+            XCTAssertNil(model.correction(beforeInput: spelling))
+        }
     }
 }

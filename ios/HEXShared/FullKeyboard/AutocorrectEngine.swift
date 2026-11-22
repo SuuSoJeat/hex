@@ -11,9 +11,9 @@ nonisolated struct KeyboardSuggestion: Equatable, Sendable {
         case secondary
         /// A Khmer word whose remaining characters can be appended at the caret.
         case khmerCompletion
-        /// A known Khmer typo and its spelling, shown before committing a word boundary.
+        /// The Khmer spelling as typed, and a replacement that may apply on a word boundary.
         case khmerKeepLiteral
-        case khmerCorrection
+        case khmerCorrection(autoReplace: Bool)
         /// A word that can follow the one just finished. Only an explicit pick inserts it.
         case nextWord
         /// An emoji for the word just finished (Settings › Keyboard › Emoji), offered after a space,
@@ -33,8 +33,7 @@ nonisolated struct KeyboardSuggestion: Equatable, Sendable {
 
     var willAutoReplace: Bool {
         switch kind {
-        case .primary(let auto): auto
-        case .khmerCorrection: true
+        case .primary(let auto), .khmerCorrection(let auto): auto
         default: false
         }
     }

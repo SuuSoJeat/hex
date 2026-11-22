@@ -2927,9 +2927,11 @@ iOS prototype (`HEXMobile`) -> Record/transcribe/copy and keyboard handoff
 │   `KeyboardLayoutTests`, `FullKeyboardEngineTests`.
 │   The suggestion strip offers up to three offline completions from a bundled
 │   SIL/Keyman dictionary. Tap one to append the missing characters. With Autocorrect
-│   on, the strip offers the original and corrected spellings for known typos and
-│   applies the correction on Space or closing punctuation. Backspace removes that
-│   delimiter and the strip offers the original spelling again. Checks:
+│   on, the same dictionary suggests nearby spellings for one-edit typos. Space or
+│   closing punctuation applies a documented correction or an unambiguous doubled
+│   dependent vowel repair. Other dictionary guesses are tap-to-accept. Backspace
+│   removes the delimiter after an automatic correction and offers the original
+│   spelling in the strip. Checks:
 │   `KhmerAutocompleteTests`, `FullKeyboardEngineTests`.
 │   Settings › Experiments › Khmerism (off by default, App Group, `FullKeyboardSettingsTests`)
 │   ├── No colors (`experiments.khmerismNoColors`) → every cap uses the keyboard theme

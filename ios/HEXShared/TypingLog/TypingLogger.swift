@@ -344,7 +344,7 @@ final class TypingLogger {
             switch suggestion.kind {
             case .keepLiteral:
                 fields.append(TypingLogField("kind", .string("literal")))
-            case .primary(let auto):
+            case .primary(let auto), .khmerCorrection(let auto):
                 fields.append(TypingLogField("kind", .string("primary")))
                 fields.append(TypingLogField("auto", .bool(auto)))
             case .secondary:
@@ -353,9 +353,6 @@ final class TypingLogger {
                 fields.append(TypingLogField("kind", .string("khmer_completion")))
             case .khmerKeepLiteral:
                 fields.append(TypingLogField("kind", .string("literal")))
-            case .khmerCorrection:
-                fields.append(TypingLogField("kind", .string("primary")))
-                fields.append(TypingLogField("auto", .bool(true)))
             case .nextWord:
                 fields.append(TypingLogField("kind", .string("next_word")))
             case .emoji:
