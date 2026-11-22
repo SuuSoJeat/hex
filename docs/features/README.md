@@ -2925,7 +2925,10 @@ iOS prototype (`HEXMobile`) -> Record/transcribe/copy and keyboard handoff
 │   123 and #+= fit four English rows and keep two Khmer punctuation keys beside Space.
 │   On #+=, hold ។ or ៖ for ៙ or ៚. Space, Return or កខគ returns to letters.
 │   The optional Number Row follows the shared setting. Khmer marks insert
-│   as entered, including coeng (្), and the host handles backspace. The five-row
+│   as entered, and the host handles backspace. With the caret just after coeng (្),
+│   the letter page brings common subscript consonants onto the main keys and hides
+│   the corner labels. Holds still work, and Shift still selects the full shifted
+│   layer. The usual labels return when the caret moves past or away from coeng. The five-row
 │   letter plane stays joined on the unfolded Duo. Checks: `KhmerKeyboardLanguageTests`,
 │   `KeyboardLayoutTests`, `FullKeyboardEngineTests`.
 │   The suggestion strip offers up to three offline completions from a bundled

@@ -65,6 +65,13 @@ nonisolated enum KhmerismLayout {
         ],
     ]
 
+    /// Base positions that promote their shifted character immediately after coeng.
+    static let afterCoeng = [
+        "ោ": "ថ", "ែ": "ធ", "ិ": "ខ", "ី": "ឃ",
+        "េ": "ឡ", "្": "ផ", "ា": "ភ", "ះ": "ឆ", "ៗ": "ឈ",
+        "ុ": "ឋ", "ូ": "ឍ",
+    ]
+
     // The English number and symbol rows use their usual keys. Only their footer adds these.
     static let numbersFooter = [Key(text: "។"), Key(text: "៕")]
     static let symbolsFooter = [Key(text: "។", alternate: "៙"), Key(text: "៖", alternate: "៚")]

@@ -214,6 +214,185 @@ final class FullKeyboardEngineTests: XCTestCase {
         XCTAssertEqual(target.text, "ក្រ៩ក")
     }
 
+    func testKhmerismCoengPromotesConsonantsWithoutChangingTouchTargets() throws {
+        engine.language = .khmer
+        let coeng = KeyKind.character("\u{17D2}")
+        let vowel = KeyKind.character("ោ")
+        let baseKeys = engine.layout.keys
+        let promoted = [
+            ("ោ", "ថ"), ("ែ", "ធ"), ("ិ", "ខ"), ("ី", "ឃ"),
+            ("េ", "ឡ"), ("្", "ផ"), ("ា", "ភ"), ("ះ", "ឆ"), ("ៗ", "ឈ"),
+            ("ុ", "ឋ"), ("ូ", "ឍ"),
+        ]
+        tap(.character("ក"))
+        tap(coeng)
+
+        XCTAssertEqual(engine.layout.keys.map(\.kind), baseKeys.map(\.kind))
+        XCTAssertEqual(engine.layout.keys.map(\.frame), baseKeys.map(\.frame))
+        XCTAssertEqual(engine.layout.keys.map(\.hitFrame), baseKeys.map(\.hitFrame))
+        for (base, consonant) in promoted {
+            let key = try XCTUnwrap(engine.layout.key(.character(base)))
+            XCTAssertEqual(engine.keycapLabel(for: key), consonant)
+            XCTAssertEqual(engine.displayLabel(for: key), consonant)
+        }
+        XCTAssertTrue(engine.layout.keys.allSatisfy { engine.khmerismAlternate(for: $0, onKeycap: true) == nil })
+        XCTAssertEqual(engine.keyKind(at: point(vowel)), vowel)
+        down(10, vowel)
+        XCTAssertEqual(engine.keyPreview?.key.kind, vowel)
+        XCTAssertEqual(engine.keyPreview?.label, "ថ")
+        up(10, vowel)
+        XCTAssertEqual(target.text.unicodeScalars.map(\.value), [0x1780, 0x17D2, 0x1790])
+        let vowelKey = try XCTUnwrap(engine.layout.key(vowel))
+        XCTAssertEqual(engine.keycapLabel(for: vowelKey), "ោ")
+        XCTAssertEqual(engine.khmerismAlternate(for: vowelKey, onKeycap: true), "ថ")
+
+        tap(coeng)
+        tap(coeng)
+        XCTAssertEqual(target.text.unicodeScalars.map(\.value), [0x1780, 0x17D2, 0x1790, 0x17D2, 0x1795])
+        let coengKey = try XCTUnwrap(engine.layout.key(coeng))
+        XCTAssertEqual(engine.keycapLabel(for: coengKey), "\u{17D2}")
+    }
+
+    func testKhmerismCoengHoldTypesTheOriginalKeyOrExistingAlternate() throws {
+        engine.language = .khmer
+        let coeng = KeyKind.character("\u{17D2}")
+        let vowel = KeyKind.character("ោ")
+        let consonant = KeyKind.character("ហ")
+
+        tap(.character("ក"))
+        tap(coeng)
+        down(10, vowel)
+        XCTAssertTrue(engine.handleCharacterHold(forTouch: 10))
+        XCTAssertEqual(engine.keyPreview?.label, "ោ")
+        up(10, vowel)
+        XCTAssertEqual(target.text.unicodeScalars.map(\.value), [0x1780, 0x17D2, 0x17C4])
+
+        tap(coeng)
+        let key = try XCTUnwrap(engine.layout.key(consonant))
+        XCTAssertEqual(engine.keycapLabel(for: key), "ហ")
+        down(11, consonant)
+        XCTAssertTrue(engine.handleCharacterHold(forTouch: 11))
+        XCTAssertEqual(engine.keyPreview?.label, "១")
+        up(11, consonant)
+        XCTAssertEqual(target.text.unicodeScalars.map(\.value), [0x1780, 0x17D2, 0x17C4, 0x17D2, 0x17E1])
+    }
+
+    func testKhmerismCoengGivesManualShiftAndCapsLockPrecedence() throws {
+        engine.language = .khmer
+        let coeng = KeyKind.character("\u{17D2}")
+        let digit = try XCTUnwrap(engine.layout.key(.character("ហ")))
+        let vowel = try XCTUnwrap(engine.layout.key(.character("ោ")))
+        tap(.character("ក"))
+        tap(coeng)
+        XCTAssertEqual(engine.keycapLabel(for: digit), "ហ")
+        tap(.shift)
+        XCTAssertEqual(engine.keycapLabel(for: digit), "១")
+        XCTAssertEqual(engine.khmerismAlternate(for: digit, onKeycap: true), "ហ")
+        tap(digit.kind)
+        XCTAssertEqual(engine.shift.state, .off)
+        XCTAssertEqual(target.text.unicodeScalars.map(\.value), [0x1780, 0x17D2, 0x17E1])
+
+        tap(coeng)
+        now += 0.5
+        tap(.shift)
+        now += 0.1
+        tap(.shift)
+        XCTAssertEqual(engine.shift.state, .locked)
+        XCTAssertEqual(engine.keycapLabel(for: digit), "១")
+        tap(.shift)
+        XCTAssertEqual(engine.shift.state, .off)
+        XCTAssertEqual(engine.keycapLabel(for: digit), "ហ")
+        XCTAssertEqual(engine.keycapLabel(for: vowel), "ថ")
+        XCTAssertNil(engine.khmerismAlternate(for: vowel, onKeycap: true))
+    }
+
+    func testKhmerismCoengFollowsBackspaceCaretAndExternalText() throws {
+        target = KhmerScalarDeletingTarget()
+        engine = FullKeyboardEngine(target: target, autocorrect: AutocorrectEngine(learnedWords: LearnedWordsStore(defaults: defaults)))
+        engine.language = .khmer
+        let coeng = KeyKind.character("\u{17D2}")
+        let vowel = try XCTUnwrap(engine.layout.key(.character("ោ")))
+
+        tap(.character("ក"))
+        tap(coeng)
+        XCTAssertEqual(engine.keycapLabel(for: vowel), "ថ")
+        tap(.delete)
+        XCTAssertEqual(target.text.unicodeScalars.map(\.value), [0x1780])
+        XCTAssertEqual(engine.keycapLabel(for: vowel), "ោ")
+
+        target.insertText("\u{17D2} រ")
+        target.adjustTextPosition(byCharacterOffset: 0)
+        engine.textDidChange()
+        XCTAssertEqual(engine.keycapLabel(for: vowel), "ោ")
+        target.adjustTextPosition(byCharacterOffset: -2)
+        engine.selectionDidChange()
+        XCTAssertEqual(target.documentContextBeforeInput, "ក\u{17D2}")
+        XCTAssertEqual(engine.keycapLabel(for: vowel), "ថ")
+        target.deleteBackward()
+        target.insertText("រ")
+        engine.textDidChange()
+        XCTAssertEqual(target.text.unicodeScalars.map(\.value), [0x1780, 0x179A, 0x20, 0x179A])
+        XCTAssertEqual(engine.keycapLabel(for: vowel), "ោ")
+    }
+
+    func testKhmerismCoengRolloverRemapsTheNextKeyInALaggingField() {
+        target = LaggingField()
+        target.autocorrectionType = .no
+        engine = FullKeyboardEngine(target: target)
+        engine.language = .khmer
+        let coeng = KeyKind.character("្")
+        let vowel = KeyKind.character("ោ")
+
+        tap(.character("ក"))
+        down(10, coeng)
+        down(11, vowel)
+        XCTAssertEqual(target.documentContextBeforeInput, "ក")
+        XCTAssertEqual(engine.keyPreview?.label, "ថ")
+        up(11, vowel)
+        up(10, coeng)
+        XCTAssertEqual(target.text.unicodeScalars.map(\.value), [0x1780, 0x17D2, 0x1790])
+        XCTAssertEqual(engine.displayLabel(for: engine.layout.key(vowel)!), "ោ")
+    }
+
+    func testKhmerismCoengDropsWhenSelectionOrDocumentChanges() throws {
+        target = LaggingField()
+        target.documentIdentifier = UUID()
+        engine = FullKeyboardEngine(target: target)
+        engine.language = .khmer
+        let vowel = try XCTUnwrap(engine.layout.key(.character("ោ")))
+
+        tap(.character("ក"))
+        tap(.character("្"))
+        XCTAssertEqual(engine.keycapLabel(for: vowel), "ថ")
+        target.selectedText = "ក"
+        engine.selectionDidChange()
+        XCTAssertEqual(engine.keycapLabel(for: vowel), "ោ")
+        target.selectedText = nil
+        engine.selectionDidChange()
+        XCTAssertEqual(engine.keycapLabel(for: vowel), "ថ")
+
+        target.documentIdentifier = UUID()
+        engine.textDidChange()
+        XCTAssertEqual(engine.keycapLabel(for: vowel), "ោ")
+    }
+
+    func testKhmerismCoengRedrawsWhenAFieldChangeClearsItWithoutSuggestions() throws {
+        engine.language = .khmer
+        target.autocorrectionType = .no
+        tap(.character("ក"))
+        tap(.character("្"))
+        let vowel = try XCTUnwrap(engine.layout.key(.character("ោ")))
+        XCTAssertEqual(engine.keycapLabel(for: vowel), "ថ")
+        XCTAssertTrue(engine.suggestions.isEmpty)
+
+        var redrew = false
+        engine.onChange = { redrew = true }
+        target.adjustTextPosition(byCharacterOffset: -target.cursorIndex)
+        engine.configureForField()
+        XCTAssertEqual(engine.keycapLabel(for: vowel), "ោ")
+        XCTAssertTrue(redrew)
+    }
+
     func testKhmerismMovingOutOfHoldRangeStillAllowsATap() {
         engine.language = .khmer
         let start = point(.character("ក"))

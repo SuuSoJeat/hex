@@ -87,6 +87,7 @@ final class FullKeyboardEngine {
     private(set) var suggestions: [KeyboardSuggestion] = []
     private var khmerAutocomplete: KhmerAutocomplete?
     private(set) var khmerAutocompleteLoad: Task<Void, Never>?
+    private(set) var isAfterKhmerCoeng = false
 
     let target: KeyboardTextTarget
     let autocorrect: AutocorrectEngine
@@ -170,6 +171,7 @@ final class FullKeyboardEngine {
             guard layoutLanguage != oldValue else { return }
             cancelAllTouches()
             rebuildLanguageLayout()
+            if updateKhmerCoengContext() { onChange?() }
         }
     }
     /// How the keys' language arranges its letters (Settings › Keyboard › Languages › Layout);
@@ -310,6 +312,21 @@ final class FullKeyboardEngine {
         if layout.language.isFrench, layout.key(.character(FrenchTyping.key)) != nil { onChange?() }
     }
 
+    func selectionDidChange() {
+        commitHangulIfHostMoved()
+        if updateKhmerCoengContext() { onChange?() }
+    }
+
+    /// Derive the layer from the caret so it follows Backspace and changes made by the host.
+    /// Keep the result for the key plane, which draws every label in one pass.
+    private func updateKhmerCoengContext() -> Bool {
+        let next = layout.language == .khmer && (target.selectedText ?? "").isEmpty
+            && typingContext?.utf16.last == 0x17D2
+        guard next != isAfterKhmerCoeng else { return false }
+        isAfterKhmerCoeng = next
+        return true
+    }
+
     /// Text moved by a path of Hex's own around the keys (a delete slide, a paste, a
     /// dictation, an undo): the host's report is the truth again, and no swipe's pending
     /// space belongs to the old text.
@@ -337,6 +354,7 @@ final class FullKeyboardEngine {
     }
 
     func refreshSuggestions() {
+        let keycapsChanged = updateKhmerCoengContext()
         syncLearning()
         // Prepare the Khmer word list off the typing path.
         if layout.language == .khmer, khmerAutocompleteLoad == nil {
@@ -365,11 +383,12 @@ final class FullKeyboardEngine {
             )
             next = displayed(offeringRevert(usualSuggestions.isEmpty ? khmerSuggestionChoices() : usualSuggestions))
         }
-        if next != suggestions {
+        let suggestionsChanged = next != suggestions
+        if suggestionsChanged {
             suggestions = next
             typingLog?.suggestionsChanged(next)
-            onChange?()
         }
+        if keycapsChanged || suggestionsChanged { onChange?() }
     }
 
     func acceptSuggestion(_ suggestion: KeyboardSuggestion) {
@@ -955,7 +974,7 @@ final class FullKeyboardEngine {
             if let returnLayer = touch.returnLayer {
                 if let under = slideTarget(for: touch, at: point), let character = under.character {
                     if layout.language == .khmer {
-                        insertKhmerKeyText(character, source: "slide", at: point)
+                        insertKhmerKeyText(displayLabel(for: under), source: "slide", at: point)
                     } else if dropsSuggestionSpace(before: character) || !correctWord(endingWith: character) {
                         insert(character, source: "slide")
                     }
@@ -1112,7 +1131,7 @@ final class FullKeyboardEngine {
     private func commitCharacter(_ key: KeyboardKey, at point: CGPoint, down: CGPoint? = nil) {
         guard let character = key.character else { return }
         if layout.language == .khmer {
-            insertKhmerKeyText(isUppercase ? key.shifted ?? character : character, source: "key", at: point)
+            insertKhmerKeyText(displayLabel(for: key), source: "key", at: point)
             return
         }
         if typeHangul(character) {

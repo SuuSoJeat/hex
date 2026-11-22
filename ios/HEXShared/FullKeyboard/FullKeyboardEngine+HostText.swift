@@ -85,6 +85,7 @@ extension FullKeyboardEngine {
         var expected: String
         /// The text after the cursor then: an insert at the cursor leaves it, a move changes it.
         var after: String?
+        var document: UUID?
         /// When Hex stops taking a host that still reports `reported` for merely behind.
         var until: TimeInterval
     }
@@ -96,10 +97,15 @@ extension FullKeyboardEngine {
     private var hostIsBehind: Bool {
         guard let expected = expectedTypingContext, clock() <= expected.until,
               target.hasText, (target.selectedText ?? "").isEmpty,
+              target.documentIdentifier == expected.document,
               target.documentContextAfterInput == expected.after else { return false }
         guard let reported = textBefore else { return true }
         if reported == expected.expected { return false }
         if reported == expected.reported { return true }
+        if layout.language == .khmer {
+            return reported.utf16.count >= (expected.reported?.utf16.count ?? 0)
+                && expected.expected.utf16.starts(with: reported.utf16)
+        }
         return reported.count >= (expected.reported?.count ?? 0) && expected.expected.hasPrefix(reported)
     }
 
@@ -118,6 +124,7 @@ extension FullKeyboardEngine {
             reported: textBefore,
             expected: (before ?? "") + SmartPunctuation.plain(inserted),
             after: target.documentContextAfterInput,
+            document: target.documentIdentifier,
             until: clock() + Self.typingContextLifetime
         )
     }

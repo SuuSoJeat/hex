@@ -1020,6 +1020,10 @@ never at a launch by itself.
   letter rows use Hex's key height and corner radius, with teal marks, green
   independent vowels and rose Khmer digits. The background and press colors follow
   the keyboard theme. The optional Number Row follows the shared setting.
+  When the caret follows coeng (**្**), common subscript consonants move onto the
+  main keys and the corner labels hide. Hold a changed key to type its usual
+  character. Shift still selects the full shifted layer. The usual labels return
+  when the caret moves past or away from coeng.
   The suggestion strip offers up to three offline completions. Tap one to append the
   missing characters. **Settings › Keyboard › Autocorrect** enables offline Khmer
   spelling suggestions. Space accepts a confident correction without inserting a
