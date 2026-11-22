@@ -345,15 +345,15 @@ struct KeyboardLanguagesPage: View {
         }
     }
 
-    /// The languages whose keys the keyboard shows, with more than one layout to pick: each
-    /// chosen one (Automatic's while none is), but only the first of English and Spanish
-    /// together, whose keys both type on (`KeyboardLanguageList.layout`).
+    /// The languages whose keys the keyboard shows and whose layout is named in Settings:
+    /// Khmerism and languages with a choice. English and Spanish together use the first
+    /// language's keys (`KeyboardLanguageList.layout`).
     private var arranged: [KeyboardLanguage] {
         let typing = chosen.isEmpty ? [automatic] : chosen
         var seen = Set<KeyboardLanguage>()
         return typing
             .map { KeyboardLanguageList(languages: typing, current: $0).layout }
-            .filter { $0.letterLayouts.count > 1 && seen.insert($0).inserted }
+            .filter { ($0 == .khmer || $0.letterLayouts.count > 1) && seen.insert($0).inserted }
     }
 
     private func layoutRow(_ language: KeyboardLanguage) -> some View {

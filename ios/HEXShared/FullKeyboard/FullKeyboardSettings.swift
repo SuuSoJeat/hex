@@ -71,6 +71,8 @@ struct FullKeyboardSettings {
         static let spatialAutocorrect = "experiments.spatialAutocorrect"
         static let germanSpatialAutocorrect = "experiments.germanSpatialAutocorrect"
         static let koreanKeyboard = KoreanKeyboardExperiment.key
+        static let khmerismNoColors = "experiments.khmerismNoColors"
+        static let khmerismNoSuperscripts = "experiments.khmerismNoSuperscripts"
         static let keyPopups = "settings.keyboardKeyPopups"
         static let haptics = "settings.keyboardHaptics"
         static let hapticStrength = "settings.keyboardHapticStrength"
@@ -150,6 +152,18 @@ struct FullKeyboardSettings {
     var koreanKeyboard: Bool {
         get { defaults?.object(forKey: Key.koreanKeyboard) as? Bool ?? false }
         nonmutating set { defaults?.set(newValue, forKey: Key.koreanKeyboard) }
+    }
+
+    /// Settings › Experiments › Khmerism › No colors: use the keyboard theme for every keycap.
+    var khmerismNoColors: Bool {
+        get { defaults?.object(forKey: Key.khmerismNoColors) as? Bool ?? false }
+        nonmutating set { defaults?.set(newValue, forKey: Key.khmerismNoColors) }
+    }
+
+    /// Settings › Experiments › Khmerism › No superscripts: hide the corner labels on the keys.
+    var khmerismNoSuperscripts: Bool {
+        get { defaults?.object(forKey: Key.khmerismNoSuperscripts) as? Bool ?? false }
+        nonmutating set { defaults?.set(newValue, forKey: Key.khmerismNoSuperscripts) }
     }
 
     /// The typing model the keyboard may read `language`'s taps with: its bundled model, with

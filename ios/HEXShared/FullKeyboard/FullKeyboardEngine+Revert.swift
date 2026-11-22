@@ -18,7 +18,8 @@ extension FullKeyboardEngine {
         }
         let revert = KeyboardSuggestion(displayText: correction.original, replacement: correction.original, kind: .revert)
         let others = suggestions.filter {
-            $0.kind != .keepLiteral && $0.replacement.caseInsensitiveCompare(correction.original) != .orderedSame
+            $0.kind != .keepLiteral && $0.kind != .khmerKeepLiteral
+                && $0.replacement.caseInsensitiveCompare(correction.original) != .orderedSame
         }
         return [revert] + others.prefix(2)
     }

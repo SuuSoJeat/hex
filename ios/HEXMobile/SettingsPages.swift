@@ -605,6 +605,8 @@ struct ExperimentsSettingsPage: View {
     @State private var confirmingTouchReset = false
     @State private var germanSpatialAutocorrect = FullKeyboardSettings().germanSpatialAutocorrect
     @State private var koreanKeyboard = FullKeyboardSettings().koreanKeyboard
+    @State private var khmerismNoColors = FullKeyboardSettings().khmerismNoColors
+    @State private var khmerismNoSuperscripts = FullKeyboardSettings().khmerismNoSuperscripts
     @State private var emojiLettersUnderEmojiKey = FullKeyboardSettings().emojiLettersUnderEmojiKey
     @State private var keyboardThemes = FullKeyboardSettings().keyboardThemesEnabled
     @State private var keyboardTheme = FullKeyboardSettings().keyboardTheme
@@ -619,6 +621,7 @@ struct ExperimentsSettingsPage: View {
     var body: some View {
         SettingsPageScaffold(title: "Experiments") {
             SettingsCard { rows }
+            khmerismExperiments
         }
         .animation(HexMotion.settleAnimation(reduceMotion: reduceMotion), value: adaptiveTouch)
         .animation(HexMotion.settleAnimation(reduceMotion: reduceMotion), value: keyboardThemes)
@@ -672,6 +675,33 @@ struct ExperimentsSettingsPage: View {
             DictationController.shared.multilingualParakeetChanged()
         }
         .onAppear { loadSettings() }
+    }
+
+    @ViewBuilder
+    private var khmerismExperiments: some View {
+        SettingsSectionHeader(title: "Khmerism")
+
+        SettingsCard {
+            SettingsToggleRow(
+                title: String(localized: "No colors"),
+                detail: String(localized: "Use the keyboard theme for all Khmerism keys"),
+                isOn: $khmerismNoColors
+            )
+
+            SettingsDivider()
+
+            SettingsToggleRow(
+                title: String(localized: "No superscripts"),
+                detail: String(localized: "Hide the corner labels. Holding a key still types its alternate."),
+                isOn: $khmerismNoSuperscripts
+            )
+        }
+        .onChange(of: khmerismNoColors) { _, enabled in
+            FullKeyboardSettings().khmerismNoColors = enabled
+        }
+        .onChange(of: khmerismNoSuperscripts) { _, enabled in
+            FullKeyboardSettings().khmerismNoSuperscripts = enabled
+        }
     }
 
     /// The experiment switches, in the card's order.
@@ -860,6 +890,8 @@ struct ExperimentsSettingsPage: View {
         refreshAdaptiveTouchStatus()
         germanSpatialAutocorrect = FullKeyboardSettings().germanSpatialAutocorrect
         koreanKeyboard = FullKeyboardSettings().koreanKeyboard
+        khmerismNoColors = FullKeyboardSettings().khmerismNoColors
+        khmerismNoSuperscripts = FullKeyboardSettings().khmerismNoSuperscripts
         emojiLettersUnderEmojiKey = FullKeyboardSettings().emojiLettersUnderEmojiKey
         keyboardThemes = FullKeyboardSettings().keyboardThemesEnabled
         keyboardTheme = FullKeyboardSettings().keyboardTheme

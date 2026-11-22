@@ -5,8 +5,8 @@ import UIKit
 /// `--snap-state full-keyboard-<state>[-dark|-dark-field]` is passed on Simulator.
 /// `-dark` is a dark app; `-dark-field` is a light app whose field asks for a dark keyboard.
 /// The layout follows `--dictation-language` (Automatic, English, without it), or
-/// `--keyboard-layout nb|es|de|it|fr|fr-CA|fr-CH|pt|pl|cs|hu|ro|ru|uk|el|sr-Latn|ko|en` pins it; drafts are in the layout's language.
-/// `--keyboard-letters qwerty|qwertz|azerty|dvorak|own` arranges its letters (its own without it).
+/// `--keyboard-layout nb|es|de|it|fr|fr-CA|fr-CH|pt|pl|cs|hu|ro|ru|uk|el|sr-Latn|ko|km|en` pins it; drafts are in the layout's language.
+/// `--keyboard-letters qwerty|qwertz|azerty|dvorak|khmerism|own` arranges its letters (its own without it).
 /// `--accent-key ø` (or Cyrillic `е`, `ь`, `ʼ`, Greek `α`, `σ`, `t` on Romanian, or `o` on Hungarian) picks the key the `accents` state holds; `--emoji-query kiss` what `emoji-search` types.
 /// Emoji states (`emoji`, `emoji-search`, `emoji-tones`, `emoji-food`, `emoji-strip`) turn
 /// Settings › Keyboard › Emoji on with a seeded history; `emoji-probe` prints the panel's
@@ -61,6 +61,14 @@ struct FullKeyboardSnapshotStage: View {
             name = String(name.dropLast(suffix.count))
         }
         return name
+    }
+
+    private var layer: KeyboardLayer {
+        switch state {
+        case "numbers": .numbers
+        case "symbols": .symbols
+        default: .letters
+        }
     }
 
     private var draft: String {
@@ -200,6 +208,8 @@ struct FullKeyboardSnapshotStage: View {
             case "accents": "한"
             default: "10분 늦어요. "
             }
+        case .khmer:
+            return "សួស្តី!"
         case .english:
             break
         }
@@ -217,12 +227,28 @@ struct FullKeyboardSnapshotStage: View {
     }
 
     var body: some View {
+        if Self.layout == .khmer {
+            GeometryReader { geometry in
+                let screen = CGSize(
+                    width: geometry.size.width,
+                    height: geometry.size.height + geometry.safeAreaInsets.top + geometry.safeAreaInsets.bottom
+                )
+                stage(phoneSize: KeyboardPhoneSize.current(screenSize: screen))
+            }
+            .background(Color(uiColor: FullKeyboardPalette(isDark: darkApp || darkField).backdrop).ignoresSafeArea(edges: .bottom))
+        } else {
+            stage()
+        }
+    }
+
+    private func stage(phoneSize: KeyboardPhoneSize = .regular) -> some View {
         let ink = darkApp ? HexTheme.textBase : Color(red: 0x14 / 255, green: 0x16 / 255, blue: 0x1B / 255)
         let canvas = darkApp
             ? Color(red: 0x09 / 255, green: 0x0A / 255, blue: 0x0C / 255)
             : Color(red: 0xF5 / 255, green: 0xF6 / 255, blue: 0xF8 / 255)
-        let backdrop = FullKeyboardPalette(isDark: darkApp || darkField).backdrop
-        VStack(spacing: 0) {
+        let darkKeyboard = darkApp || darkField
+        let backdrop = FullKeyboardPalette(isDark: darkKeyboard).backdrop
+        return VStack(spacing: 0) {
             Spacer()
             Text(draft)
                 .font(.system(size: 15))
@@ -236,8 +262,11 @@ struct FullKeyboardSnapshotStage: View {
                 )
                 .padding(.horizontal, 14)
                 .padding(.bottom, 10)
-            FullKeyboardFixture(state: state, draft: draft, darkKeyboard: darkApp || darkField)
-                .frame(height: KeyboardLayout.height(for: .portrait, numberRow: FullKeyboardSettings().numberRow)
+            FullKeyboardFixture(state: state, draft: draft, darkKeyboard: darkKeyboard)
+                .frame(height: KeyboardLayout.height(
+                    for: .portrait, phoneSize: phoneSize,
+                    numberRow: FullKeyboardSettings().numberRow, language: Self.layout, layer: layer
+                )
                     + (state == "emoji-search" ? KeyboardMetrics.portrait.stripHeight : 0))
                 .background(Color(uiColor: backdrop).ignoresSafeArea(edges: .bottom))
         }
@@ -313,6 +342,7 @@ private struct FullKeyboardFixture: UIViewRepresentable {
         // `--typing-log-mark`: Record typing logs is recording this field.
         model.isLoggingTyping = ProcessInfo.processInfo.arguments.contains("--typing-log-mark")
         let view = FullKeyboardView(model: model, target: context.coordinator.target)
+        if FullKeyboardSnapshotStage.layout == .khmer { view.emojiOverride = true }
         if state.hasPrefix("emoji") {
             view.emojiOverride = true
             let usage = EmojiFixture.usage()
@@ -354,12 +384,16 @@ private struct FullKeyboardFixture: UIViewRepresentable {
             case "numbers":
                 view.engine.touchBegan(id: 900, at: center(of: .layerSwitch(.numbers), in: view))
                 view.engine.touchEnded(id: 900, at: center(of: .layerSwitch(.numbers), in: view))
-                view.debugPress("3")
+                if FullKeyboardSnapshotStage.layout != .khmer { view.debugPress("3") }
             case "symbols":
                 for kind in [KeyKind.layerSwitch(.numbers), .layerSwitch(.symbols)] {
                     view.engine.touchBegan(id: 901, at: center(of: kind, in: view))
                     view.engine.touchEnded(id: 901, at: center(of: kind, in: view))
                 }
+            case "shift" where FullKeyboardSnapshotStage.layout == .khmer:
+                let shift = center(of: .shift, in: view)
+                view.engine.touchBegan(id: 902, at: shift)
+                view.engine.touchEnded(id: 902, at: shift)
             case "capslock":
                 view.engine.touchBegan(id: 902, at: center(of: .shift, in: view))
                 view.engine.touchEnded(id: 902, at: center(of: .shift, in: view))

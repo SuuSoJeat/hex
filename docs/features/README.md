@@ -2913,6 +2913,40 @@ iOS prototype (`HEXMobile`) -> Record/transcribe/copy and keyboard handoff
 │   dictionary behind its autocorrect (a missing accent is the cheapest fix, "koszonom" →
 │   "köszönöm", while a word of its own such as "meg" keeps its spelling), English as its
 │   bilingual partner through the Latin-script rule, and no typing (spatial) model
+├── Khmer (ភាសាខ្មែរ) → Layout → Khmerism: a regular keyboard language (`km-KH`).
+│   Its five rows use Hex's key height and corner radius. The background and press
+│   colors follow the keyboard theme, with teal marks, green independent vowels,
+│   and rose Khmer digits in light and dark. Arabic digits use the keyboard theme.
+│   Tap for the main glyph
+│   or hold for the corner glyph, which replaces the main glyph in the key pop-up
+│   when pop-ups are enabled. Tap Shift for one character or double-tap to lock
+│   the shifted layer. Tap Shift again to unlock. Space shows ខ្មែរ and uses
+│   the regular language swipe. The emoji key opens Hex's picker.
+│   123 and #+= fit four English rows and keep two Khmer punctuation keys beside Space.
+│   On #+=, hold ។ or ៖ for ៙ or ៚. Space, Return or កខគ returns to letters.
+│   The optional Number Row follows the shared setting. Khmer marks insert
+│   as entered, and the host handles backspace. With the caret just after coeng (្),
+│   the letter page brings common subscript consonants onto the main keys and hides
+│   the corner labels. Holds still work, and Shift still selects the full shifted
+│   layer. The usual labels return when the caret moves past or away from coeng. The five-row
+│   letter plane stays joined on the unfolded Duo. Checks: `KhmerKeyboardLanguageTests`,
+│   `KeyboardLayoutTests`, `FullKeyboardEngineTests`.
+│   The suggestion strip offers up to three offline completions from a bundled
+│   SIL/Keyman dictionary. Tap one to append the missing characters. With Autocorrect
+│   on, the same dictionary suggests nearby spellings for one-edit typos. Space
+│   accepts a confident correction and leaves the words joined. Space types a literal
+│   space when no automatic correction is pending. A quick double Space after a word
+│   types ។ and a space. iOS Text Replacement uses the shared shortcut behavior.
+│   Closing punctuation applies the
+│   correction and types the punctuation. Other dictionary guesses are tap-to-accept.
+│   After a correction accepted with Space, the strip offers the original spelling
+│   immediately. After a correction with punctuation, Backspace reveals that option.
+│   Checks:
+│   `KhmerAutocompleteTests`, `FullKeyboardEngineTests`.
+│   Settings › Experiments › Khmerism (off by default, App Group, `FullKeyboardSettingsTests`)
+│   ├── No colors (`experiments.khmerismNoColors`) → every cap uses the keyboard theme
+│   └── No superscripts (`experiments.khmerismNoSuperscripts`) → hide corner labels,
+│       center the main glyph, and keep hold-to-type and its pop-up
 ├── Korean keyboard (두벌식) (off by default, `experiments.koreanKeyboard`): Settings ›
 │   Experiments adds 한국어 to Settings › Keyboard › Languages, typed on the standard two-set
 │   rows (ㅂㅈㄷㄱㅅㅛㅕㅑㅐㅔ / ㅁㄴㅇㄹㅎㅗㅓㅏㅣ / ㅋㅌㅊㅍㅠㅜㅡ, shift's ㅃㅉㄸㄲㅆ and ㅒㅖ, no

@@ -1008,6 +1008,34 @@ never at a launch by itself.
   the experiment off the language isn't listed, Automatic never picks it, and a stored "ko" is
   ignored. Unit tests only (`HangulComposerTests`, `HangulKeyboardTests`,
   `KoreanKeyboardGatingTests`): no CI compiles the iOS targets and no device run checks it.
+- **Khmer (ភាសាខ្មែរ):** Choose Khmer under **Settings › Keyboard › Languages**
+  and select **Khmerism** under **Layout**. Tap a key for its main character and
+  hold it for its corner character, shown in the pop-up when enabled. Tap Shift
+  for one character or double-tap to lock the shifted layer. Tap Shift again to
+  unlock. Space, Return and **កខគ** go from 123 or #+= back to the letters and
+  clear Shift. Those pages use English rows with two Khmer punctuation keys beside Space.
+  Arabic digits use the keyboard theme. On #+=,
+  hold **។** or **៖** to type **៙** or **៚**. The space bar shows **ខ្មែរ** and
+  switches languages with the standard swipe. Emoji opens Hex's picker. The five
+  letter rows use Hex's key height and corner radius, with teal marks, green
+  independent vowels and rose Khmer digits. The background and press colors follow
+  the keyboard theme. The optional Number Row follows the shared setting.
+  When the caret follows coeng (**្**), common subscript consonants move onto the
+  main keys and the corner labels hide. Hold a changed key to type its usual
+  character. Shift still selects the full shifted layer. The usual labels return
+  when the caret moves past or away from coeng.
+  The suggestion strip offers up to three offline completions. Tap one to append the
+  missing characters. **Settings › Keyboard › Autocorrect** enables offline Khmer
+  spelling suggestions. Space accepts a confident correction without inserting a
+  space. Press Space again if you want a space after the corrected word. A quick
+  double Space after a word types **។** and a space. iOS Text Replacement uses
+  the shared shortcut behavior. Closing
+  punctuation applies the correction and types the punctuation. Tap other dictionary
+  guesses to use them. Tap the quoted spelling to keep it or tap the undo suggestion
+  to restore it. After a correction with punctuation, Backspace reveals that option.
+  Under **Settings › Experiments › Khmerism**, **No colors** uses the keyboard theme
+  for every key, and **No superscripts** hides the small corner labels while keeping
+  hold-to-type. Both switches are off by default.
 - **Layout per language (Settings › Keyboard › Languages › Layout):** each language the keys
   show (every chosen one, Automatic's while none is, and only the first of English and
   Español together) gets a menu of the layouts Apple's Keyboard Layout list offers for it
