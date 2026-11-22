@@ -96,18 +96,14 @@ final class KeyboardKeyPlaneView: UIView {
         let isLandscape = layout.orientation == .landscape && layout.metrics.pad == nil
         let labelScale = layout.keyLabelScale
         let radius = layout.metrics.cornerRadius
+        var pressed = engine.pressedKinds
+        if let lingeringKind { pressed.insert(lingeringKind) }
+        pressed.formUnion(lingeringFunctionKinds)
         // Like Apple's spacebar trackpad, key glyphs fade out while sliding the cursor, and the
         // keycaps fade most of the way to blank (`trackpadKeycapAlpha`).
         let hideGlyphs = engine.isTrackpadActive || (engine.isSelectionActive && !engine.selectionActionsShown)
         let glyphAlpha = currentGlyphAlpha()
         let keycapAlpha = 1 - (1 - Self.trackpadKeycapAlpha) * (1 - glyphAlpha)
-        if layout.language == .khmer {
-            drawKhmerism(in: context, dirty: rect, glyphAlpha: glyphAlpha, keycapAlpha: keycapAlpha)
-            return
-        }
-        var pressed = engine.pressedKinds
-        if let lingeringKind { pressed.insert(lingeringKind) }
-        pressed.formUnion(lingeringFunctionKinds)
         let showGlyphs = { () -> Bool in
             context.setAlpha(glyphAlpha)
             return glyphAlpha > 0
@@ -245,63 +241,6 @@ final class KeyboardKeyPlaneView: UIView {
                 drawSymbol("keyboard.chevron.compact.down", in: labelFrame, color: palette.textBase, pointSize: 19, yOffset: 0)
             }
         }
-    }
-
-    private func drawKhmerism(in context: CGContext, dirty: CGRect, glyphAlpha: CGFloat, keycapAlpha: CGFloat) {
-        let layout = engine.layout
-        let metrics = layout.metrics
-        let scale = metrics.cornerRadius / 6
-        let pageEdge = CGRect(x: 0, y: metrics.stripArea, width: bounds.width, height: 1)
-        context.setFillColor(KhmerismAppearance.edge.cgColor)
-        context.fill(pixelAligned(pageEdge))
-
-        for key in layout.keys where key.kind != .hex && key.frame.intersects(dirty) {
-            let frame = pixelAligned(key.frame)
-            let label = engine.keycapLabel(for: key)
-            let isCharacter = key.character != nil
-            let isDisabled = (key.kind == .shift && layout.layer == .emoji) || (key.kind == .returnKey && !returnIsEnabled)
-            let isPressed = engine.touches.values.contains { !$0.committed && ($0.key == key || $0.slideKey == key) }
-            let isSelected = key.kind == .shift && engine.isUppercase
-            let face = if !isDisabled && (isPressed || isSelected || lingeringKind == key.kind || lingeringFunctionKinds.contains(key.kind)) {
-                KhmerismAppearance.selected
-            } else if isCharacter {
-                KhmerismAppearance.face(for: label)
-            } else {
-                KhmerismAppearance.action
-            }
-
-            context.setAlpha(keycapAlpha)
-            context.fillKeycap(frame, fill: face.fill, radius: metrics.cornerRadius)
-            guard glyphAlpha > 0 else { continue }
-            context.saveGState()
-            context.clip(to: frame)
-            context.setAlpha(glyphAlpha)
-            let ink = isDisabled ? face.ink.withAlphaComponent(0.5) : face.ink
-            if key.kind == .globe || key.kind == .dismiss || (key.kind == .returnKey && returnStyle.isAction) {
-                let symbol = key.kind == .globe ? "globe" : key.kind == .dismiss ? "keyboard.chevron.compact.down" : returnStyle.symbol
-                drawSymbol(symbol, in: frame, color: ink, pointSize: 13 * scale)
-            } else {
-                let alternate = engine.khmerismAlternate(for: key)
-                let title = label == "☺" ? "☺\u{FE0E}" : label
-                let size = min((isCharacter ? 17.331 : 13) * scale, frame.height * 0.62)
-                drawText(
-                    title, in: frame, font: KhmerismAppearance.font(for: title, size: size),
-                    color: ink, yOffset: alternate == nil ? 0 : 3 * scale
-                )
-                if let alternate {
-                    let size = min(8 * scale, frame.height * 0.25)
-                    let properties: [NSAttributedString.Key: Any] = [
-                        .font: KhmerismAppearance.font(for: alternate, size: size),
-                        .foregroundColor: ink.withAlphaComponent(0.8),
-                    ]
-                    let text = alternate as NSString
-                    let advance = text.size(withAttributes: properties)
-                    text.draw(at: CGPoint(x: frame.maxX - 3 * scale - advance.width, y: frame.minY), withAttributes: properties)
-                }
-            }
-            context.restoreGState()
-        }
-        context.setAlpha(1)
     }
 
     /// `rect` with its edges on this screen's pixel grid.

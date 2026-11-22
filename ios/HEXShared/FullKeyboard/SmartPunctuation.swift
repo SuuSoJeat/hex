@@ -171,7 +171,6 @@ extension FullKeyboardEngine {
     /// after a hyphen making both an em dash. Accent picks and emoji go in as they are.
     func typeIntoField(_ text: String, source: String?) {
         guard !text.isEmpty else { return }
-        guard layout.language != .khmer else { return target.insertText(text) }
         guard source == "key" || source == "slide" || source == nil else { return target.insertText(text) }
         if text == "-", smartDashes, target.documentContextBeforeInput?.last == "-" {
             typingLog?.edit("smart_dash", [TypingLogField("deleted", .string("-")), TypingLogField("inserted", .string(SmartPunctuation.emDash))])

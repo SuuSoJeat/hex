@@ -1008,13 +1008,6 @@ never at a launch by itself.
   the experiment off the language isn't listed, Automatic never picks it, and a stored "ko" is
   ignored. Unit tests only (`HangulComposerTests`, `HangulKeyboardTests`,
   `KoreanKeyboardGatingTests`): no CI compiles the iOS targets and no device run checks it.
-- **Khmer (ភាសាខ្មែរ):** Choose Khmer under **Settings › Keyboard › Languages** and
-  select **Khmerism** under **Layout**. Khmerism uses purple consonants, teal marks,
-  green independent vowels, and rose digits. Tap the main character or flick up from
-  a key with a corner character. Shift stays selected until you tap it again or tap
-  **ខ្មែរ**. **123**, **#+=**, and **☺** open the layout's numbers, symbols, and emoji.
-  Khmer text inserts as entered, and the host handles backspace. The five rows stay
-  joined when unfolded. They include Khmer digits in place of the optional Number row.
 - **Layout per language (Settings › Keyboard › Languages › Layout):** each language the keys
   show (every chosen one, Automatic's while none is, and only the first of English and
   Español together) gets a menu of the layouts Apple's Keyboard Layout list offers for it

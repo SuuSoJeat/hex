@@ -18,7 +18,7 @@ extension KeyboardLayout {
             return ["%", "-", "+", "=", "/", ";", ":"].map { ($0, nil) } + [(",", "!"), (".", "?")]
         case .symbols:
             return ["§", "|", "~", "…", "\\", "<", ">", "!", "?"].map { ($0, nil) }
-        case .letters, .emoji:
+        case .letters:
             switch rowThree.count {
             // English, German, QWERTY and QWERTZ: , and ! then . and ?
             case 7: return rowThree.map { ($0, nil) } + [(",", "!"), (".", "?")]
@@ -32,7 +32,7 @@ extension KeyboardLayout {
     static func padRows(layer: KeyboardLayer, language: KeyboardLanguage, letters: KeyboardLetterLayout) -> (top: [String], middle: [String], bottom: [(String, String?)]) {
         let digits = "1234567890".map(String.init)
         switch layer {
-        case .letters, .emoji:
+        case .letters:
             // The iPhone's French apostrophe key is the iPad's ' and : pair key (`padPairs`).
             let rows = language.letterRows(letters).map { language.isFrench ? $0.filter { $0 != FrenchTyping.key } : $0 }
             return (rows[0], rows[1], padPairs(letters: rows[2], layer: .letters))
@@ -104,7 +104,7 @@ extension KeyboardLayout {
         // Row 3: shift (or the page switch), the letters and two-symbol keys, the other shift.
         let shiftW = padShiftRatio(language: language, letters: letters, layer: layer) * lw
         let page: (KeyKind, String) = switch layer {
-        case .letters, .emoji: (.shift, "shift")
+        case .letters: (.shift, "shift")
         case .numbers: (.layerSwitch(.symbols), "#+=")
         case .symbols: (.layerSwitch(.numbers), "123")
         }
