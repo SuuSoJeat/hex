@@ -11,5 +11,9 @@ name = "hex_keyboard_core"
 [dependencies]
 unicode-normalization = "0.1"
 
+[dev-dependencies]
+# The parity fixtures and the replay benchmark's sets are JSON Lines.
+serde_json = "1"
+
 [lints]
 workspace = true
