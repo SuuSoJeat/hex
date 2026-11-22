@@ -297,8 +297,7 @@ final class FullKeyboardEngineTests: XCTestCase {
         XCTAssertEqual(engine.suggestions.map(\.willAutoReplace), [false, true])
 
         tap(.space)
-        XCTAssertEqual(target.text, "ចំណុច ")
-        engine.deleteBackward()
+        XCTAssertEqual(target.text, "ចំណុច")
         let revert = try XCTUnwrap(engine.suggestions.first)
         XCTAssertEqual(revert.kind, .revert)
         engine.acceptSuggestion(revert)
@@ -314,8 +313,7 @@ final class FullKeyboardEngineTests: XCTestCase {
         await engine.khmerAutocompleteLoad?.value
 
         tap(.space)
-        XCTAssertEqual(target.text, "ខ្ញុំចំណុច ")
-        engine.deleteBackward()
+        XCTAssertEqual(target.text, "ខ្ញុំចំណុច")
         let revert = try XCTUnwrap(engine.suggestions.first)
         XCTAssertEqual(revert.kind, .revert)
         engine.acceptSuggestion(revert)
@@ -331,8 +329,7 @@ final class FullKeyboardEngineTests: XCTestCase {
         XCTAssertEqual(correction.displayText, "សាលា")
 
         tap(.space)
-        XCTAssertEqual(target.text, "ខ្ញុំសាលា ")
-        engine.deleteBackward()
+        XCTAssertEqual(target.text, "ខ្ញុំសាលា")
         let revert = try XCTUnwrap(engine.suggestions.first)
         XCTAssertEqual(revert.kind, .revert)
         engine.acceptSuggestion(revert)
@@ -342,18 +339,53 @@ final class FullKeyboardEngineTests: XCTestCase {
     func testKhmerDictionarySpellingGuessRequiresATap() async throws {
         engine.language = .khmer
         await engine.khmerAutocompleteLoad?.value
-        target.insertText("កមពុជា")
+        target.insertText("សួស្ដី")
         engine.textDidChange()
         let suggestion = try XCTUnwrap(engine.suggestions.first { $0.kind == .khmerCorrection(autoReplace: false) })
-        XCTAssertEqual(suggestion.displayText, "កម្ពុជា")
+        XCTAssertEqual(suggestion.displayText, "សួស្តី")
         XCTAssertFalse(suggestion.willAutoReplace)
 
         tap(.space)
         engine.acceptSuggestion(suggestion)
-        XCTAssertEqual(target.text, "កមពុជា ")
+        XCTAssertEqual(target.text, "សួស្ដី ")
         engine.deleteBackward()
         engine.acceptSuggestion(suggestion)
+        XCTAssertEqual(target.text, "សួស្តី")
+    }
+
+    func testKhmerSpaceRestoresAMissingCoengAndKeepsTheNextWordJoined() async throws {
+        engine.language = .khmer
+        await engine.khmerAutocompleteLoad?.value
+        target.insertText("កមពុជា")
+        engine.textDidChange()
+        XCTAssertEqual(engine.suggestions.first(where: \.willAutoReplace)?.replacement, "កម្ពុជា")
+
+        tap(.space)
         XCTAssertEqual(target.text, "កម្ពុជា")
+        XCTAssertEqual(engine.suggestions.first?.kind, .revert)
+        target.insertText("ទៅ")
+        engine.textDidChange()
+        XCTAssertEqual(target.text, "កម្ពុជាទៅ")
+        XCTAssertFalse(engine.suggestions.contains { $0.kind == .revert })
+    }
+
+    func testKhmerSpaceCorrectsSchoolThenCanInsertADeliberateSpace() async throws {
+        engine.language = .khmer
+        await engine.khmerAutocompleteLoad?.value
+        target.insertText("សាលារ")
+        engine.textDidChange()
+        XCTAssertEqual(engine.suggestions.first(where: \.willAutoReplace)?.replacement, "សាលា")
+
+        tap(.space)
+        XCTAssertEqual(target.text, "សាលា")
+        XCTAssertEqual(engine.suggestions.first?.kind, .revert)
+        tap(.space)
+        XCTAssertEqual(target.text, "សាលា ")
+
+        target.insertText("សាលារៀន")
+        engine.textDidChange()
+        tap(.space)
+        XCTAssertEqual(target.text, "សាលា សាលារៀន ")
     }
 
     func testKhmerAutocorrectOnPunctuationAndExplicitPick() async throws {

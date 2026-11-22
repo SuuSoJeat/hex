@@ -28,6 +28,7 @@ struct KhmerAutocomplete: Sendable {
 
     private static let minimumPrefixLength = 2
     private static let minimumSpellingLength = 4
+    private static let minimumCoengCorrectionFrequency = 1_000
     private static let contextLength = 96
     private static let coeng: UInt16 = 0x17D2
     private static let dependentVowels: ClosedRange<UInt16> = 0x17B6...0x17C5
@@ -45,6 +46,10 @@ struct KhmerAutocomplete: Sendable {
         "ចំនុច": "ចំណុច",
         "សមត្ថិភាព": "សមត្ថភាព",
     ].map { (units: Array($0.key.utf16), fix: Correction(typed: $0.key, replacement: $0.value)) }
+
+    private static let schoolMisspelling = Correction(typed: "សាលារ", replacement: "សាលា")
+    private static let schoolMisspellingUnits = Array(schoolMisspelling.typed.utf16)
+    private static let schoolUnits = Array(schoolMisspelling.replacement.utf16)
 
     private let entries: [Entry]
     private let longestWord: Int
@@ -114,8 +119,8 @@ struct KhmerAutocomplete: Sendable {
         return []
     }
 
-    /// Spelling choices begin at an established Khmer word boundary. A full reading made of
-    /// dictionary words takes precedence, including a compound typed without spaces.
+    /// Spelling choices begin at an established Khmer word boundary. A full dictionary
+    /// reading takes precedence unless the user has confirmed a specific misspelling.
     func correction(beforeInput: String?) -> Correction? {
         guard let beforeInput else { return nil }
         let tail = beforeInput.utf16.reversed().prefix(Self.contextLength + 1)
@@ -130,6 +135,16 @@ struct KhmerAutocomplete: Sendable {
         for start in run.indices where wordStarts[start] {
             markWordEnds(from: start, in: run, into: &wordStarts)
         }
+
+        // The dictionary can split this confirmed misspelling into សាលា + រ.
+        // Preserve a whole dictionary word at or across the split before the school word.
+        let schoolStart = run.count - Self.schoolMisspellingUnits.count
+        if schoolStart >= 0, wordStarts[schoolStart],
+           run[schoolStart...].elementsEqual(Self.schoolMisspellingUnits),
+           contains(Self.schoolUnits[...]),
+           !(0...schoolStart).contains(where: { wordStarts[$0] && contains(run[$0...]) }) {
+            return Self.schoolMisspelling
+        }
         guard !wordStarts[run.count] else { return nil }
 
         let reviewed = Self.reviewedMisspellings.filter { units, fix in
@@ -142,41 +157,56 @@ struct KhmerAutocomplete: Sendable {
         // Let the completion path handle a prefix of a word the person may still be typing.
         guard !suffixes.contains(where: { hasPrefix($0) }) else { return nil }
         let eligible = suffixes.filter { spelling in
-            spelling.count >= Self.minimumPrefixLength + 1 && spelling.count <= longestWord + 1 && Self.hasCompleteClusters(spelling)
+            spelling.count >= Self.minimumPrefixLength + 1 && spelling.count <= longestWord + 1
         }
-        let repeatedVowels = eligible.compactMap(duplicateVowelCorrection)
+        let repeatedMarks = eligible.compactMap(duplicateMarkCorrection)
         // Equivalent readings remove the same scalar. Keep the shortest confirmed replacement.
-        if let shortest = repeatedVowels.last, repeatedVowels.allSatisfy({ $0.offset == shortest.offset }) {
+        if let shortest = repeatedMarks.last, repeatedMarks.allSatisfy({ $0.offset == shortest.offset }) {
             return shortest.fix
         }
 
-        for spelling in eligible where spelling.count >= Self.minimumSpellingLength {
-            if let match = bestSingleEdit(to: spelling) {
-                return Correction(typed: String(decoding: spelling, as: UTF16.self), replacement: match.word, automaticallyApplies: false)
-            }
+        let complete = eligible.filter(Self.hasCompleteClusters)
+        for (index, spelling) in complete.enumerated() where spelling.count >= Self.minimumSpellingLength {
+            guard let edit = bestSingleEdit(to: spelling) else { continue }
+            // Restoring a missing coeng requires a unique repair to a common word
+            // and no competing common word at a later boundary.
+            let confident = edit.insertsCoeng && edit.unique
+                && edit.entry.frequency >= Self.minimumCoengCorrectionFrequency
+                && complete.dropFirst(index + 1).allSatisfy {
+                    (bestSingleEdit(to: $0)?.entry.frequency ?? 0) < Self.minimumCoengCorrectionFrequency
+                }
+            return Correction(typed: String(decoding: spelling, as: UTF16.self),
+                              replacement: edit.entry.word, automaticallyApplies: confident)
         }
         return nil
     }
 
-    // Unicode 17, chapter 16.4.2, places one dependent vowel slot in the Khmer syllable.
-    private func duplicateVowelCorrection(_ spelling: ArraySlice<UInt16>) -> (offset: Int, fix: Correction)? {
+    // Unicode 17, chapter 16.4.2, places one dependent vowel slot in the Khmer syllable
+    // and pairs each coeng with the following letter.
+    private func duplicateMarkCorrection(_ spelling: ArraySlice<UInt16>) -> (offset: Int, fix: Correction)? {
         let repeated = spelling.indices.dropFirst().filter {
-            spelling[$0] == spelling[$0 - 1] && Self.dependentVowels.contains(spelling[$0])
+            let mark = spelling[$0]
+            return mark == spelling[$0 - 1] && (mark == Self.coeng || Self.dependentVowels.contains(mark))
         }
         guard repeated.count == 1, let extra = repeated.first else { return nil }
         var repaired = Array(spelling)
         repaired.remove(at: extra - spelling.startIndex)
-        guard let match = entry(for: repaired[...]) else { return nil }
+        guard Self.hasCompleteClusters(repaired[...]), let match = entry(for: repaired[...]) else { return nil }
         return (extra, Correction(typed: String(decoding: spelling, as: UTF16.self), replacement: match.word))
     }
 
-    private func bestSingleEdit(to spelling: ArraySlice<UInt16>) -> Entry? {
+    private func bestSingleEdit(to spelling: ArraySlice<UInt16>) -> (entry: Entry, insertsCoeng: Bool, unique: Bool)? {
         let original = Array(spelling)
-        var best: Entry?
-        func consider(_ units: [UInt16]) {
+        var best: (entry: Entry, insertsCoeng: Bool)?
+        var unique = true
+        func consider(_ units: [UInt16], insertsCoeng: Bool = false) {
             guard let match = entry(for: units[...]), Self.hasCompleteClusters(match.units[...]) else { return }
-            if let current = best, !ranksAhead(match, current) { return }
-            best = match
+            if let current = best {
+                guard match.units != current.entry.units else { return }
+                unique = false
+                guard ranksAhead(match, current.entry) else { return }
+            }
+            best = (match, insertsCoeng)
         }
 
         for index in original.indices {
@@ -203,10 +233,12 @@ struct KhmerAutocomplete: Sendable {
                     consider(replaced)
                 }
                 inserted[index] = candidate
-                consider(inserted)
+                let insertsCoeng = candidate == Self.coeng && index > 0
+                    && Self.beginsWord(original[index - 1]) && Self.beginsWord(unit)
+                consider(inserted, insertsCoeng: insertsCoeng)
             }
         }
-        return best
+        return best.map { ($0.entry, $0.insertsCoeng, unique) }
     }
 
     private func markWordEnds(from start: Int, in run: [UInt16], into wordStarts: inout [Bool]) {

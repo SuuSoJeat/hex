@@ -489,7 +489,9 @@ final class FullKeyboardEngine {
     }
 
     private func insertKhmerKeyText(_ text: String, source: String) {
-        if (text == " " || Self.khmerWordEnders.contains(text)), applyKhmerCorrection(ending: text) { return }
+        // Space accepts a pending correction without separating the Khmer words.
+        let ending = text == " " ? "" : text
+        if (text == " " || Self.khmerWordEnders.contains(text)), applyKhmerCorrection(ending: ending) { return }
         insert(text, source: source)
     }
 

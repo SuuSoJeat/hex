@@ -1019,10 +1019,11 @@ never at a launch by itself.
   keys in light and dark. The background and press colors follow the keyboard theme.
   The suggestion strip offers up to three offline completions. Tap one to append the
   missing characters. **Settings › Keyboard › Autocorrect** enables offline Khmer
-  spelling suggestions. Space and closing punctuation apply documented fixes and
-  unambiguous repairs of doubled dependent vowel signs. Tap other dictionary guesses
-  to use them. Tap the quoted spelling to keep it, or backspace over the delimiter
-  after an automatic correction to see the original spelling in the strip.
+  spelling suggestions. Space accepts a confident correction without inserting a
+  space. Press Space again if you want a space after the corrected word. Closing
+  punctuation applies the correction and types the punctuation. Tap other dictionary
+  guesses to use them. Tap the quoted spelling to keep it or tap the undo suggestion
+  to restore it. After a correction with punctuation, Backspace reveals that option.
   Under **Settings › Experiments › Khmerism**, **No colors** uses the keyboard theme
   for every key, and **No superscripts** hides the small corner labels while keeping
   hold-to-type. Both switches are off by default.
