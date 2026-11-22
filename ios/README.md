@@ -1010,12 +1010,13 @@ never at a launch by itself.
   `KoreanKeyboardGatingTests`): no CI compiles the iOS targets and no device run checks it.
 - **Khmer (ភាសាខ្មែរ):** Choose Khmer under **Settings › Keyboard › Languages**
   and select **Khmerism** under **Layout**. Tap a key for its main character and
-  hold it for its corner character. Shift swaps them until you turn it off or
-  return from 123 or #+= using **កខគ**. Those pages use English rows with two
-  Khmer punctuation keys beside Space. On #+=, hold **។** or **៖** to type **៙**
-  or **៚**. The space bar shows **ខ្មែរ** and switches languages with the standard
-  swipe. Emoji opens Hex's picker. The five letter rows keep Hex's key height and
-  corner radius, with corresponding teal, green and rose keys in light and dark.
+  hold it for its corner character, shown in the pop-up when enabled. Shift swaps
+  them until you turn it off or return from 123 or #+= using **កខគ**. Those pages
+  fit four English rows with two Khmer punctuation keys beside Space. On #+=,
+  hold **។** or **៖** to type **៙** or **៚**. The space bar shows **ខ្មែរ** and
+  switches languages with the standard swipe. Emoji opens Hex's picker. The five
+  letter rows use Hex's key height and corner radius, with teal, green and rose
+  keys in light and dark. The background and press colors follow the keyboard theme.
 - **Layout per language (Settings › Keyboard › Languages › Layout):** each language the keys
   show (every chosen one, Automatic's while none is, and only the first of English and
   Español together) gets a menu of the layouts Apple's Keyboard Layout list offers for it

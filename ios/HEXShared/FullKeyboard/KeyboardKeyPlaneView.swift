@@ -252,9 +252,9 @@ final class KeyboardKeyPlaneView: UIView {
         let layout = engine.layout
         let metrics = layout.metrics
         let isDark = palette.isDark
-        let neutral = KhmerismAppearance.neutral(isDark: isDark)
-        let pageEdge = CGRect(x: 0, y: metrics.stripArea, width: bounds.width, height: 1)
-        context.setFillColor(KhmerismAppearance.edge(isDark: isDark).cgColor)
+        let neutral = KhmerismAppearance.Face(fill: palette.keyFill, ink: palette.textBase)
+        let pageEdge = CGRect(x: 0, y: metrics.stripTop + metrics.stripHeight - 1, width: bounds.width, height: 1)
+        context.setFillColor(palette.stripDivider.cgColor)
         context.fill(pixelAligned(pageEdge))
 
         for key in layout.keys where key.kind != .hex && key.frame.intersects(dirty) {
@@ -262,11 +262,11 @@ final class KeyboardKeyPlaneView: UIView {
             let label = engine.keycapLabel(for: key)
             let isDisabled = key.kind == .returnKey && !returnIsEnabled
             let isPressed = engine.touches.values.contains { $0.key == key || $0.slideKey == key }
-            let isSelected = key.kind == .shift && engine.isUppercase
-            let face = if !isDisabled && (isPressed || isSelected || lingeringKind == key.kind || lingeringFunctionKinds.contains(key.kind)) {
-                KhmerismAppearance.selected
+            let isHighlighted = !isDisabled && (isPressed || lingeringKind == key.kind || lingeringFunctionKinds.contains(key.kind))
+            let face = if isHighlighted {
+                KhmerismAppearance.Face(fill: heldFill(for: key.kind), ink: palette.textBase)
             } else if key.character != nil {
-                KhmerismAppearance.face(for: label, isDark: isDark)
+                KhmerismAppearance.face(for: label, isDark: isDark) ?? neutral
             } else {
                 neutral
             }
@@ -305,6 +305,14 @@ final class KeyboardKeyPlaneView: UIView {
             context.restoreGState()
         }
         context.setAlpha(1)
+    }
+
+    private func heldFill(for kind: KeyKind) -> UIColor {
+        switch kind {
+        case .space: palette.spaceHeldFill
+        case .character, .layerSwitch: palette.keyHeldFill
+        default: palette.functionHeldFill
+        }
     }
 
     private func drawKhmerismCharacter(_ title: String, alternate: String?, in frame: CGRect, ink: UIColor) {
@@ -861,6 +869,7 @@ final class KeyCalloutView: UIView {
     var palette = FullKeyboardPalette(isDark: false)
     private var balloon: KeyBalloon?
     private var label = ""
+    private var labelFont: UIFont?
 
     override init(frame: CGRect) {
         super.init(frame: frame)
@@ -873,12 +882,14 @@ final class KeyCalloutView: UIView {
     @available(*, unavailable)
     required init?(coder: NSCoder) { fatalError() }
 
-    func show(_ balloon: KeyBalloon?, label: String, style: KeyboardKeyPlaneView.LabelStyle? = nil) {
+    func show(_ balloon: KeyBalloon?, label: String, style: KeyboardKeyPlaneView.LabelStyle? = nil, font: UIFont? = nil) {
         let style = style ?? Self.letterStyle
-        guard balloon != self.balloon || label != self.label || style.size != labelStyle.size || style.yOffset != labelStyle.yOffset else { return }
+        guard balloon != self.balloon || label != self.label || font != labelFont
+                || style.size != labelStyle.size || style.yOffset != labelStyle.yOffset else { return }
         self.balloon = balloon
         self.label = label
         labelStyle = style
+        labelFont = font
         setNeedsDisplay()
     }
 
@@ -932,7 +943,7 @@ final class KeyCalloutView: UIView {
         }
 
         let attributes: [NSAttributedString.Key: Any] = [
-            .font: labelStyle.font,
+            .font: labelFont ?? labelStyle.font,
             .foregroundColor: palette.textBase,
         ]
         let shown = labelStyle.shows ?? label

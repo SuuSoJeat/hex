@@ -13,6 +13,8 @@ extension FullKeyboardEngine {
         var point: CGPoint
         /// This press is finished. It typed on rollover or hold, or a corner hold was cancelled.
         var committed: Bool
+        /// The corner character already typed by this hold, shown until the finger lifts.
+        var heldAlternate: String?
         /// The page a 123/ABC press came from; releasing over a character returns there.
         var returnLayer: KeyboardLayer?
         /// A 123, #+= or shift press slid onto this character key: it shows the key's pop-up,

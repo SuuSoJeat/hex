@@ -324,6 +324,7 @@ final class FullKeyboardView: UIView {
 
     /// On an iPad, which way up its screen is (`KeyboardPadPlacement.orientation`); nil on an iPhone.
     private var padOrientation: KeyboardOrientation?
+    private var presentedLayer: KeyboardLayer = .letters
 
     var preferredHeight: CGFloat {
         keysHeight + lift
@@ -333,7 +334,7 @@ final class FullKeyboardView: UIView {
     private var keysHeight: CGFloat {
         KeyboardLayout.height(
             for: orientation, posture: engine.posture, phoneSize: engine.phoneSize, pad: engine.pad,
-            numberRow: engine.hasNumberRow, language: engine.layout.language
+            numberRow: engine.hasNumberRow, language: engine.layout.language, layer: engine.layout.layer
         )
     }
 
@@ -492,14 +493,12 @@ final class FullKeyboardView: UIView {
         }
         guard list != languages || engine.language != list.current || engine.letterLayout != letters else { return }
         let oldHeight = preferredHeight
-        let wasKhmer = engine.layout.language == .khmer
         languages = list
         engine.switchesLanguage = list.switches
         engine.layoutLanguage = list.layout == list.current ? nil : list.layout
         engine.letterLayout = letters
         engine.language = list.current
         engine.partnerLanguage = list.partner(available: Self.spellCheckLanguages)
-        if wasKhmer != (engine.layout.language == .khmer) { applyAppearance() }
         syncSpatialAutocorrect()
         refreshSpaceLabel()
         syncSwipeTyping()
@@ -661,6 +660,7 @@ final class FullKeyboardView: UIView {
         if routeField != field {
             plane.cancelAllTouches()
             engine.configureForField()
+            resizeForPageIfNeeded()
             refreshEmojiKey()
         } else {
             engine.textDidChange()
@@ -680,6 +680,7 @@ final class FullKeyboardView: UIView {
         syncSettings()
         plane.cancelAllTouches()
         engine.configureForField()
+        resizeForPageIfNeeded()
         refreshReturnKey()
         applyAppearance()
         refreshStrip()
@@ -737,6 +738,7 @@ final class FullKeyboardView: UIView {
         engine.availableHeight = bounds.height - lift
         engine.typingLog?.commitGeometry()
         let layout = engine.layout
+        presentedLayer = layout.layer
 
         let content = CGRect(x: 0, y: lift, width: bounds.width, height: bounds.height - lift)
         plane.frame = content
@@ -786,16 +788,13 @@ final class FullKeyboardView: UIView {
     private func applyAppearance() {
         let isDark = appearanceOverride
             ?? FullKeyboardPalette.isDark(traits: traitCollection)
-        let khmerism = engine.layout.language == .khmer
         let next = FullKeyboardPalette(isDark: isDark, theme: keyboardTheme)
         // A theme paints its own opaque panel, so the system glass behind the keys never
         // shows through. The panel, not this view, keeps the glass panel's corners;
         // Automatic leaves both clear as before.
-        let backdrop = khmerism ? KhmerismAppearance.plate(isDark: next.isDark) : next.backdrop
-        let drawsPanel = khmerism || next.drawsOwnBackground
-        backgroundColor = drawsBackdrop ? backdrop : .clear
-        themePanel.isHidden = !drawsPanel
-        themePanel.backgroundColor = drawsPanel ? backdrop : .clear
+        backgroundColor = drawsBackdrop ? next.backdrop : .clear
+        themePanel.isHidden = !next.drawsOwnBackground
+        themePanel.backgroundColor = next.drawsOwnBackground ? next.backdrop : .clear
         stripView.inSystemPlatter = !drawsBackdrop
         guard next != palette || !didApplyPalette else { return }
         didApplyPalette = true
@@ -1103,9 +1102,19 @@ final class FullKeyboardView: UIView {
         plane.setNeedsDisplay()
         updateCallout()
         refreshStrip()
+        resizeForPageIfNeeded()
         if globeButton.isHidden != (engine.layout.key(.globe) == nil) || hexKey.frame != engine.layout.key(.hex)?.hitFrame {
             setNeedsLayout()
         }
+    }
+
+    private func resizeForPageIfNeeded() {
+        let previous = presentedLayer
+        let current = engine.layout.layer
+        presentedLayer = current
+        guard previous != current, engine.layout.language == .khmer, previous == .letters || current == .letters else { return }
+        setNeedsLayout()
+        onPreferredHeightChange?()
     }
 
     private func updateCallout() {
@@ -1117,12 +1126,15 @@ final class FullKeyboardView: UIView {
         }
         accentCallout.show(nil)
         let layout = engine.layout
-        if engine.showsKeyPopups, let key = engine.previewKey, let balloon = layout.balloon(for: key) {
+        if engine.showsKeyPopups, let preview = engine.keyPreview, let balloon = layout.balloon(for: preview.key) {
             endCalloutLinger()
-            let label = engine.layout.language == .khmer ? engine.displayLabel(for: key)
-                : KeyboardKeyPlaneView.keycapLabel(engine.displayLabel(for: key))
-            callout.show(balloon, label: label, style: KeyCalloutView.style(for: label))
-            shownPreviewKind = key.kind
+            let label = layout.language == .khmer ? preview.label : KeyboardKeyPlaneView.keycapLabel(preview.label)
+            let style = KeyCalloutView.style(for: label)
+            let khmerFont = label.unicodeScalars.contains { (0x1780...0x17FF).contains($0.value) }
+                ? KhmerismAppearance.font(for: label, size: min(style.size, balloon.bubble.height * 0.56))
+                : nil
+            callout.show(balloon, label: label, style: style, font: khmerFont)
+            shownPreviewKind = preview.key.kind
         } else if let kind = shownPreviewKind, calloutLingerWork == nil, engine.touches.isEmpty {
             // The finger lifted: Apple's pop-up and its grey key stay up 3 frames more (about
             // 50 ms after the letter lands, iOS 27.2 at 60 fps), then go in one frame.

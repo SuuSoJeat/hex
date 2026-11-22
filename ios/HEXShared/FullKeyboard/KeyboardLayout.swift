@@ -199,7 +199,7 @@ nonisolated struct KeyboardMetrics: Equatable, Sendable {
     let keyHeight: CGFloat
     let stripTop: CGFloat
     let stripHeight: CGFloat
-    let stripBottom: CGFloat
+    var stripBottom: CGFloat
     let keysTop: CGFloat
     let keysBottom: CGFloat
     let cornerRadius: CGFloat
@@ -228,7 +228,7 @@ nonisolated struct KeyboardMetrics: Equatable, Sendable {
     /// Settings › Keyboard › Number row: the keycap height of the row of 1 to 0 above row 1
     /// (`withNumberRow()`), with a row gap under it; 0 without it.
     var numberRowHeight: CGFloat = 0
-    /// Khmerism reserves five slots so its four-row numeric pages keep the same height.
+    /// Khmerism's letter page uses five rows. Other pages use four.
     var keyRowCount: Int = 4
 
     /// The suggestion strip is Apple's predictive bar from the top of its suggestion pill down.
@@ -461,14 +461,16 @@ nonisolated struct KeyboardMetrics: Equatable, Sendable {
         pad: KeyboardPadPlacement? = nil,
         numberRow: Bool = false,
         joinsUnfoldedKeyboard: Bool = false,
-        language: KeyboardLanguage = .english
+        language: KeyboardLanguage = .english,
+        layer: KeyboardLayer = .letters
     ) -> KeyboardMetrics {
         var rows = letterRows(
             orientation, innerWidth: innerWidth, posture: posture, windowInset: windowInset,
             phoneSize: phoneSize, pad: pad, joinsUnfoldedKeyboard: joinsUnfoldedKeyboard || language == .khmer
         )
         if language == .khmer {
-            rows.keyRowCount = 5
+            if layer == .letters { rows.keyRowCount = 5 }
+            rows.stripBottom = max(rows.stripBottom, stripGap)
             return rows
         }
         return numberRow && pad == nil ? rows.withNumberRow() : rows
@@ -719,7 +721,7 @@ nonisolated struct KeyboardLayout: Equatable, Sendable {
         let innerWidth = width - 2 * self.horizontalInset
         var metrics = KeyboardMetrics.for(
             orientation, innerWidth: innerWidth, posture: posture, windowInset: windowInset, phoneSize: phoneSize, pad: pad,
-            numberRow: numberRow, joinsUnfoldedKeyboard: joinsUnfoldedKeyboard, language: language
+            numberRow: numberRow, joinsUnfoldedKeyboard: joinsUnfoldedKeyboard, language: language, layer: layer
         )
         if let availableHeight { metrics = metrics.fitted(toHeight: availableHeight) }
         self.metrics = metrics
@@ -799,11 +801,12 @@ nonisolated struct KeyboardLayout: Equatable, Sendable {
         pad: KeyboardPadPlacement? = nil,
         numberRow: Bool = false,
         language: KeyboardLanguage = .english,
-        innerWidth: CGFloat? = nil
+        innerWidth: CGFloat? = nil,
+        layer: KeyboardLayer = .letters
     ) -> CGFloat {
         KeyboardMetrics.for(
             orientation, innerWidth: innerWidth, posture: posture, phoneSize: phoneSize,
-            pad: pad, numberRow: numberRow, language: language
+            pad: pad, numberRow: numberRow, language: language, layer: layer
         ).totalHeight
     }
 
@@ -877,8 +880,7 @@ nonisolated struct KeyboardLayout: Equatable, Sendable {
     /// reach about 8 pt above their keycaps to the predictive bar, or `stripTouchBand`.
     var rowOneReach: CGFloat { max(metrics.stripBottom, Self.stripTouchBand) }
 
-    /// Where touches go to the key plane: the key area plus `rowOneReach`. Khmerism's four-row
-    /// pages leave the reserved top slot empty.
+    /// Where touches go to the key plane: the key area plus `rowOneReach`.
     var touchAreaFrame: CGRect {
         CGRect(x: 0, y: metrics.stripArea - rowOneReach, width: width, height: metrics.keysArea + rowOneReach)
     }

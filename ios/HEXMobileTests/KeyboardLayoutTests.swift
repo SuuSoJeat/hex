@@ -498,7 +498,7 @@ final class KeyboardLayoutTests: XCTestCase {
         }
     }
 
-    func testKhmerismLaysOutEveryPageAtStableHeightWithReachableControls() {
+    func testKhmerismLaysOutEveryPageWithReachableControls() {
         let screens: [(CGFloat, KeyboardOrientation, KeyboardPhoneSize, KeyboardPosture, CGFloat, KeyboardPadPlacement?)] = [
             (320, .portrait, .regular, .phone, 0, .floating),
             (375, .portrait, .homeButton, .phone, 0, nil),
@@ -507,6 +507,7 @@ final class KeyboardLayoutTests: XCTestCase {
             (452, .portrait, .regular, .cover, 7, nil),
             (801, .portrait, .regular, .unfoldedWide, 75, nil),
             (744, .portrait, .regular, .phone, 0, .docked(.mini)),
+            (1032, .portrait, .regular, .phone, 0, .docked(.large)),
         ]
         for (width, orientation, phoneSize, posture, windowInset, pad) in screens {
             for layer in layers {
@@ -519,33 +520,39 @@ final class KeyboardLayoutTests: XCTestCase {
                 XCTAssertFalse(layout.isSplit, label)
                 XCTAssertFalse(layout.hasNumberRow, label)
                 XCTAssertEqual(layout.totalHeight, KeyboardLayout.height(
-                    for: orientation, posture: posture, phoneSize: phoneSize, pad: pad, language: .khmer, innerWidth: width
+                    for: orientation, posture: posture, phoneSize: phoneSize, pad: pad, language: .khmer, innerWidth: width,
+                    layer: layer
                 ), accuracy: 0.001, label)
-                XCTAssertEqual(layout.bottomRowIndex, 4, label)
+                let footerRow = layer == .letters ? 4 : 3
+                XCTAssertEqual(layout.bottomRowIndex, footerRow, label)
                 XCTAssertEqual(layout.key(.globe)?.row, -1, label)
                 XCTAssertEqual(layout.key(.hex)?.row, -1, label)
-                let footer = layout.keys.filter { $0.row == 4 }
+                let footer = layout.keys.filter { $0.row == footerRow }
                 XCTAssertEqual(footer[0].label, layer == .letters ? "123" : "កខគ", label)
                 XCTAssertEqual(footer[1].kind, .emoji, label)
                 XCTAssertEqual(footer[2].label, "ខ្មែរ", label)
-                XCTAssertEqual(layout.key(.returnKey)?.row, 4, label)
-                XCTAssertEqual(layout.key(.delete)?.row, 3, label)
+                XCTAssertEqual(layout.key(.returnKey)?.row, footerRow, label)
+                XCTAssertEqual(layout.key(.delete)?.row, footerRow - 1, label)
                 let pageKey: KeyKind = switch layer {
                 case .letters: .shift
                 case .numbers: .layerSwitch(.symbols)
                 case .symbols: .layerSwitch(.numbers)
                 }
-                XCTAssertEqual(layout.keys.first { $0.row == 3 }?.kind, pageKey, label)
+                XCTAssertEqual(layout.keys.first { $0.row == footerRow - 1 }?.kind, pageKey, label)
                 let rows: [[String]] = switch layer {
                 case .letters: KhmerismLayout.base.map { $0.map(\.text) }
                 case .numbers: KeyboardLayout.characterRows(for: .numbers) + [["។", "៕"]]
                 case .symbols: KeyboardLayout.characterRows(for: .symbols) + [["។", "៖"]]
                 }
-                let first = layer == .letters ? 0 : 1
-                XCTAssertEqual(Set(layout.keys.filter { $0.row >= 0 }.map(\.row)), Set(first...4), label)
+                let firstKey = layout.keys.first { $0.row == 0 }
+                let stripBottom = layout.metrics.stripTop + layout.metrics.stripHeight
+                XCTAssertEqual(firstKey?.frame.minY ?? 0, layout.metrics.stripArea, accuracy: 0.001, label)
+                XCTAssertGreaterThanOrEqual((firstKey?.frame.minY ?? 0) - stripBottom, KeyboardMetrics.stripGap, label)
+                XCTAssertEqual(firstKey?.hitFrame.minY, layout.touchAreaFrame.minY, label)
+                XCTAssertEqual(Set(layout.keys.filter { $0.row >= 0 }.map(\.row)), Set(0...footerRow), label)
                 for (row, page) in rows.enumerated() {
-                    XCTAssertEqual(letters(layout, row: row + first), page, label)
-                    let rowKeys = layout.keys.filter { $0.row == row + first }
+                    XCTAssertEqual(letters(layout, row: row), page, label)
+                    let rowKeys = layout.keys.filter { $0.row == row }
                     XCTAssertEqual(rowKeys.first?.hitFrame.minX, 0, label)
                     XCTAssertEqual(rowKeys.last?.hitFrame.maxX ?? -1, width, accuracy: 0.001, label)
                     for (left, right) in zip(rowKeys, rowKeys.dropFirst()) {
@@ -577,25 +584,67 @@ final class KeyboardLayoutTests: XCTestCase {
         }
     }
 
-    func testKhmerismNumericCapsUseEnglishWidthsAndKeepTheFooterAnchored() {
+    func testKhmerismNumericCapsUseEnglishGeometry() {
         let base = KeyboardLayout(width: 440, showsEmoji: true, language: .khmer, phoneSize: .large)
         let pitch = base.metrics.keyHeight + base.metrics.rowGap
         for layer in [KeyboardLayer.numbers, .symbols] {
             let numeric = KeyboardLayout(width: 440, layer: layer, showsEmoji: true, language: .khmer, phoneSize: .large)
             let english = KeyboardLayout(width: 440, layer: layer, showsEmoji: true, phoneSize: .large)
-            XCTAssertEqual(numeric.totalHeight, base.totalHeight, accuracy: 0.001)
-            XCTAssertEqual(numeric.key(.space)?.frame, base.key(.space)?.frame)
-            let emptySlot = CGPoint(x: 220, y: numeric.metrics.stripArea + pitch / 2)
-            XCTAssertNil(numeric.hitTest(emptySlot))
+            XCTAssertEqual(numeric.totalHeight, english.totalHeight, accuracy: 0.001)
+            XCTAssertEqual(base.totalHeight - numeric.totalHeight, pitch, accuracy: 0.001)
+            XCTAssertEqual(numeric.key(.space)?.frame, base.key(.space)?.frame.offsetBy(dx: 0, dy: -pitch))
+            let firstRowPoint = CGPoint(x: 220, y: numeric.metrics.stripArea + pitch / 2)
+            XCTAssertEqual(numeric.hitTest(firstRowPoint)?.row, 0)
             let englishBody = english.keys.filter { (0..<3).contains($0.row) }
-            let numericBody = numeric.keys.filter { (1..<4).contains($0.row) }
+            let numericBody = numeric.keys.filter { (0..<3).contains($0.row) }
             XCTAssertEqual(englishBody.map(\.kind), numericBody.map(\.kind))
             for (expected, actual) in zip(englishBody, numericBody) {
-                assertSameRect(actual.frame, expected.frame.offsetBy(dx: 0, dy: pitch), actual.label)
+                assertSameRect(actual.frame, expected.frame, actual.label)
+                assertSameRect(actual.hitFrame, expected.hitFrame, actual.label)
             }
         }
         let symbols = KeyboardLayout(width: 440, layer: .symbols, language: .khmer, phoneSize: .large)
-        XCTAssertEqual(symbols.keys.filter { $0.row == 4 }.compactMap(\.alternate), ["៙", "៚"])
+        XCTAssertEqual(symbols.keys.filter { $0.row == 3 }.compactMap(\.alternate), ["៙", "៚"])
+    }
+
+    @MainActor
+    func testKhmerismRequestsAHostResizeWhenItsRowCountChanges() {
+        let target = FixtureTextTarget()
+        let view = FullKeyboardView(model: KeyboardViewModel(), target: target)
+        view.languageOverride = .khmer
+        let fiveRowHeight = view.preferredHeight
+        view.frame = CGRect(x: 0, y: 0, width: 393, height: fiveRowHeight)
+        view.layoutIfNeeded()
+        let fourRowHeight = KeyboardLayout.height(for: .portrait, language: .khmer, layer: .numbers)
+        var requested: [CGFloat] = []
+        view.onPreferredHeightChange = { [weak view] in
+            guard let view else { return }
+            requested.append(view.preferredHeight)
+            view.frame.size.height = view.preferredHeight
+            view.layoutIfNeeded()
+        }
+        for (id, layer) in [KeyboardLayer.numbers, .symbols, .letters].enumerated() {
+            let heightBefore = view.bounds.height
+            let frame = view.engine.layout.key(.layerSwitch(layer))!.frame
+            let point = CGPoint(x: frame.midX, y: frame.midY)
+            view.engine.touchBegan(id: id, at: point)
+            // The host grows or shrinks upward, so the same point on screen is offset in the view.
+            view.engine.touchEnded(id: id, at: CGPoint(x: point.x, y: point.y + view.bounds.height - heightBefore))
+            XCTAssertEqual(view.engine.layout.layer, layer)
+        }
+        XCTAssertEqual(requested, [fourRowHeight, fiveRowHeight])
+        XCTAssertEqual(target.text, "")
+
+        let page = view.engine.layout.key(.layerSwitch(.numbers))!.frame
+        view.engine.touchBegan(id: 3, at: CGPoint(x: page.midX, y: page.midY))
+        let digit = view.engine.layout.key(.character("1"))!.frame
+        let digitCenter = CGPoint(x: digit.midX, y: digit.midY)
+        view.engine.touchMoved(id: 3, to: digitCenter)
+        XCTAssertEqual(view.engine.previewKey?.character, "1")
+        view.engine.touchEnded(id: 3, at: digitCenter)
+        XCTAssertEqual(target.text, "1")
+        XCTAssertEqual(view.engine.layout.layer, .letters)
+        XCTAssertEqual(requested, [fourRowHeight, fiveRowHeight, fourRowHeight, fiveRowHeight])
     }
 
     func testKhmerismFitsFiveRowsIntoAShorterView() {

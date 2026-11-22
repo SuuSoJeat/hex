@@ -2914,12 +2914,13 @@ iOS prototype (`HEXMobile`) -> Record/transcribe/copy and keyboard handoff
 │   "köszönöm", while a word of its own such as "meg" keeps its spelling), English as its
 │   bilingual partner through the Latin-script rule, and no typing (spatial) model
 ├── Khmer (ភាសាខ្មែរ) → Layout → Khmerism: a regular keyboard language (`km-KH`).
-│   Its five rows use Hex's key height and corner radius, with teal marks, green
-│   independent vowels, and rose digits in light and dark. Tap for the main glyph
-│   or hold for the corner glyph. Shift swaps the two until toggled off. Space shows
+│   Its five rows use Hex's key height and corner radius. The background and press
+│   colors follow the keyboard theme, with teal marks, green independent vowels,
+│   and rose digits in light and dark. Tap for the main glyph
+│   or hold for the corner glyph, which replaces the main glyph in the key pop-up
+│   when pop-ups are enabled. Shift swaps the two until toggled off. Space shows
 │   ខ្មែរ and uses the regular language swipe. The emoji key opens Hex's picker.
-│   123 and #+= use English rows and keep the two punctuation keys beside Space.
-│   They leave the top slot free so the footer stays in place when switching pages.
+│   123 and #+= fit four English rows and keep two Khmer punctuation keys beside Space.
 │   On #+=, hold ។ or ៖ for ៙ or ៚. កខគ returns to the letters. Khmer marks insert
 │   as entered, including coeng (្), and the host handles backspace. The five-row
 │   letter plane stays joined on the unfolded Duo. Khmerism has no Khmer word

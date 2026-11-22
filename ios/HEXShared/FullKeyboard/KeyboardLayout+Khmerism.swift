@@ -1,8 +1,7 @@
 import CoreGraphics
 
 extension KeyboardLayout {
-    /// The letter grid uses all five slots. The standard English numeric caps sit in the
-    /// last four so their footer stays under the same fingers and a page switch needs no resize.
+    /// Five letter rows and four rows on the English numeric pages with Khmerism's footer.
     static func buildKhmerismKeys(
         width: CGFloat,
         metrics: KeyboardMetrics,
@@ -22,7 +21,6 @@ extension KeyboardLayout {
         let gap = metrics.gap
         let pitch = metrics.keyHeight + metrics.rowGap
         let footerRow = metrics.keyRowCount - 1
-        let firstRow = layer == .letters ? 0 : 1
         let touchTop = metrics.stripArea - max(metrics.stripBottom, stripTouchBand)
         let firstY = metrics.stripArea + metrics.keysTop
         var keys: [KeyboardKey] = []
@@ -45,7 +43,7 @@ extension KeyboardLayout {
         func addRow(_ caps: [Cap], row: Int) {
             let y = firstY + CGFloat(row) * pitch
             let height = row == footerRow ? metrics.bottomRowHeight : metrics.keyHeight
-            let hitTop = row == firstRow ? touchTop + CGFloat(firstRow) * pitch : y - metrics.rowGap / 2
+            let hitTop = row == 0 ? touchTop : y - metrics.rowGap / 2
             let hitBottom = row == footerRow ? metrics.totalHeight : y + pitch - metrics.rowGap / 2
             for (index, cap) in caps.enumerated() {
                 let frame = CGRect(x: cap.x, y: y, width: cap.width, height: height)
@@ -80,7 +78,7 @@ extension KeyboardLayout {
         } else {
             let rows = characterRows(for: layer)
             for (index, letters) in rows.dropLast().enumerated() {
-                addRow(weightedCaps(letters.map { character(.init(text: $0)) }), row: firstRow + index)
+                addRow(weightedCaps(letters.map { character(.init(text: $0)) }), row: index)
             }
             let punctuation = rows[2].map { character(.init(text: $0)) }
             let letter = letterWidth(innerWidth: innerWidth, metrics: metrics)

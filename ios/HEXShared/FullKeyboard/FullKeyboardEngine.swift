@@ -237,19 +237,22 @@ final class FullKeyboardEngine {
         return AutoCapitalization.Mode(target.autocapitalizationType)
     }
 
-    /// The key whose balloon shows: the newest character still held, or the one a 123, #+= or
-    /// shift press slid onto (hidden while an accent menu is up).
-    var previewKey: KeyboardKey? {
+    /// The balloon for the newest character held, including the corner character if it typed
+    /// on hold. A 123, #+= or shift slide previews its target. An accent menu hides the balloon.
+    var keyPreview: (key: KeyboardKey, label: String)? {
         guard activeAccentMenu == nil else { return nil }
         for id in touchOrder.reversed() {
             guard let touch = touches[id] else { continue }
-            if let slid = touch.slideKey { return slid }
+            if let slid = touch.slideKey { return (slid, displayLabel(for: slid)) }
+            if let alternate = touch.heldAlternate { return (touch.key, alternate) }
             if touch.key.character != nil, !touch.committed {
-                return touch.key
+                return (touch.key, displayLabel(for: touch.key))
             }
         }
         return nil
     }
+
+    var previewKey: KeyboardKey? { keyPreview?.key }
 
     // MARK: - Field
 
@@ -535,6 +538,7 @@ final class FullKeyboardEngine {
         }
         guard !touch.committed, !khmerismCornerMoved(touch) else { return false }
         touch.committed = true
+        touch.heldAlternate = alternate
         touches[id] = touch
         insert(alternate, source: "khmerism_hold")
         onChange?()

@@ -145,15 +145,21 @@ final class FullKeyboardEngineTests: XCTestCase {
 
         let start = point(.character("ក"))
         engine.touchBegan(id: 10, at: start)
+        XCTAssertEqual(engine.keyPreview?.label, "ក")
         XCTAssertTrue(engine.handleCharacterHold(forTouch: 10))
+        XCTAssertEqual(engine.keyPreview?.key.kind, .character("ក"))
+        XCTAssertEqual(engine.keyPreview?.label, "៩")
         XCTAssertFalse(engine.handleCharacterHold(forTouch: 10))
         engine.touchEnded(id: 10, at: start)
+        XCTAssertNil(engine.keyPreview)
         XCTAssertEqual(target.text, "ក្រ៩")
         XCTAssertNil(engine.activeAccentMenu)
 
         tap(.shift)
         engine.touchBegan(id: 11, at: start)
+        XCTAssertEqual(engine.keyPreview?.label, "៩")
         XCTAssertTrue(engine.handleCharacterHold(forTouch: 11))
+        XCTAssertEqual(engine.keyPreview?.label, "ក")
         engine.touchEnded(id: 11, at: start)
         XCTAssertEqual(target.text, "ក្រ៩ក")
     }
@@ -165,6 +171,7 @@ final class FullKeyboardEngineTests: XCTestCase {
         engine.touchBegan(id: 10, at: start)
         engine.touchMoved(id: 10, to: above)
         engine.touchMoved(id: 10, to: start)
+        XCTAssertNil(engine.keyPreview)
         XCTAssertFalse(engine.handleCharacterHold(forTouch: 10))
         engine.touchEnded(id: 10, at: start)
 
@@ -181,8 +188,10 @@ final class FullKeyboardEngineTests: XCTestCase {
         plane.began(id: 1, sample: sample)
         RunLoop.main.run(until: Date().addingTimeInterval(FullKeyboardEngine.accentHoldDelay + 0.15))
         XCTAssertEqual(target.text, "១")
+        XCTAssertEqual(engine.keyPreview?.label, "១")
         plane.ended(id: 1, sample: sample)
         XCTAssertEqual(target.text, "១")
+        XCTAssertNil(engine.keyPreview)
     }
 
     func testKhmerismEnglishNumberRowsAndKhmerSymbolHolds() {

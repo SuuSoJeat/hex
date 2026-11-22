@@ -63,6 +63,14 @@ struct FullKeyboardSnapshotStage: View {
         return name
     }
 
+    private var layer: KeyboardLayer {
+        switch state {
+        case "numbers": .numbers
+        case "symbols": .symbols
+        default: .letters
+        }
+    }
+
     private var draft: String {
         switch Self.layout {
         case .norwegian:
@@ -227,7 +235,7 @@ struct FullKeyboardSnapshotStage: View {
                 )
                 stage(phoneSize: KeyboardPhoneSize.current(screenSize: screen))
             }
-            .background(Color(uiColor: KhmerismAppearance.plate(isDark: darkApp || darkField)).ignoresSafeArea(edges: .bottom))
+            .background(Color(uiColor: FullKeyboardPalette(isDark: darkApp || darkField).backdrop).ignoresSafeArea(edges: .bottom))
         } else {
             stage()
         }
@@ -239,8 +247,7 @@ struct FullKeyboardSnapshotStage: View {
             ? Color(red: 0x09 / 255, green: 0x0A / 255, blue: 0x0C / 255)
             : Color(red: 0xF5 / 255, green: 0xF6 / 255, blue: 0xF8 / 255)
         let darkKeyboard = darkApp || darkField
-        let backdrop = Self.layout == .khmer
-            ? KhmerismAppearance.plate(isDark: darkKeyboard) : FullKeyboardPalette(isDark: darkKeyboard).backdrop
+        let backdrop = FullKeyboardPalette(isDark: darkKeyboard).backdrop
         return VStack(spacing: 0) {
             Spacer()
             Text(draft)
@@ -258,7 +265,7 @@ struct FullKeyboardSnapshotStage: View {
             FullKeyboardFixture(state: state, draft: draft, darkKeyboard: darkKeyboard)
                 .frame(height: KeyboardLayout.height(
                     for: .portrait, phoneSize: phoneSize,
-                    numberRow: FullKeyboardSettings().numberRow, language: Self.layout
+                    numberRow: FullKeyboardSettings().numberRow, language: Self.layout, layer: layer
                 )
                     + (state == "emoji-search" ? KeyboardMetrics.portrait.stripHeight : 0))
                 .background(Color(uiColor: backdrop).ignoresSafeArea(edges: .bottom))

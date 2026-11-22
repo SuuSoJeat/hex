@@ -1,7 +1,7 @@
 import UIKit
 
-/// Simulator fixtures (`FullKeyboardSnapshotStage`): a key held down, or its accent callout
-/// open with an option picked.
+/// Simulator fixtures (`FullKeyboardSnapshotStage`): a key held down, its accent callout
+/// open with an option picked, or its Khmerism corner typed and still previewed.
 extension FullKeyboardView {
     func debugPress(_ character: String) {
         guard let key = engine.layout.key(.character(character)) else { return }
@@ -18,7 +18,7 @@ extension FullKeyboardView {
         guard let key = engine.layout.key(.character(character)) else { return }
         let center = CGPoint(x: key.frame.midX, y: key.frame.midY)
         engine.touchBegan(id: -2, at: center)
-        _ = engine.openAccentMenuIfEligible(forTouch: -2)
+        _ = engine.handleCharacterHold(forTouch: -2)
         if let selectIndex { engine.debugSelectAccent(selectIndex) }
     }
 }
