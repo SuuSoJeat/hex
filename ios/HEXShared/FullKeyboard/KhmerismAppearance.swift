@@ -35,7 +35,7 @@ enum KhmerismAppearance {
         switch scalar.value {
         case 0x17D4...0x17D7: return palette.mark  // ។ ៕ ៖ ៗ
         case 0x17A5...0x17B3: return palette.independentVowel
-        case 0x17E0...0x17E9, 0x30...0x39: return palette.digit
+        case 0x17E0...0x17E9: return palette.digit
         default: return nil
         }
     }

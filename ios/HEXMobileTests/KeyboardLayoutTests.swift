@@ -513,8 +513,7 @@ final class KeyboardLayoutTests: XCTestCase {
             for layer in layers {
                 let layout = KeyboardLayout(
                     width: width, orientation: orientation, layer: layer, showsGlobe: true, showsEmoji: true,
-                    language: .khmer, posture: posture, windowInset: windowInset, phoneSize: phoneSize, pad: pad,
-                    numberRow: true
+                    language: .khmer, posture: posture, windowInset: windowInset, phoneSize: phoneSize, pad: pad
                 )
                 let label = "\(width) \(layer)"
                 XCTAssertFalse(layout.isSplit, label)
@@ -555,7 +554,7 @@ final class KeyboardLayoutTests: XCTestCase {
                     let rowKeys = layout.keys.filter { $0.row == row }
                     XCTAssertEqual(rowKeys.first?.hitFrame.minX, 0, label)
                     XCTAssertEqual(rowKeys.last?.hitFrame.maxX ?? -1, width, accuracy: 0.001, label)
-                    for (left, right) in zip(rowKeys, rowKeys.dropFirst()) {
+                    for (left, right) in zip(rowKeys, rowKeys.dropFirst()) where left.kind != .emoji && right.kind != .emoji {
                         XCTAssertEqual(left.hitFrame.maxX, right.hitFrame.minX, accuracy: 0.001, label)
                     }
                     for key in rowKeys {
@@ -605,6 +604,62 @@ final class KeyboardLayoutTests: XCTestCase {
         }
         let symbols = KeyboardLayout(width: 440, layer: .symbols, language: .khmer, phoneSize: .large)
         XCTAssertEqual(symbols.keys.filter { $0.row == 3 }.compactMap(\.alternate), ["៙", "៚"])
+    }
+
+    func testKhmerismUsesTheSharedNumberRowOnEveryPage() throws {
+        for layer in layers {
+            let enabled = KeyboardLayout(width: 440, layer: layer, language: .khmer, phoneSize: .large, numberRow: true)
+            let disabled = KeyboardLayout(width: 440, layer: layer, language: .khmer, phoneSize: .large)
+            let english = KeyboardLayout(width: 440, layer: layer, phoneSize: .large, numberRow: true)
+            let pitch = english.metrics.numberRowPitch
+            let digits = enabled.keys.filter(\.isNumberRow)
+            XCTAssertTrue(enabled.hasNumberRow)
+            XCTAssertEqual(enabled.totalHeight - disabled.totalHeight, pitch, accuracy: 0.001)
+            XCTAssertEqual(digits.map(\.label), english.keys.filter(\.isNumberRow).map(\.label))
+            for (actual, expected) in zip(digits, english.keys.filter(\.isNumberRow)) {
+                assertSameRect(actual.frame, expected.frame, actual.label)
+                assertSameRect(actual.hitFrame, expected.hitFrame, actual.label)
+            }
+
+            let firstCharacter = try XCTUnwrap(enabled.keys.first { $0.row == 0 && $0.character != nil })
+            let original = try XCTUnwrap(disabled.key(firstCharacter.kind))
+            assertSameRect(firstCharacter.frame, original.frame.offsetBy(dx: 0, dy: pitch), "(layer)")
+            if layer == .numbers {
+                XCTAssertTrue(digits.isEmpty)
+                let reservedBand = CGPoint(x: firstCharacter.frame.midX, y: enabled.metrics.stripArea + pitch / 2)
+                XCTAssertEqual(enabled.hitTest(reservedBand)?.kind, .character("1"))
+            }
+        }
+
+        let pad = KeyboardLayout(width: 744, language: .khmer, pad: .docked(.mini), numberRow: true)
+        XCTAssertFalse(pad.hasNumberRow)
+    }
+
+    func testKhmerismKeepsTheEmojiHitTargetInsideItsCap() throws {
+        for layer in layers {
+            let layout = KeyboardLayout(width: 440, layer: layer, showsEmoji: true, language: .khmer, phoneSize: .large)
+            let emoji = try XCTUnwrap(layout.key(.emoji))
+            XCTAssertEqual(layout.hitTest(CGPoint(x: emoji.frame.midX, y: emoji.frame.midY))?.kind, .emoji)
+            for point in [
+                CGPoint(x: emoji.frame.minX + 1, y: emoji.frame.midY),
+                CGPoint(x: emoji.frame.maxX - 1, y: emoji.frame.midY),
+                CGPoint(x: emoji.frame.midX, y: emoji.frame.minY + 1),
+            ] {
+                XCTAssertNil(layout.hitTest(point))
+            }
+        }
+    }
+
+    @MainActor
+    func testKhmerismColorsKhmerDigitsAndLeavesArabicDigitsNeutral() {
+        for isDark in [false, true] {
+            for digit in "០១២៣៤៥៦៧៨៩" {
+                XCTAssertNotNil(KhmerismAppearance.face(for: String(digit), isDark: isDark))
+            }
+            for digit in KeyboardLayout.numberRowDigits {
+                XCTAssertNil(KhmerismAppearance.face(for: digit, isDark: isDark))
+            }
+        }
     }
 
     @MainActor

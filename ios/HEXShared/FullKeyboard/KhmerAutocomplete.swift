@@ -26,6 +26,24 @@ struct KhmerAutocomplete: Sendable {
         let frequency: Int
     }
 
+    private struct PersonalLexicon {
+        let terms: [[UInt16]]
+        let words: Set<[UInt16]>
+        let longestWord: Int
+
+        init(_ spellings: [String]) {
+            var seen = Set<[UInt16]>()
+            terms = spellings.compactMap { spelling in
+                let units = Array(spelling.utf16)
+                guard let first = units.first, KhmerAutocomplete.beginsWord(first),
+                      seen.insert(units).inserted else { return nil }
+                return units
+            }
+            words = Set(terms.filter { $0.allSatisfy(KhmerAutocomplete.isWordUnit) && KhmerAutocomplete.hasCompleteClusters($0[...]) })
+            longestWord = words.map(\.count).max() ?? 0
+        }
+    }
+
     private static let minimumPrefixLength = 2
     private static let minimumSpellingLength = 4
     private static let minimumCoengCorrectionFrequency = 1_000
@@ -84,8 +102,12 @@ struct KhmerAutocomplete: Sendable {
         return isWordUnit(first)
     }
 
-    func suggestions(beforeInput: String?, limit: Int = 3) -> [Candidate] {
-        guard let beforeInput, limit > 0, longestWord > Self.minimumPrefixLength else { return [] }
+    func suggestions(
+        beforeInput: String?, limit: Int = 3, personalWords: [String] = [],
+        mayOffer: (String) -> Bool = { _ in true }
+    ) -> [Candidate] {
+        guard let beforeInput, limit > 0 else { return [] }
+        let personal = PersonalLexicon(personalWords)
         let tail = beforeInput.utf16.reversed().prefix(Self.contextLength + 1).prefix(while: Self.isWordUnit)
         let run = Array(tail.prefix(Self.contextLength).reversed())
         let lastStart = run.count - Self.minimumPrefixLength
@@ -98,30 +120,46 @@ struct KhmerAutocomplete: Sendable {
         if tail.count > Self.contextLength {
             // The lookback may start mid-word. Recover at a plausible cluster boundary near
             // the cut, then still require known words between there and the live prefix.
-            for start in 1...min(longestWord, lastStart) where Self.isBoundary(start, in: run) {
-                wordStarts[start] = true
+            let lastRecoveryStart = min(max(longestWord, personal.longestWord), lastStart)
+            if lastRecoveryStart > 0 {
+                for start in 1...lastRecoveryStart where Self.isBoundary(start, in: run) {
+                    wordStarts[start] = true
+                }
             }
         }
 
         for start in 0...lastStart where wordStarts[start] {
             let prefix = run[start...]
+            let personalMatches = personal.terms.filter { $0.count > prefix.count && $0.starts(with: prefix) }
+            let preferred = personalMatches.compactMap { units -> Candidate? in
+                let word = String(decoding: units, as: UTF16.self)
+                guard mayOffer(word) else { return nil }
+                return Candidate(word: word, suffix: String(decoding: units.dropFirst(prefix.count), as: UTF16.self))
+            }
+            if preferred.count >= limit { return Array(preferred.prefix(limit)) }
             if prefix.count <= longestWord {
                 let first = lowerBound(of: prefix)
                 if first < entries.count, entries[first].units.starts(with: prefix) {
                     // A finished word needs no completion. A shorter suffix could just be
-                    // its final syllable, so stop once the longest live spelling is found.
-                    if entries[first].units.count == prefix.count { return [] }
-                    return completions(for: prefix, from: first, limit: limit)
+                    // its final syllable. A saved vocabulary term can still extend it.
+                    if entries[first].units.count == prefix.count || personal.words.contains(Array(prefix)) { return preferred }
+                    return preferred + completions(for: prefix, from: first, limit: limit - preferred.count) {
+                        !personalMatches.contains($0.units) && mayOffer($0.word)
+                    }
                 }
             }
-            markWordEnds(from: start, in: run, into: &wordStarts)
+            if !personalMatches.isEmpty || personal.words.contains(Array(prefix)) { return preferred }
+            markWordEnds(from: start, in: run, personal: personal, into: &wordStarts)
         }
         return []
     }
 
     /// Spelling choices begin at an established Khmer word boundary. A full dictionary
     /// reading takes precedence unless the user has confirmed a specific misspelling.
-    func correction(beforeInput: String?) -> Correction? {
+    func correction(
+        beforeInput: String?, personalWords: [String] = [], learnedSpellings: [String: String] = [:],
+        canCorrect: (String) -> Bool = { _ in true }, mayOffer: (String) -> Bool = { _ in true }
+    ) -> Correction? {
         guard let beforeInput else { return nil }
         let tail = beforeInput.utf16.reversed().prefix(Self.contextLength + 1)
         let run = Array(tail.prefix(while: Self.isWordUnit).reversed())
@@ -130,10 +168,11 @@ struct KhmerAutocomplete: Sendable {
         if let separator = tail.dropFirst(run.count).first,
            !Self.isSpellingBoundary(separator) { return nil }
 
+        let personal = PersonalLexicon(personalWords)
         var wordStarts = Array(repeating: false, count: run.count + 1)
         wordStarts[0] = true
         for start in run.indices where wordStarts[start] {
-            markWordEnds(from: start, in: run, into: &wordStarts)
+            markWordEnds(from: start, in: run, personal: personal, into: &wordStarts)
         }
 
         // The dictionary can split this confirmed misspelling into សាលា + រ.
@@ -142,7 +181,8 @@ struct KhmerAutocomplete: Sendable {
         if schoolStart >= 0, wordStarts[schoolStart],
            run[schoolStart...].elementsEqual(Self.schoolMisspellingUnits),
            contains(Self.schoolUnits[...]),
-           !(0...schoolStart).contains(where: { wordStarts[$0] && contains(run[$0...]) }) {
+           !(0...schoolStart).contains(where: { wordStarts[$0] && contains(run[$0...], personal: personal) }),
+           canCorrect(Self.schoolMisspelling.typed), mayOffer(Self.schoolMisspelling.replacement) {
             return Self.schoolMisspelling
         }
         guard !wordStarts[run.count] else { return nil }
@@ -151,23 +191,43 @@ struct KhmerAutocomplete: Sendable {
             run.suffix(units.count).elementsEqual(units) && wordStarts[run.count - units.count]
                 && contains(Array(fix.replacement.utf16)[...])
         }
-        if !reviewed.isEmpty { return reviewed.count == 1 ? reviewed[0].fix : nil }
+        if !reviewed.isEmpty {
+            guard reviewed.count == 1, let fix = reviewed.first?.fix, canCorrect(fix.typed), mayOffer(fix.replacement) else { return nil }
+            return fix
+        }
 
         let suffixes = run.indices.filter { wordStarts[$0] }.map { run[$0...] }
         // Let the completion path handle a prefix of a word the person may still be typing.
-        guard !suffixes.contains(where: { hasPrefix($0) }) else { return nil }
+        guard !suffixes.contains(where: { suffix in
+            hasPrefix(suffix) || personal.terms.contains { $0.starts(with: suffix) }
+        }) else { return nil }
+
+        // The journal supplies spellings the user has chosen repeatedly. Only a unique
+        // repair at an established boundary can replace text automatically.
+        if !learnedSpellings.isEmpty {
+            let learned = suffixes.compactMap { suffix -> Correction? in
+                guard Self.hasCompleteClusters(suffix) else { return nil }
+                let typed = String(decoding: suffix, as: UTF16.self)
+                guard let replacement = learnedSpellings[typed], !replacement.utf16.elementsEqual(suffix),
+                      canCorrect(typed), mayOffer(replacement) else { return nil }
+                return Correction(typed: typed, replacement: replacement)
+            }
+            if !learned.isEmpty { return learned.count == 1 ? learned[0] : nil }
+        }
         let eligible = suffixes.filter { spelling in
             spelling.count >= Self.minimumPrefixLength + 1 && spelling.count <= longestWord + 1
         }
         let repeatedMarks = eligible.compactMap(duplicateMarkCorrection)
         // Equivalent readings remove the same scalar. Keep the shortest confirmed replacement.
         if let shortest = repeatedMarks.last, repeatedMarks.allSatisfy({ $0.offset == shortest.offset }) {
-            return shortest.fix
+            return canCorrect(shortest.fix.typed) && mayOffer(shortest.fix.replacement) ? shortest.fix : nil
         }
 
         let complete = eligible.filter(Self.hasCompleteClusters)
         for (index, spelling) in complete.enumerated() where spelling.count >= Self.minimumSpellingLength {
             guard let edit = bestSingleEdit(to: spelling) else { continue }
+            let typed = String(decoding: spelling, as: UTF16.self)
+            guard canCorrect(typed), mayOffer(edit.entry.word) else { return nil }
             // Restoring a missing coeng requires a unique repair to a common word
             // and no competing common word at a later boundary.
             let confident = edit.insertsCoeng && edit.unique
@@ -175,8 +235,7 @@ struct KhmerAutocomplete: Sendable {
                 && complete.dropFirst(index + 1).allSatisfy {
                     (bestSingleEdit(to: $0)?.entry.frequency ?? 0) < Self.minimumCoengCorrectionFrequency
                 }
-            return Correction(typed: String(decoding: spelling, as: UTF16.self),
-                              replacement: edit.entry.word, automaticallyApplies: confident)
+            return Correction(typed: typed, replacement: edit.entry.word, automaticallyApplies: confident)
         }
         return nil
     }
@@ -241,16 +300,20 @@ struct KhmerAutocomplete: Sendable {
         return best.map { ($0.entry, $0.insertsCoeng, unique) }
     }
 
-    private func markWordEnds(from start: Int, in run: [UInt16], into wordStarts: inout [Bool]) {
-        let lastEnd = min(start + longestWord, wordStarts.count - 1)
+    private func markWordEnds(from start: Int, in run: [UInt16], personal: PersonalLexicon, into wordStarts: inout [Bool]) {
+        let lastEnd = min(start + max(longestWord, personal.longestWord), wordStarts.count - 1)
         guard start < lastEnd else { return }
         for end in (start + 1)...lastEnd where end == run.count || Self.isBoundary(end, in: run) {
-            if contains(run[start..<end]) { wordStarts[end] = true }
+            if contains(run[start..<end], personal: personal) { wordStarts[end] = true }
         }
     }
 
     private func contains(_ spelling: ArraySlice<UInt16>) -> Bool {
         entry(for: spelling) != nil
+    }
+
+    private func contains(_ spelling: ArraySlice<UInt16>, personal: PersonalLexicon) -> Bool {
+        contains(spelling) || (spelling.count <= personal.longestWord && personal.words.contains(Array(spelling)))
     }
 
     private func entry(for spelling: ArraySlice<UInt16>) -> Entry? {
@@ -264,9 +327,11 @@ struct KhmerAutocomplete: Sendable {
         return index < entries.count && entries[index].units.starts(with: spelling)
     }
 
-    private func completions(for prefix: ArraySlice<UInt16>, from first: Int, limit: Int) -> [Candidate] {
+    private func completions(
+        for prefix: ArraySlice<UInt16>, from first: Int, limit: Int, mayOffer: (Entry) -> Bool
+    ) -> [Candidate] {
         let matches = entries[first...].prefix { $0.units.starts(with: prefix) }
-        return matches.sorted(by: ranksAhead).prefix(limit).map { entry in
+        return matches.filter(mayOffer).sorted(by: ranksAhead).prefix(limit).map { entry in
             Candidate(word: entry.word, suffix: String(decoding: entry.units.dropFirst(prefix.count), as: UTF16.self))
         }
     }

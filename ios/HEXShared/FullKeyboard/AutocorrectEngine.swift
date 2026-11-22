@@ -307,6 +307,23 @@ final class AutocorrectEngine {
         mayOffer(candidate, after: Self.previousWord(beforeInput ?? "", token: token))
     }
 
+    func khmerCompletions(using index: KhmerAutocomplete, beforeInput: String?) -> [KhmerAutocomplete.Candidate] {
+        index.suggestions(beforeInput: beforeInput, personalWords: lexiconTerms) { mayOffer($0) }
+    }
+
+    func khmerCorrection(using index: KhmerAutocomplete, beforeInput: String?) -> KhmerAutocomplete.Correction? {
+        guard isEnabled else { return nil }
+        return index.correction(
+            beforeInput: beforeInput, personalWords: lexiconTerms, learnedSpellings: learning.typos,
+            canCorrect: { typed in
+                let key = typed.lowercased()
+                return !suppressedInSession.contains(key) && !learning.rejected.contains(key) && !learnedWords.contains(key)
+                    && !offensiveWords.blocks(typed, allowSwearing: allowsSwearing)
+            },
+            mayOffer: { mayOffer($0) }
+        )
+    }
+
     func loadLexicon(_ lexicon: UILexicon) {
         loadLexiconEntries(lexicon.entries.map { ($0.userInput, $0.documentText) })
     }

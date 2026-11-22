@@ -31,6 +31,67 @@ final class KhmerAutocompleteTests: XCTestCase {
         XCTAssertTrue(model.suggestions(beforeInput: "ឝ្ឞ្សស្រឡា").isEmpty)
     }
 
+    @MainActor
+    func testPersonalVocabularyCompletesBeforeTheDictionaryEvenWithAutocorrectOff() {
+        let autocorrect = AutocorrectEngine(learnedWords: LearnedWordsStore(defaults: nil))
+        autocorrect.setLanguage(.khmer)
+        autocorrect.setVocabulary(["ហេក្ស", "កម្មករគំរូ"])
+        autocorrect.isEnabled = false
+
+        let names = autocorrect.khmerCompletions(using: model, beforeInput: "ខ្ញុំហេ")
+        XCTAssertEqual(names, [.init(word: "ហេក្ស", suffix: "ក្ស")])
+        let knownName = autocorrect.khmerCompletions(using: model, beforeInput: "ហេក្សស្រឡា")
+        XCTAssertEqual(knownName.map(\.word), ["ស្រឡាញ់", "ស្រឡាង"])
+        let candidates = autocorrect.khmerCompletions(using: model, beforeInput: "កម្")
+        XCTAssertEqual(candidates.map(\.word), ["កម្មករគំរូ", "កម្ពុជា", "កម្មករ"])
+    }
+
+    @MainActor
+    func testLearnedSpellingsHonorAutocorrectAndKeepChoices() {
+        let autocorrect = AutocorrectEngine(learnedWords: LearnedWordsStore(defaults: nil))
+        autocorrect.setLanguage(.khmer)
+        let typed = "កមពុជា"
+        let replacement = "ស្រុកខ្មែរ"
+        autocorrect.applyLearning(.init(typos: [typed: replacement]))
+        XCTAssertEqual(autocorrect.khmerCorrection(using: model, beforeInput: "ខ្ញុំ" + typed),
+                       .init(typed: typed, replacement: replacement))
+        XCTAssertNil(autocorrect.khmerCorrection(using: model, beforeInput: "@" + typed))
+        autocorrect.isEnabled = false
+        XCTAssertNil(autocorrect.khmerCorrection(using: model, beforeInput: typed))
+        autocorrect.isEnabled = true
+        autocorrect.applyLearning(.init(rejected: [typed]))
+        XCTAssertNil(autocorrect.khmerCorrection(using: model, beforeInput: typed))
+        autocorrect.applyLearning(.init(typos: [typed: replacement]))
+        autocorrect.setVocabulary([typed])
+        XCTAssertNil(autocorrect.khmerCorrection(using: model, beforeInput: typed))
+    }
+
+    func testFilteredCompletionsLeaveRoomForOtherCandidates() {
+        let candidates = model.suggestions(beforeInput: "ស្រឡា", limit: 1) { $0 != "ស្រឡាញ់" }
+        XCTAssertEqual(candidates, [.init(word: "ស្រឡាង", suffix: "ង")])
+    }
+
+    @MainActor
+    func testSwearWordSettingAppliesToKhmerCompletionsAndLearnedFixes() throws {
+        let bundled = try XCTUnwrap(KhmerAutocomplete.bundled)
+        let autocorrect = AutocorrectEngine(learnedWords: LearnedWordsStore(defaults: nil))
+        autocorrect.setLanguage(.khmer)
+        let typed = "កមពុជា"
+        let swear = "សំផឹង"
+        autocorrect.applyLearning(.init(typos: [typed: swear]))
+
+        XCTAssertFalse(autocorrect.khmerCompletions(using: bundled, beforeInput: "សំផឹ").contains { $0.word == swear })
+        XCTAssertEqual(autocorrect.khmerCorrection(using: model, beforeInput: typed)?.replacement, "កម្ពុជា")
+
+        autocorrect.allowsSwearing = true
+        XCTAssertTrue(autocorrect.khmerCompletions(using: bundled, beforeInput: "សំផឹ").contains { $0.word == swear })
+        XCTAssertEqual(autocorrect.khmerCorrection(using: model, beforeInput: typed)?.replacement, swear)
+
+        autocorrect.allowsSwearing = false
+        autocorrect.setVocabulary([swear])
+        XCTAssertTrue(autocorrect.khmerCompletions(using: bundled, beforeInput: "សំផឹ").contains { $0.word == swear })
+    }
+
     func testRespectsPunctuationAndScriptBoundaries() {
         let original = model.suggestions(beforeInput: "ស្រឡា")
         XCTAssertFalse(original.isEmpty)

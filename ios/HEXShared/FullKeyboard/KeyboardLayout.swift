@@ -471,7 +471,6 @@ nonisolated struct KeyboardMetrics: Equatable, Sendable {
         if language == .khmer {
             if layer == .letters { rows.keyRowCount = 5 }
             rows.stripBottom = max(rows.stripBottom, stripGap)
-            return rows
         }
         return numberRow && pad == nil ? rows.withNumberRow() : rows
     }
@@ -821,6 +820,11 @@ nonisolated struct KeyboardLayout: Equatable, Sendable {
     /// types that digit.
     static func drawsNumberRow(_ metrics: KeyboardMetrics, layer: KeyboardLayer) -> Bool {
         metrics.numberRowHeight > 0 && layer != .numbers
+    }
+
+    /// Leave the margins beside 123 and Space inactive so an imprecise tap doesn't open Emoji.
+    static func emojiHitFrame(for frame: CGRect, rowBottom: CGFloat) -> CGRect {
+        CGRect(x: frame.minX + 6, y: frame.minY + 7.5, width: frame.width - 12, height: rowBottom - frame.minY - 7.5)
     }
 
     var totalHeight: CGFloat { metrics.totalHeight }
@@ -1253,10 +1257,7 @@ nonisolated struct KeyboardLayout: Equatable, Sendable {
                 let x1 = i == rowKeys.count - 1 ? width : (item.2.maxX + rowKeys[i + 1].2.minX) / 2
                 var hit = CGRect(x: x0, y: y0, width: x1 - x0, height: y1 - y0)
                 if item.0 == .emoji, row == 3, m.keyHeight >= 40 {
-                    // Apple's emoji key takes taps only well inside its keycap, 6 pt in from each
-                    // side and 7.5 pt below its top, and the margins around it type nothing:
-                    // a finger aimed at 123 or space that lands near it doesn't switch keyboards.
-                    hit = CGRect(x: item.2.minX + 6, y: item.2.minY + 7.5, width: item.2.width - 12, height: y1 - item.2.minY - 7.5)
+                    hit = emojiHitFrame(for: item.2, rowBottom: y1)
                 }
                 keys.append(KeyboardKey(
                     kind: item.0,

@@ -152,7 +152,7 @@ extension FullKeyboardEngine {
     /// Marks that go against a suggestion's word, taking the space it typed, as on Apple's
     /// keyboard (black box, iOS 27.2: "Hello" picked, then "," types "Hello,"; a quote, a bracket
     /// or @ keeps the space), whatever the field's `smartInsertDeleteType`.
-    static let suggestionJoiners: Set<Character> = [",", ".", "!", "?", ";", ":", ")"]
+    static let suggestionJoiners = Set<Character>([",", ".", "!", "?", ";", ":", ")"]).union(khmerClosingMarks)
 
     /// Deletes a suggestion's space before `text`, one of `suggestionJoiners`, typed right
     /// after it. True when it did: the mark then goes in as typed.
@@ -171,7 +171,6 @@ extension FullKeyboardEngine {
     /// after a hyphen making both an em dash. Accent picks and emoji go in as they are.
     func typeIntoField(_ text: String, source: String?) {
         guard !text.isEmpty else { return }
-        guard layout.language != .khmer else { return target.insertText(text) }
         guard source == "key" || source == "slide" || source == nil else { return target.insertText(text) }
         if text == "-", smartDashes, target.documentContextBeforeInput?.last == "-" {
             typingLog?.edit("smart_dash", [TypingLogField("deleted", .string("-")), TypingLogField("inserted", .string(SmartPunctuation.emDash))])

@@ -104,7 +104,7 @@ final class KeyboardKeyPlaneView: UIView {
         let glyphAlpha = currentGlyphAlpha()
         let keycapAlpha = 1 - (1 - Self.trackpadKeycapAlpha) * (1 - glyphAlpha)
         if layout.language == .khmer {
-            drawKhmerism(in: context, dirty: rect, glyphAlpha: glyphAlpha, keycapAlpha: keycapAlpha)
+            drawKhmerism(in: context, dirty: rect, glyphAlpha: glyphAlpha, keycapAlpha: keycapAlpha, hideGlyphs: hideGlyphs)
             return
         }
         var pressed = engine.pressedKinds
@@ -168,31 +168,9 @@ final class KeyboardKeyPlaneView: UIView {
                     color: palette.textMuted
                 )
             case .returnKey:
-                let isPressed = pressed.contains(.returnKey) && returnIsEnabled
-                let isAction = returnStyle.isAction && !hideGlyphs
-                let activeAction = isAction && returnIsEnabled
-                let fill: UIColor = if activeAction {
-                    isPressed ? palette.actionPressedFill : palette.actionFill
-                } else if isAction {
-                    palette.actionDisabledFill
-                } else {
-                    isPressed ? palette.functionHeldFill : palette.keyFill
-                }
-                let ink: UIColor = if !returnIsEnabled {
-                    palette.returnDisabledInk
-                } else if activeAction {
-                    .white
-                } else {
-                    palette.textBase
-                }
-                context.fillKeycap(frame, fill: fill, shadow: palette.keyShadow, radius: radius)
-                guard showGlyphs() else { continue }
-                drawSymbol(
-                    returnStyle.symbol,
-                    in: labelFrame,
-                    color: ink,
-                    pointSize: isLandscape ? 18 : 19,
-                    weight: activeAction ? .medium : .regular,
+                drawReturnKey(
+                    in: context, frame: frame, labelFrame: labelFrame, pressed: pressed.contains(.returnKey),
+                    glyphAlpha: glyphAlpha, hideGlyphs: hideGlyphs, pointSize: isLandscape ? 18 : 19,
                     yOffset: isLandscape ? -0.5 : -0.33
                 )
             case .shift:
@@ -240,6 +218,36 @@ final class KeyboardKeyPlaneView: UIView {
         }
     }
 
+    private func drawReturnKey(
+        in context: CGContext, frame: CGRect, labelFrame: CGRect, pressed: Bool,
+        glyphAlpha: CGFloat, hideGlyphs: Bool, pointSize: CGFloat, yOffset: CGFloat
+    ) {
+        let isPressed = pressed && returnIsEnabled
+        let isAction = returnStyle.isAction && !hideGlyphs
+        let activeAction = isAction && returnIsEnabled
+        let fill: UIColor = if activeAction {
+            isPressed ? palette.actionPressedFill : palette.actionFill
+        } else if isAction {
+            palette.actionDisabledFill
+        } else {
+            isPressed ? palette.functionHeldFill : palette.keyFill
+        }
+        let ink: UIColor = if !returnIsEnabled {
+            palette.returnDisabledInk
+        } else if activeAction {
+            .white
+        } else {
+            palette.textBase
+        }
+        context.fillKeycap(frame, fill: fill, shadow: palette.keyShadow, radius: engine.layout.metrics.cornerRadius)
+        context.setAlpha(glyphAlpha)
+        guard glyphAlpha > 0 else { return }
+        drawSymbol(
+            returnStyle.symbol, in: labelFrame, color: ink, pointSize: pointSize,
+            weight: activeAction ? .medium : .regular, yOffset: yOffset
+        )
+    }
+
     private var shiftSymbol: String {
         let shift = engine.shift
         if shift.pressShowsOff { return "shift" }
@@ -250,7 +258,9 @@ final class KeyboardKeyPlaneView: UIView {
         }
     }
 
-    private func drawKhmerism(in context: CGContext, dirty: CGRect, glyphAlpha: CGFloat, keycapAlpha: CGFloat) {
+    private func drawKhmerism(
+        in context: CGContext, dirty: CGRect, glyphAlpha: CGFloat, keycapAlpha: CGFloat, hideGlyphs: Bool
+    ) {
         let layout = engine.layout
         let metrics = layout.metrics
         let isDark = palette.isDark
@@ -261,10 +271,19 @@ final class KeyboardKeyPlaneView: UIView {
 
         for key in layout.keys where key.kind != .hex && key.frame.intersects(dirty) {
             let frame = pixelAligned(key.frame)
-            let label = engine.keycapLabel(for: key)
-            let isDisabled = key.kind == .returnKey && !returnIsEnabled
             let isPressed = engine.touches.values.contains { $0.key == key || $0.slideKey == key }
-            let isHighlighted = !isDisabled && (isPressed || lingeringKind == key.kind || lingeringFunctionKinds.contains(key.kind))
+            let isHighlighted = isPressed || lingeringKind == key.kind || lingeringFunctionKinds.contains(key.kind)
+            let iconSize = min(19, frame.width * 0.75, frame.height * 0.62)
+            context.setAlpha(keycapAlpha)
+            if key.kind == .returnKey {
+                drawReturnKey(
+                    in: context, frame: frame, labelFrame: frame, pressed: isHighlighted,
+                    glyphAlpha: glyphAlpha, hideGlyphs: hideGlyphs, pointSize: iconSize, yOffset: -0.33
+                )
+                continue
+            }
+
+            let label = engine.keycapLabel(for: key)
             let face = if isHighlighted {
                 KhmerismAppearance.Face(fill: heldFill(for: key.kind), ink: palette.textBase)
             } else if showsKhmerismColors, key.character != nil {
@@ -273,14 +292,12 @@ final class KeyboardKeyPlaneView: UIView {
                 neutral
             }
 
-            context.setAlpha(keycapAlpha)
             context.fillKeycap(frame, fill: face.fill, radius: metrics.cornerRadius)
             guard glyphAlpha > 0 else { continue }
             context.saveGState()
             context.clip(to: frame)
             context.setAlpha(glyphAlpha)
-            let ink = isDisabled ? face.ink.withAlphaComponent(0.5) : face.ink
-            let iconSize = min(19, frame.width * 0.75, frame.height * 0.62)
+            let ink = face.ink
             switch key.kind {
             case .character:
                 let title = layout.layer == .letters ? label : Self.keycapLabel(label == "•" ? "⦁" : label)
@@ -296,13 +313,11 @@ final class KeyboardKeyPlaneView: UIView {
                 drawSymbol("globe", in: frame, color: ink, pointSize: iconSize, yOffset: -1)
             case .dismiss:
                 drawSymbol("keyboard.chevron.compact.down", in: frame, color: ink, pointSize: iconSize)
-            case .returnKey:
-                drawSymbol(returnStyle.symbol, in: frame, color: ink, pointSize: iconSize, yOffset: -0.33)
             case .space, .layerSwitch:
                 let title = key.kind == .space ? (spaceLabel ?? label) : label
                 let size = min(13, frame.height * 0.6)
                 drawText(title, in: frame, font: KhmerismAppearance.font(for: title, size: size), color: ink)
-            case .hex:
+            case .hex, .returnKey:
                 break
             }
             context.restoreGState()

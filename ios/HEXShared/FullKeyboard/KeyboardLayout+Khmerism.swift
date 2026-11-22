@@ -23,6 +23,7 @@ extension KeyboardLayout {
         let footerRow = metrics.keyRowCount - 1
         let touchTop = metrics.stripArea - max(metrics.stripBottom, stripTouchBand)
         let firstY = metrics.stripArea + metrics.keysTop
+        let numberRow = drawsNumberRow(metrics, layer: layer)
         var keys: [KeyboardKey] = []
 
         func character(_ key: KhmerismLayout.Key) -> Entry {
@@ -40,11 +41,17 @@ extension KeyboardLayout {
             }
         }
 
+        func rowY(_ row: Int) -> CGFloat {
+            if row == numberRowIndex { return firstY }
+            return firstY + metrics.numberRowPitch + CGFloat(row) * pitch
+        }
+
         func addRow(_ caps: [Cap], row: Int) {
-            let y = firstY + CGFloat(row) * pitch
-            let height = row == footerRow ? metrics.bottomRowHeight : metrics.keyHeight
-            let hitTop = row == 0 ? touchTop : y - metrics.rowGap / 2
-            let hitBottom = row == footerRow ? metrics.totalHeight : y + pitch - metrics.rowGap / 2
+            let y = rowY(row)
+            let height = row == footerRow ? metrics.bottomRowHeight : row == numberRowIndex ? metrics.numberRowHeight : metrics.keyHeight
+            let hitTop = row == numberRowIndex || (row == 0 && !numberRow) ? touchTop : y - metrics.rowGap / 2
+            let nextRow = row == numberRowIndex ? 0 : row + 1
+            let hitBottom = row == footerRow ? metrics.totalHeight : rowY(nextRow) - metrics.rowGap / 2
             for (index, cap) in caps.enumerated() {
                 let frame = CGRect(x: cap.x, y: y, width: cap.width, height: height)
                 let hitLeft: CGFloat
@@ -56,13 +63,21 @@ extension KeyboardLayout {
                 }
                 let hitRight = index == caps.count - 1 ? width : (frame.maxX + caps[index + 1].x) / 2
                 let entry = cap.entry
+                var hitFrame = CGRect(x: hitLeft, y: hitTop, width: hitRight - hitLeft, height: hitBottom - hitTop)
+                if entry.kind == .emoji, row == footerRow, metrics.keyHeight >= 40 {
+                    hitFrame = emojiHitFrame(for: frame, rowBottom: hitBottom)
+                }
                 keys.append(KeyboardKey(
                     kind: entry.kind, row: row, frame: frame,
-                    hitFrame: CGRect(x: hitLeft, y: hitTop, width: hitRight - hitLeft, height: hitBottom - hitTop),
+                    hitFrame: hitFrame,
                     label: entry.label, shifted: entry.character?.shifted,
                     alternate: entry.character?.alternate, shiftedAlternate: entry.character?.shiftedAlternate
                 ))
             }
+        }
+
+        if numberRow {
+            addRow(weightedCaps(numberRowDigits.map { character(.init(text: $0)) }), row: numberRowIndex)
         }
 
         let delete: Entry = (.delete, "delete", 100, nil)

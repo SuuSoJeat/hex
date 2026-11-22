@@ -22,5 +22,11 @@ and two use spellings from Chuon Nath's dictionary. [Research examples, table 5]
 The confirmed misspelling `សាលារ` is corrected to `សាលា` at a known word boundary.
 This takes precedence over splitting it into `សាលា` and `រ`.
 
+Custom Vocabulary supplies completions and keeps saved spellings. Learned fixes
+can apply at an established word boundary. The shared suggestion filter checks
+completions and corrections against a starter list of Khmer spellings
+cross-checked with Chuon Nath's and Headley's dictionaries.
+[Chuon Nath dictionary data](https://github.com/interscript/khmer-dict-spice/blob/85f37da6d79e9cc8f45a1fe308fc518fa24eddb4/kh_dictionary.csv)
+
 `KhmerAutocompleteTests` checks the documented rules, detection of dictionary
 typos, and preservation of valid joined readings and unknown word boundaries.

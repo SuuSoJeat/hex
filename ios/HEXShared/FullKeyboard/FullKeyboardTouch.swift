@@ -11,7 +11,7 @@ extension FullKeyboardEngine {
         var key: KeyboardKey
         var startPoint: CGPoint
         var point: CGPoint
-        /// This press is finished. It typed on rollover or hold, or a corner hold was cancelled.
+        /// This press is finished. It typed on rollover or hold.
         var committed: Bool
         /// The corner character already typed by this hold, shown until the finger lifts.
         var heldAlternate: String?
