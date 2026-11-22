@@ -114,7 +114,7 @@ final class FullKeyboardEngineTests: XCTestCase {
         XCTAssertEqual(target.text, "ABcDe")
     }
 
-    func testKhmerismShiftStaysSelectedUntilReturningFromNumbers() throws {
+    func testKhmerismShiftTypesOneCharacter() throws {
         target.autocapitalizationType = .sentences
         engine.language = .khmer
         engine.configureForField()
@@ -123,14 +123,63 @@ final class FullKeyboardEngineTests: XCTestCase {
         tap(.shift)
         XCTAssertEqual(engine.displayLabel(for: key), "១")
         tap(key.kind)
+        XCTAssertEqual(engine.shift.state, .off)
+        XCTAssertEqual(engine.displayLabel(for: key), "ហ")
         tap(.space)
         engine.textDidChange()
         tap(key.kind)
-        XCTAssertEqual(target.text, "១ ១")
+        XCTAssertEqual(target.text, "១ ហ")
+    }
+
+    func testKhmerismDoubleTapLocksShiftUntilTappedAgain() {
+        engine.language = .khmer
+        let key = KeyKind.character("ហ")
+        tap(.shift)
+        now += 0.1
+        tap(.shift)
+        XCTAssertEqual(engine.shift.state, .locked)
+        tap(key)
+        tap(key)
+        XCTAssertEqual(target.text, "១១")
+        XCTAssertEqual(engine.shift.state, .locked)
+        down(10, key)
+        XCTAssertTrue(engine.handleCharacterHold(forTouch: 10))
+        up(10, key)
+        XCTAssertEqual(engine.shift.state, .locked)
+
+        tap(.shift)
+        tap(key)
+        XCTAssertEqual(target.text, "១១ហហ")
+
+        tap(.shift)
         tap(.layerSwitch(.numbers))
         tap(.layerSwitch(.letters))
+        XCTAssertEqual(engine.shift.state, .off)
+    }
+
+    func testKhmerismHoldShiftAndSlideTypesOneShiftedCharacter() throws {
+        engine.language = .khmer
+        let key = try XCTUnwrap(engine.layout.key(.character("ហ")))
+        down(10, .shift)
+        XCTAssertEqual(engine.keycapLabel(for: key), "ហ")
+        XCTAssertEqual(engine.khmerismAlternate(for: key, onKeycap: true), "១")
+        engine.touchMoved(id: 10, to: point(key.kind))
+        XCTAssertEqual(engine.keyPreview?.label, "១")
+        up(10, key.kind)
+        XCTAssertEqual(engine.shift.state, .off)
         tap(key.kind)
-        XCTAssertEqual(target.text, "១ ១ហ")
+        XCTAssertEqual(target.text, "១ហ")
+    }
+
+    func testKhmerismCancellingHeldShiftAfterTypingReleasesTheChord() {
+        engine.language = .khmer
+        let key = KeyKind.character("ហ")
+        down(10, .shift)
+        tap(key)
+        engine.touchCancelled(id: 10)
+        XCTAssertFalse(engine.shift.isHeld)
+        tap(key)
+        XCTAssertEqual(target.text, "១ហ")
     }
 
     func testKhmerismCornerHoldTypesOnceAndPreservesUnicodeScalars() throws {
@@ -160,6 +209,7 @@ final class FullKeyboardEngineTests: XCTestCase {
         XCTAssertEqual(engine.keyPreview?.label, "៩")
         XCTAssertTrue(engine.handleCharacterHold(forTouch: 11))
         XCTAssertEqual(engine.keyPreview?.label, "ក")
+        XCTAssertEqual(engine.shift.state, .off)
         engine.touchEnded(id: 11, at: start)
         XCTAssertEqual(target.text, "ក្រ៩ក")
     }

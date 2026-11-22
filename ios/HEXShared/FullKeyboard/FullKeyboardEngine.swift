@@ -319,7 +319,7 @@ final class FullKeyboardEngine {
     }
 
     func refreshAutoCapitalization() {
-        // Shift selects a persistent second page on Khmerism.
+        // Khmerism uses Shift for alternate characters, without automatic capitalization.
         guard layout.language != .khmer else { return }
         let before = shift
         shift.refreshAutoCapitalization(
@@ -489,6 +489,10 @@ final class FullKeyboardEngine {
     }
 
     private func insertKhmerKeyText(_ text: String, source: String) {
+        if layerState.layer == .letters, text != " " {
+            shift.didType()
+            logState("typed")
+        }
         // Space accepts a pending correction without separating the Khmer words.
         let ending = text == " " ? "" : text
         if (text == " " || Self.khmerWordEnders.contains(text)), applyKhmerCorrection(ending: ending) { return }
@@ -649,10 +653,8 @@ final class FullKeyboardEngine {
         }
         switch key.kind {
         case .shift:
-            if layout.language != .khmer {
-                shift.shiftDown(now: clock())
-                logState("shift_key")
-            }
+            shift.shiftDown(now: clock())
+            logState("shift_key")
         case .delete:
             deleteBackward()
         case .layerSwitch(let next):
@@ -778,7 +780,7 @@ final class FullKeyboardEngine {
         // 3. Holding 123, #+= or shift and sliding: the character key under the finger shows its
         // pop-up; over any other key, or off the keys, none does. Never a swipe: swipes start on
         // letters only.
-        if Self.slidesToType(touch), layout.language != .khmer || touch.key.kind != .shift {
+        if Self.slidesToType(touch) {
             let next = slideTarget(for: touch, at: point)
             if next?.kind != touch.slideKey?.kind {
                 touch.slideKey = next
@@ -874,14 +876,7 @@ final class FullKeyboardEngine {
                 commitCharacterTouch(touch)
             }
         case .shift:
-            if layout.language == .khmer {
-                if layerState.layer == .letters, layout.hitTest(point)?.kind == .shift {
-                    shift = ShiftStateMachine(state: shift.state == .off ? .on : .off)
-                    logState("shift_key")
-                }
-                break
-            }
-            // Hold shift, slide to a letter, let go: a capital, as on Apple's keyboard.
+            // Hold Shift, slide to a key, and release to type its shifted character.
             if let under = slideTarget(for: touch, at: point) {
                 commitCharacter(under, at: point)
             }
@@ -970,8 +965,12 @@ final class FullKeyboardEngine {
             activeAccentTouchID = nil
             typingLog?.ui("accent_cancel", [TypingLogField("id", .int(id))])
         }
-        guard touches.removeValue(forKey: id) != nil else { return }
+        guard let touch = touches.removeValue(forKey: id) else { return }
         touchOrder.removeAll { $0 == id }
+        if touch.key.kind == .shift {
+            shift.shiftUp()
+            logState("cancel")
+        }
         onChange?()
     }
 

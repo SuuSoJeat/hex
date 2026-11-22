@@ -284,7 +284,7 @@ final class KeyboardKeyPlaneView: UIView {
             switch key.kind {
             case .character:
                 let title = layout.layer == .letters ? label : Self.keycapLabel(label == "•" ? "⦁" : label)
-                let cornerLabel = showsKhmerismSuperscripts ? engine.khmerismAlternate(for: key) : nil
+                let cornerLabel = showsKhmerismSuperscripts ? engine.khmerismAlternate(for: key, onKeycap: true) : nil
                 drawKhmerismCharacter(title, alternate: cornerLabel, in: frame, ink: ink)
             case .shift:
                 drawSymbol(shiftSymbol, in: frame, color: ink, pointSize: iconSize, yOffset: 0.67)

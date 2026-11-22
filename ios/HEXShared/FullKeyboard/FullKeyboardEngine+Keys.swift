@@ -77,15 +77,19 @@ extension FullKeyboardEngine {
 
     /// A key's label as its keycap shows it (`keycapsUppercase`); pop-ups use `displayLabel`.
     func keycapLabel(for key: KeyboardKey) -> String {
-        if layout.language == .khmer { return displayLabel(for: key) }
         guard let character = key.character else { return key.label }
         if typesFrenchApostrophe(character) { return SmartPunctuation.apostrophe }
         guard keycapsUppercase else { return character }
-        return layout.language == .korean ? HangulComposer.shifted(character) : character.uppercased()
+        switch layout.language {
+        case .khmer: return key.shifted ?? character
+        case .korean: return HangulComposer.shifted(character)
+        default: return character.uppercased()
+        }
     }
 
-    func khmerismAlternate(for key: KeyboardKey) -> String? {
-        isUppercase ? key.shiftedAlternate : key.alternate
+    func khmerismAlternate(for key: KeyboardKey, onKeycap: Bool = false) -> String? {
+        let shifted = onKeycap ? keycapsUppercase : isUppercase
+        return shifted ? key.shiftedAlternate : key.alternate
     }
 
     /// The key a touch going down at `point` presses: the one under it, or a neighbouring
