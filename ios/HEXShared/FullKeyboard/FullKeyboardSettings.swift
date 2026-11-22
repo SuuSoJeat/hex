@@ -36,17 +36,6 @@ nonisolated enum KoreanKeyboardExperiment {
     }
 }
 
-/// Settings › Experiments › Khmerism keyboard. Shared with the keyboard extension.
-nonisolated enum KhmerismKeyboardExperiment {
-    static let key = "experiments.khmerismKeyboard"
-
-    static var isEnabled: Bool { isEnabled(in: UserDefaults(suiteName: KeyboardBridge.appGroup)) }
-
-    static func isEnabled(in defaults: UserDefaults?) -> Bool {
-        defaults?.object(forKey: key) as? Bool ?? false
-    }
-}
-
 /// The full keyboard's switches in the shared App Group.
 ///
 /// Without Full Access an iPhone may not let the keyboard read the App Group (the simulator
@@ -82,7 +71,6 @@ struct FullKeyboardSettings {
         static let spatialAutocorrect = "experiments.spatialAutocorrect"
         static let germanSpatialAutocorrect = "experiments.germanSpatialAutocorrect"
         static let koreanKeyboard = KoreanKeyboardExperiment.key
-        static let khmerismKeyboard = KhmerismKeyboardExperiment.key
         static let keyPopups = "settings.keyboardKeyPopups"
         static let haptics = "settings.keyboardHaptics"
         static let hapticStrength = "settings.keyboardHapticStrength"
@@ -162,12 +150,6 @@ struct FullKeyboardSettings {
     var koreanKeyboard: Bool {
         get { defaults?.object(forKey: Key.koreanKeyboard) as? Bool ?? false }
         nonmutating set { defaults?.set(newValue, forKey: Key.koreanKeyboard) }
-    }
-
-    /// Adds Khmer to Settings › Keyboard › Languages. Off by default.
-    var khmerismKeyboard: Bool {
-        get { KhmerismKeyboardExperiment.isEnabled(in: defaults) }
-        nonmutating set { defaults?.set(newValue, forKey: Key.khmerismKeyboard) }
     }
 
     /// The typing model the keyboard may read `language`'s taps with: its bundled model, with

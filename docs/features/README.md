@@ -2897,7 +2897,7 @@ Windows `hex app` -> one tray process, Rune window // dev.rune-ui-windows
 iOS prototype (`HEXMobile`) -> Record/transcribe/copy and keyboard handoff
 ├── Experiments: Full keyboard, Apple Intelligence cleanup, Custom vocabulary,
 │   Hinglish, Two-language dictation, Adaptive touch, German spatial autocorrect,
-│   Korean keyboard (두벌식), Khmerism keyboard, ABC under the emoji key, Keyboard themes (Black, White,
+│   Korean keyboard (두벌식), ABC under the emoji key, Keyboard themes (Black, White,
 │   Navy, Forest, Ember), Two-thumb selection, Delete swiped words letter by letter,
 │   Hide word suggestions, Join the keyboard when unfolded, Learn each language separately
 ├── Full keyboard's languages (Settings › Keyboard › Languages, with Full chosen): one or
@@ -2935,17 +2935,6 @@ iOS prototype (`HEXMobile`) -> Record/transcribe/copy and keyboard handoff
 │   Unit tests only (`HangulComposerTests`, `HangulKeyboardTests`,
 │   `KoreanKeyboardGatingTests`): no CI compiles the iOS targets, and no physical iPhone run
 │   checks it
-├── Khmerism keyboard (off by default, `experiments.khmerismKeyboard`): Settings ›
-│   Experiments adds ភាសាខ្មែរ to Settings › Keyboard › Languages. The input mode
-│   reports `km-KH`. The five-row layout has Base, Shift, 123 and #+= pages. Shift
-│   stays selected while typing. Shift again or ខ្មែរ returns to Base. A tap inserts
-│   the main character and an upward swipe inserts the corner character from the
-│   key where it began. Standalone marks draw with dotted circles and insert their
-│   Khmer scalars. The layout uses Hex's emoji picker, stays joined when unfolded,
-│   and includes Khmer digits instead of adding a Number row. No Khmer autocorrect,
-│   word suggestions, or swipe typing. With the experiment off, Automatic and
-│   stored language choices skip Khmer. Checks: `KhmerismKeyboardGatingTests`,
-│   `KeyboardLayoutTests`, and `FullKeyboardEngineTests`. No physical iPhone run.
 ├── German spatial autocorrect (off by default, `experiments.germanSpatialAutocorrect`):
 │   with Spatial autocorrect on too, the Deutsch layout reads taps with the German
 │   model Android ships (`ios/HEXKeyboard/TypingModel/de.hextm`, the same v3 file
