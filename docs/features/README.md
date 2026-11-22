@@ -2913,6 +2913,10 @@ iOS prototype (`HEXMobile`) -> Record/transcribe/copy and keyboard handoff
 │   dictionary behind its autocorrect (a missing accent is the cheapest fix, "koszonom" →
 │   "köszönöm", while a word of its own such as "meg" keeps its spelling), English as its
 │   bilingual partner through the Latin-script rule, and no typing (spatial) model
+├── English Dvorak on iPhone: comma and period precede P, and semicolon sits to the
+│   left of Space when two keys fit. On the Duo's split keyboard all three sit on the
+│   left half. Shift types `<`, `>`, and `:`.
+│   See [iOS keyboard layouts](../../ios/README.md#capabilities).
 ├── Korean keyboard (두벌식) (off by default, `experiments.koreanKeyboard`): Settings ›
 │   Experiments adds 한국어 to Settings › Keyboard › Languages, typed on the standard two-set
 │   rows (ㅂㅈㄷㄱㅅㅛㅕㅑㅐㅔ / ㅁㄴㅇㄹㅎㅗㅓㅏㅣ / ㅋㅌㅊㅍㅠㅜㅡ, shift's ㅃㅉㄸㄲㅆ and ㅒㅖ, no

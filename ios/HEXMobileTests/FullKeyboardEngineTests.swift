@@ -114,6 +114,24 @@ final class FullKeyboardEngineTests: XCTestCase {
         XCTAssertEqual(target.text, "ABcDe")
     }
 
+    func testDvorakPunctuationTypesItsShiftedLabels() throws {
+        engine.letterLayout = .dvorak
+        let comma = try XCTUnwrap(engine.layout.key(.character(",")))
+        let period = try XCTUnwrap(engine.layout.key(.character(".")))
+        type(",.;")
+        tap(.shift)
+        XCTAssertEqual(engine.displayLabel(for: comma), "<")
+        XCTAssertEqual(engine.keycapLabel(for: period), ">")
+        tap(.character(","))
+        now += 0.5
+        tap(.shift)
+        tap(.character("."))
+        now += 0.5
+        tap(.shift)
+        tap(.character(";"))
+        XCTAssertEqual(target.text, ",.;<>:")
+    }
+
     func testDoubleTapShiftLocks() {
         tap(.shift)
         now += 0.1

@@ -67,7 +67,7 @@ extension FullKeyboardEngine {
         guard let character = key.character else { return key.label }
         if typesFrenchApostrophe(character) { return SmartPunctuation.apostrophe }
         guard isUppercase, layerState.layer == .letters else { return character }
-        return layout.language == .korean ? HangulComposer.shifted(character) : character.uppercased()
+        return shiftedLabel(for: key, character: character)
     }
 
     /// Whether the letter keys read as capitals: as `isUppercase`, except while a press that
@@ -79,6 +79,11 @@ extension FullKeyboardEngine {
         guard let character = key.character else { return key.label }
         if typesFrenchApostrophe(character) { return SmartPunctuation.apostrophe }
         guard keycapsUppercase else { return character }
+        return shiftedLabel(for: key, character: character)
+    }
+
+    private func shiftedLabel(for key: KeyboardKey, character: String) -> String {
+        if layout.metrics.pad?.isDocked != true, let shifted = key.shifted { return shifted }
         return layout.language == .korean ? HangulComposer.shifted(character) : character.uppercased()
     }
 

@@ -1027,10 +1027,12 @@ never at a launch by itself.
   Holds and autocorrect stay the language's: English on QWERTZ (the TestFlight request,
   build 56) holds what English QWERTY does, and a plain layout without the language's own
   letter keys holds them right after their base letter, as Apple's does (German QWERTZ:
-  A Ä À…, O Ö…, U Ü…; Spanish QWERTY: N Ñ Ń). Apple's Dvorak is P Y F G C R L and delete,
-  A O E U I D H T N S from the edge, shift and Q J K X B M W V Z, on keys narrowed so that
-  row fits (38.3 pt pitch on a 402 pt iPhone); split on the Duo it keeps delete on row 3
-  (Apple's split Dvorak unobserved). Kept per language in the App Group
+  A Ä À…, O Ö…, U Ü…; Spanish QWERTY: N Ñ Ń). On iPhone, Dvorak starts with comma and period
+  before P Y F G C R L, with Delete at the right. A semicolon sits immediately left of Space
+  when the row can fit both. Shift types `<`, `>`, and `:` on the three punctuation keys.
+  The second row is A O E U I D H T N S and the third is Shift and Q J K X B M W V Z.
+  On the Duo's split keyboard, comma and period precede P on the left half, the semicolon
+  precedes the left Space key, and Delete stays on row 3. Kept per language in the App Group
   (`settings.keyboardLanguages.layouts`, `LanguageSettings.letterLayout(for:)`); unset,
   not offered, or unreadable (an iPhone that keeps the App Group from a keyboard without
   Full Access), a language types on its own layout. Spatial autocorrect, the touch decoder,
