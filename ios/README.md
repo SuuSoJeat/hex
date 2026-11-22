@@ -700,11 +700,13 @@ never at a launch by itself.
   - **Privacy:** "Everything stays on this iPhone", Learn how I type (what it
     learned below the switch), and under **Advanced**, Record typing logs (off
     by default) with its Typing logs viewer while it's on.
-  - **Experiments:** Hinglish (Hindi in Latin letters), Two-language dictation,
+  - **Experiments:** Hinglish (Hindi in Latin letters), Greeklish (Greek in Latin
+    letters), Two-language dictation,
     Clean up with Apple Intelligence, Adaptive touch (its status and Reset touch learning
     below the switch), German spatial autocorrect, Korean keyboard (두벌식), ABC under the
-    emoji key, Two-thumb selection, Delete swiped words letter by letter, Hide word
-    suggestions, Join the keyboard when unfolded, and Multilingual model (Parakeet).
+    emoji key, Keyboard themes (its Theme menu below the switch while it's on), Two-thumb
+    selection, Delete swiped words letter by letter, Hide word suggestions, Join the
+    keyboard when unfolded, and Multilingual model (Parakeet).
 
   Simulator scenes: `--snap-state settings-home` (ready), `setup` (keyboard
   added, Full Access not confirmed yet), `setup-sheet`, `setup-sheet-microphone`
@@ -713,7 +715,11 @@ never at a launch by itself.
   its page's switches to the App Group: off by default, on with `-on`; switches that are
   on by default (Spatial autocorrect, Swipe typing, Emoji) stay on.
   `-end` starts the page scrolled to the bottom. `settings-privacy-confirm`
-  opens Record typing logs' consent dialog.
+  opens Record typing logs' consent dialog. `--experiment-keyboard-themes` turns
+  Keyboard themes on, and `--keyboard-theme automatic|black|white|navy|forest|ember`
+  picks the theme the full keyboard draws;
+  the dictation bar keeps the system look, and iOS draws its own strip above or below
+  a third-party keyboard, which a theme can't color.
 - **Dictation language (Settings › Dictation › Dictation language, iOS 26+):** Automatic by
   default: the first of the iPhone's preferred languages (then its region's
   locale, then US English) that Apple Speech transcribes, so a Norwegian iPhone
@@ -742,32 +748,47 @@ never at a launch by itself.
   An iPhone without `SpeechTranscriber` (A13: iPhone 11, SE 2nd generation, all
   3–4 GB) dictates English with `DictationTranscriber` on iOS 26+: loading
   Parakeet there sat at 50% (Core ML's compile) until iOS ended Hex, at every
-  launch. Parakeet stays where it fits (6 GB) and before iOS 26, for English only: when
-  Apple Speech doesn't answer, any other language stays on Apple Speech, which says it can't
-  dictate it, rather than going to Parakeet as English
-  (`DictationController.appleSpeechLanguage`). After Hex ended
-  while loading Parakeet, the next launch waits for Set up instead of loading it
-  again (`ParakeetLoadGuard`), and a Parakeet download that sits at one fraction
-  for 90 s ends with a message. **When a model won't install**
+  launch. Parakeet stays where it fits (6 GB) and before iOS 26, for English only, on
+  an iPhone without `SpeechTranscriber`: an iPhone that has it keeps English on Apple
+  Speech, on `DictationTranscriber` too while `SpeechTranscriber`'s English is set
+  aside, and goes to Parakeet only once neither Apple module's English installed twice
+  in a row (TestFlight build 126: one failed install sent an iPhone 15 Pro Max to a
+  Parakeet download that stalled, until a reinstall). When Apple Speech doesn't answer,
+  English stays on it there too, and any other language stays on Apple Speech, which
+  says it can't dictate it, rather than going to Parakeet as English
+  (`DictationController.appleSpeechLanguage`). After Hex ended twice in a row while
+  loading Parakeet, the next launches wait for Set up instead of loading it again, for
+  a day and on that build only (`ParakeetLoadGuard`: iOS ending Hex in the background
+  or a swipe away mid-load once is no evidence), and a Parakeet download that sits at
+  one fraction for 90 s ends with a message. A preparation that says nothing for 30 s
+  ("Checking the speech model": Speech or its asset store not answering), or nothing
+  new for 120 s after, ends with "The speech model isn't ready. Try again."
+  (`watchPreparation`), as does the keyboard model's check behind setup's last step,
+  whose row then offers **Try again**. **When a model won't install**
   (`SpeechModelInstall`, shared by the app and in-keyboard dictation): Apple lists
   some languages whose `SpeechTranscriber` asset never arrives ("transcription.ru
   asset not found after attempted download"), so Hex then installs the same
-  language on `DictationTranscriber` and goes straight to it for three days. A
-  download whose progress doesn't move for 60 s is given up on. When neither
-  module installs while the iPhone is online, Automatic sets the language aside
-  for three days and dictates the next one ("Russian isn't available on this
-  iPhone yet. Using English."); a language picked by hand says so and offers that
-  one ("Try English", with **Use English** in the app). With nothing else to move
+  language on `DictationTranscriber`, and after the second such failure in a row goes
+  straight to it for three days. A download whose progress doesn't move for 60 s is
+  given up on. When neither module installs while the iPhone is online, twice in a row,
+  Automatic sets the language aside for three days and dictates the next one ("Russian
+  isn't available on this iPhone yet. Using English."); a language picked by hand says
+  so and offers that one ("Try English", with **Use English** in the app). A model that
+  installs clears the failures so far. Only Hex's own failures set anything aside:
+  in-keyboard dictation's are often its own (each process holds its own reservation, one
+  released, removed or over Apple's limit reads as not installed there, "Too many asset
+  locales allocated"). With nothing else to move
   to (an English-only iPhone), Automatic tries the set-aside language again
   rather than none, so "Apple's speech recognition can't dictate this language" means neither
   module lists any of the iPhone's languages. Offline or stalled, it
   says the download failed and tries again next time. In the keyboard, a model it
-  can't get itself (each process holds its own reservation, and one released or
-  removed since Hex downloaded it reads as not installed there) says "Open Hex to
-  download English." and Dictate and the Hex key open Hex, which downloads it,
-  until a model installs, a language is chosen, or a day passes
-  (`SpeechModelNeedsHex`, `settings.dictationLanguage.keyboardNeedsHex`); a move
-  to another language keeps its own sentence. Reservations make room
+  can't get itself says "Hex couldn't transcribe that. Try again." the first time, and the
+  second time in a row (within 6 h, no model in place since) "Open Hex to download
+  English.": Dictate and the Hex key then open Hex, which downloads it, until a model
+  installs (in either process; Hex checks again each time it comes to the front), a
+  language is chosen, or a day passes (`SpeechModelNeedsHex`,
+  `settings.dictationLanguage.keyboardNeedsHex`); a move to another language keeps its
+  own sentence. Reservations make room
   under `AssetInventory.maximumReservedLocales` by releasing others first. Only
   Hex's own error text reaches the app or keyboard (`HexDescribedError`); Apple's
   and other packages' descriptions go to logs, however readable.
@@ -863,7 +884,8 @@ never at a launch by itself.
   error code, never the text) beside the download until a dictation
   translates. With Hinglish on, Hindi going into another language is
   translated from its Devanagari, and romanized only if it goes in as
-  spoken. Where you dictate, a "Translate to
+  spoken; Greeklish does the same for Greek, translated from Greek letters.
+  Where you dictate, a "Translate to
   English" switch turns it on or off without opening Hex (testers asked for
   a button, not a setting): a row in the full keyboard's Hex key menu, lit
   with a checkmark while on, and a chip in the dictation bar's language tray.

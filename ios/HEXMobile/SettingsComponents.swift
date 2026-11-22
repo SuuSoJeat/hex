@@ -284,6 +284,8 @@ enum SettingsSnapshotFixture {
         keyboard.germanSpatialAutocorrect = on
         keyboard.koreanKeyboard = on
         keyboard.emojiLettersUnderEmojiKey = on
+        keyboard.keyboardThemesEnabled = false
+        keyboard.keyboardTheme = .automatic
         keyboard.suggestSwearWords = on
         keyboard.keyPopups = true
         keyboard.haptics = true
@@ -309,6 +311,7 @@ enum SettingsSnapshotFixture {
         TypingJournalSettings().learnsPerLanguage = on
         TypingLogSettings().isEnabled = on
         HinglishSettings().isEnabled = on
+        GreeklishSettings().isEnabled = on
         TwoLanguageDictationSettings().isEnabled = on
         AdaptiveTouchSettings().isEnabled = on
         // Settings scenes skip preparing a model, so this only draws the switch.
