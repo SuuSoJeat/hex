@@ -65,7 +65,6 @@ extension FullKeyboardEngine {
     /// A key's label as the keys read it: upper case on the letters page with shift on.
     func displayLabel(for key: KeyboardKey) -> String {
         guard let character = key.character else { return key.label }
-        if layout.language == .khmer { return isUppercase ? key.shifted ?? character : character }
         if typesFrenchApostrophe(character) { return SmartPunctuation.apostrophe }
         guard isUppercase, layerState.layer == .letters else { return character }
         return layout.language == .korean ? HangulComposer.shifted(character) : character.uppercased()
@@ -77,15 +76,10 @@ extension FullKeyboardEngine {
 
     /// A key's label as its keycap shows it (`keycapsUppercase`); pop-ups use `displayLabel`.
     func keycapLabel(for key: KeyboardKey) -> String {
-        if layout.language == .khmer { return displayLabel(for: key) }
         guard let character = key.character else { return key.label }
         if typesFrenchApostrophe(character) { return SmartPunctuation.apostrophe }
         guard keycapsUppercase else { return character }
         return layout.language == .korean ? HangulComposer.shifted(character) : character.uppercased()
-    }
-
-    func khmerismAlternate(for key: KeyboardKey) -> String? {
-        isUppercase ? key.shiftedAlternate : key.alternate
     }
 
     /// The key a touch going down at `point` presses: the one under it, or a neighbouring
