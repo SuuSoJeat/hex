@@ -133,14 +133,20 @@ extension KeyboardLayout {
         footer.append((.returnKey, "↵", 221, nil))
         if metrics.pad?.isDocked == true { footer.append((.dismiss, "dismiss", 100, nil)) }
         addRow(weightedCaps(footer), row: footerRow)
+        giveSpaceBarItsTopGap(in: &keys, metrics: metrics)
 
         func addStripKey(_ kind: KeyKind, label: String, leading: Bool) {
             let span: CGFloat = 44
+            let cell = KeyboardMetrics.appleIconCellWidth
+            let height = metrics.appleBar ? KeyboardMetrics.barHexKeyHeight : metrics.stripPillHeight
+            let x = metrics.appleBar
+                ? (leading ? inset + (cell - span) / 2 : width - inset - (cell + span) / 2)
+                : (leading ? left : right - span)
             let frame = CGRect(
-                x: leading ? left : right - span, y: metrics.stripTop + metrics.stripInset,
-                width: span, height: metrics.stripPillHeight
+                x: x, y: metrics.stripTop + metrics.stripTextCenter - height / 2,
+                width: span, height: height
             )
-            let target = frame.insetBy(dx: -4, dy: 0)
+            let target = frame.insetBy(dx: metrics.appleBar ? -(cell - span) / 2 : -4, dy: 0)
             keys.append(KeyboardKey(
                 kind: kind, row: -1, frame: frame,
                 hitFrame: CGRect(x: target.minX, y: metrics.stripTop, width: target.width, height: touchTop - metrics.stripTop),

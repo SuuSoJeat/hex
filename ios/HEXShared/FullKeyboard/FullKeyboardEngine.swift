@@ -127,6 +127,9 @@ final class FullKeyboardEngine {
     var showsGlobe = false { didSet { if showsGlobe != oldValue { rebuildLayout() } } }
     /// Settings › Keyboard › Emoji, in fields that take emoji.
     var showsEmoji = false { didSet { if showsEmoji != oldValue { rebuildLayout() } } }
+    /// Settings › Experiments › Emoji shortcodes: what a closing ":" types for a name typed
+    /// in full (":pizza"), set by the keyboard from the App Group; nil is off.
+    var emojiShortcode: ((String?) -> EmojiShortcode.Replacement?)?
     var horizontalInset: CGFloat = 0 { didSet { if horizontalInset != oldValue { rebuildLayout() } } }
     /// An iPhone, or the iPhone Duo folded or unfolded (`KeyboardPosture`).
     var posture: KeyboardPosture = .phone { didSet { if posture != oldValue { rebuildLayout() } } }
@@ -151,6 +154,22 @@ final class FullKeyboardEngine {
     var joinsUnfoldedKeyboard = false {
         didSet { if joinsUnfoldedKeyboard != oldValue { rebuildLayout(cause: "join_unfolded") } }
     }
+    /// Settings › Experiments › Dvorak punctuation keys (off by default): English's Dvorak
+    /// letters gain comma and period on row 1 and a semicolon by the space bar, which type
+    /// `<`, `>` and `:` with shift.
+    var dvorakPunctuation = false {
+        didSet { if dvorakPunctuation != oldValue { rebuildLayout(cause: "dvorak_punctuation") } }
+    }
+    /// Settings › Experiments › Comma and period keys (off by default): a comma left of the
+    /// space bar and a period right of it on an iPhone's letters page in a text field, unless
+    /// Dvorak punctuation already puts them on row 1.
+    var commaPeriodKeys = false {
+        didSet { if commaPeriodKeys != oldValue { rebuildLayout(cause: "comma_period_keys") } }
+    }
+    /// Settings › Experiments › Quick accents (off by default): a held letter's callout opens
+    /// on its language's preferred accent (`AccentCatalog.primaryVariant`, Spanish "o" → "ó"),
+    /// so letting go types it; sliding into another cell still picks that one.
+    var quickAccentsEnabled = false
     /// Whether the keys have the number row's band: its switch is on and this is an iPhone (the
     /// iPad keeps Apple's rows; `KeyboardMetrics.for`).
     var hasNumberRow: Bool { showsNumberRow && pad == nil }
@@ -277,6 +296,7 @@ final class FullKeyboardEngine {
         forgetTypingContext()
         tokenTaps.removeAll()
         swipedWord = nil
+        swipeRetries.forget()
         finishedWord = nil
         autocorrect.forgetCorrection()
         adaptiveTouch?.beginSession()
@@ -333,6 +353,7 @@ final class FullKeyboardEngine {
     func forgetTextAroundKeys() {
         forgetTypingContext()
         swipedWord = nil
+        swipeRetries.forget()
     }
 
     func refreshAutoCapitalization() {
@@ -509,6 +530,7 @@ final class FullKeyboardEngine {
             shift.didType()
             logState("typed")
         }
+        if typeEmojiShortcode(text) { return }
         if dropsSuggestionSpace(before: text) || !correctWord(endingWith: text) {
             insert(text, source: source, at: point)
         }
@@ -699,7 +721,7 @@ final class FullKeyboardEngine {
             committed: false,
             returnLayer: nil
         )
-        touch.claimed = !key.hitFrame.contains(point)
+        touch.claimed = !key.takes(point)
         touch.downPoint = downPoint
         if key.character != nil {
             learning?.recordTap(on: key, at: point)
@@ -777,6 +799,7 @@ final class FullKeyboardEngine {
         }
         activeAccentTouchID = id
         accentOpenCell = activeAccentMenu?.index(for: touch.point)
+        preselectQuickAccent(for: base)
         typingLog?.ui("accent_open", [
             TypingLogField("id", .int(id)),
             TypingLogField("key", .string(TypingLogger.keyID(touch.key.kind))),
@@ -794,6 +817,23 @@ final class FullKeyboardEngine {
         accentOpenCell = nil
         onSelectionStep?()
         onChange?()
+    }
+
+    /// Settings › Experiments › Quick accents: opens the callout on the held letter's main
+    /// accent. Letters on the letters page only, so the 123 and #+= pages' held symbols and the
+    /// mark keys ˇ and ʼ keep the key's own. `accentOpenCell` still holds the cell under the
+    /// finger at opening, so only a slide into another cell changes the selection; a lift in
+    /// place types the accent.
+    private func preselectQuickAccent(for base: String) {
+        guard quickAccentsEnabled, layerState.layer == .letters,
+              base.first?.isLetter == true, base.uppercased() != base,
+              var menu = activeAccentMenu,
+              let primary = AccentCatalog.primaryVariant(
+                  for: base, uppercase: isUppercase, language: layout.language, letters: layout.letters
+              ),
+              let index = menu.options.firstIndex(of: primary) else { return }
+        menu.selectedIndex = index
+        activeAccentMenu = menu
     }
 
     /// The callout's selection for a finger at `point` (`accentOpenCell`).
@@ -1065,6 +1105,7 @@ final class FullKeyboardEngine {
         // unless its experiment asks for one character at a time, as anywhere else.
         let swiped = swipedWord
         swipedWord = nil
+        swipeRetries.willDelete(letterOf: takesSwipeBack && deletesSwipedWordsLetterByLetter ? swiped : nil)
         if takesSwipeBack, !deletesSwipedWordsLetterByLetter, let swiped, deleteSwipedWord(swiped) { return }
         let before = textBefore
         learning?.willErase(word: AutocorrectEngine.currentToken(in: before))
@@ -1139,11 +1180,15 @@ final class FullKeyboardEngine {
             return
         }
         spaceBeforeNextWord(character)
-        var text = layerState.layer == .letters && shift.isUppercase ? key.shifted ?? character.uppercased() : character
+        // The Dvorak punctuation keys' symbols follow a shift you pressed, or caps lock, not
+        // auto-capitalization; the docked iPad's two-symbol keys have always followed both.
+        let shifted = layout.metrics.pad?.isDocked == true || shift.isUserShift ? key.shifted : nil
+        var text = layerState.layer == .letters && shift.isUppercase ? shifted ?? character.uppercased() : character
         if layerState.layer == .letters {
             shift.didType()
         }
         if layerState.layer == .letters, typeLayoutRules(&text) { return }
+        if typeEmojiShortcode(text) { return }
         if dropsSuggestionSpace(before: text) || !correctWord(endingWith: text) {
             insert(text, source: "key", at: point)
         }
@@ -1283,7 +1328,7 @@ final class FullKeyboardEngine {
         }
         guard fix != nil || revised != nil else { return false }
         adaptiveLearning?.finish(token: token, corrected: fix?.replacement, previousRevised: revised != nil, before: before)
-        let original = (revised.map { $0.from + " " } ?? "") + token
+        let original = (revised.map { $0.from + " " } ?? "") + (fix?.original ?? token)
         let inserted = (revised.map { $0.to + " " } ?? "") + word + ending
         rememberTypingContext(before: String(before.dropLast(original.count)), inserted: inserted)
         for _ in 0..<original.count {
@@ -1291,7 +1336,7 @@ final class FullKeyboardEngine {
         }
         tokenTaps.removeAll()
         var fields = [
-            TypingLogField("from", .string(token)),
+            TypingLogField("from", .string(fix?.original ?? token)),
             TypingLogField("to", .string(word)),
             TypingLogField("deleted", .string(original)),
             TypingLogField("inserted", .string(inserted)),
@@ -1306,9 +1351,9 @@ final class FullKeyboardEngine {
             changes.append(.init(from: revised.from, to: revised.to, language: language))
             learning?.record(.autocorrected, typed: revised.from, final: revised.to, language: language.rawValue)
         }
-        if fix != nil {
-            changes.append(.init(from: token, to: word, language: fixLanguage))
-            learning?.record(.autocorrected, typed: token, final: word, language: fixLanguage?.rawValue)
+        if let fix {
+            changes.append(.init(from: fix.original, to: word, language: fixLanguage))
+            learning?.record(.autocorrected, typed: fix.original, final: word, language: fixLanguage?.rawValue)
         }
         recordCorrection(original: original, corrected: String(inserted.dropLast(ending.count)), ending: ending, changes: changes)
         swipedWord = nil
@@ -1515,6 +1560,8 @@ final class FullKeyboardEngine {
     // MARK: - Swipe typing (Settings › Keyboard › Swipe typing; SwipeTyping.swift)
 
     private(set) var swipedWord: SwipedWord?
+    /// Words just taken back after swipes typed them, which the next swipe there skips.
+    let swipeRetries = SwipeRetries()
     /// Settings › Experiments › Delete swiped words letter by letter (off by default): delete
     /// right after a swipe acts as an ordinary delete and takes one character, instead of the
     /// whole word and the space the swipe added before it (`deleteBackward`). Its record still
@@ -1540,7 +1587,7 @@ final class FullKeyboardEngine {
     /// that may be offered.
     func showSwipePreview(_ words: [String]) {
         guard isSwiping else { return }
-        let next = swipeReadings(words).first.map { swipeCased($0, capital: swipeCapital) }
+        let next = swipeRetries.reordered(swipeReadings(words), before: typingContext).first.map { swipeCased($0, capital: swipeCapital) }
         guard next != swipePreview else { return }
         swipePreview = next
         refreshSuggestions()
@@ -1556,7 +1603,7 @@ final class FullKeyboardEngine {
         swipePreview = nil
         // The finger came up off a key: a quick tap on the strip's lower half next is a key.
         lastKeyTouchAt = clock()
-        let readings = swipeReadings(words)
+        let readings = swipeRetries.typing(swipeReadings(words), before: typingContext)
         if let log = typingLog {
             log.ui("swipe_end", [
                 TypingLogField("points", .int(points)),
@@ -1664,6 +1711,7 @@ final class FullKeyboardEngine {
         for _ in 0..<swiped.inserted.count {
             target.deleteBackward()
         }
+        swipeRetries.tookBack(swiped)
         tokenTaps.removeAll()
         lastSpaceAt = nil
         didEdit()
@@ -1705,6 +1753,8 @@ final class FullKeyboardEngine {
             pad: pad,
             numberRow: hasNumberRow,
             joinsUnfoldedKeyboard: joinsUnfoldedKeyboard,
+            dvorakPunctuation: dvorakPunctuation,
+            commaPeriodKeys: commaPeriodKeys,
             availableHeight: availableHeight
         )
         autocorrect.setKeys(layout.language, letters: layout.letters)

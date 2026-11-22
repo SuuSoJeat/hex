@@ -42,8 +42,13 @@ final class KeyboardLocalDictation {
         }
     }
 
-    private var phase: Phase = .idle
+    private var phase: Phase = .idle {
+        didSet { if case .idle = phase { liveText?.end() } else if case .failed = phase { liveText?.end() } }
+    }
     private var job: Job?
+    /// The words so far while recording (`KeyboardLiveDictation`), for the keyboard to show.
+    var liveText: LiveDictationText?
+    private var live: KeyboardLiveDictation?
     /// When the job last showed progress: its start, its capture's last audio, or the start of
     /// its transcription (`KeyboardJobWatchdog`).
     private var lastProgressAt: TimeInterval = 0
@@ -232,6 +237,8 @@ final class KeyboardLocalDictation {
     }
 
     private func noteCaptureStopped() {
+        live?.stop()
+        live = nil
         if capture === Self.sharedCapture {
             Self.ownership.endCapture(by: ownerID)
         }
@@ -265,6 +272,8 @@ final class KeyboardLocalDictation {
     }
 
     func handleMemoryWarning() {
+        live?.memoryWarning()
+        KeyboardParakeet.shared.handleMemoryWarning()
         guard !isActive else { return }
         let current = capture
         capture = nil
@@ -531,6 +540,7 @@ final class KeyboardLocalDictation {
             do {
                 let url = FileManager.default.temporaryDirectory.appendingPathComponent("keyboard-\(jobID).wav")
                 pcmFile = try KeyboardPCMFile(url: url, sampleRate: sampleRate)
+                live = KeyboardLiveDictation.start(sampleRate: sampleRate, text: liveText)
             } catch {
                 capture?.stop()
                 fail(UserFacingError.Context.microphone.fallback, detail: "Could not create audio file: \(Self.describe(error))")
@@ -541,6 +551,7 @@ final class KeyboardLocalDictation {
                 timeline = nil
             }
             pcmFile?.append(data)
+            live?.append(data)
             lastProgressAt = Date().timeIntervalSince1970
             loudness = peak > 0 ? max(-62, 20 * log10(peak)) : -62
         case .stopped:
@@ -686,17 +697,17 @@ final class KeyboardLocalDictation {
         lastProgressAt = Date().timeIntervalSince1970
         let url = file.url
         let fixes = activeCorrections
-        let hints = DictationCorrections.recognitionHints(vocabulary: [], corrections: fixes)
+        let vocabulary = CustomVocabularySettings().activeTerms
+        let hints = DictationCorrections.recognitionHints(vocabulary: vocabulary, corrections: fixes)
         transcription = Task { [weak self] in
             let started = Date()
             do {
-                let (heard, language) = try await KeyboardSpeech.transcribe(url, hints: hints)
+                let (heard, language, engine) = try await KeyboardTranscription.transcribe(url, hints: hints, audioSeconds: seconds)
                 try? FileManager.default.removeItem(at: url)
                 let locale = language.identifier
                 let style = KeyboardBridge().style
-                let vocabulary = CustomVocabularySettings().activeTerms
                 // The app's steps (but Apple Intelligence's cleanup), its style, Format lists,
-                // Spoken punctuation, End with a period and Lowercase included.
+                // Spoken punctuation, Numbers as digits, End with a period and Lowercase included.
                 let pipeline = DictationPipeline(
                     style: style,
                     language: locale,
@@ -705,7 +716,9 @@ final class KeyboardLocalDictation {
                     lowercase: DictationLowercaseSettings().isEnabled,
                     formatLists: DictationListSettings().isEnabled,
                     spokenPunctuation: DictationPunctuationSettings().isEnabled,
+                    numbersAsDigits: DictationNumberSettings().isEnabled,
                     hinglish: HinglishSettings().isEnabled,
+                    greeklish: GreeklishSettings().isEnabled,
                     endsWithPeriod: DictationPeriodSettings().isEnabled
                 )
                 let steps = await pipeline.run(heard, translationSource: language.locale.language)
@@ -733,9 +746,7 @@ final class KeyboardLocalDictation {
                 // Record typing logs keeps every step; nothing is kept while it is off.
                 let stages: DictationStages? = TypingLogSettings().isEnabled
                     ? DictationStages(
-                        engine: language.module == .dictation
-                            ? "Apple Speech (keyboard, DictationTranscriber)"
-                            : "Apple Speech (keyboard)",
+                        engine: engine,
                         locale: locale,
                         style: style.rawValue,
                         recordedMS: Int((seconds * 1000).rounded()),
@@ -1174,7 +1185,7 @@ private final class WeakMessageHandler: NSObject, WKScriptMessageHandler {
 }
 
 @available(iOS 26.0, *)
-private enum KeyboardSpeech {
+enum KeyboardSpeech {
     enum Failure: HexDescribedError, NoSpeechError {
         case noLocale
         case empty
@@ -1211,7 +1222,9 @@ private enum KeyboardSpeech {
         let started = Date()
         let language: SpeechLanguage
         do {
-            language = try await AppleSpeechAssets.install(picked, settings: settings, log: { log.write($0) })
+            // The keyboard's failures set nothing aside for Hex (`setsAside`): they are often
+            // the keyboard's own reservation, not the language.
+            language = try await AppleSpeechAssets.install(picked, settings: settings, setsAside: false, log: { log.write($0) })
         } catch {
             throw SpeechModelNeedsHex.keyboardError(for: error, language: picked.identifier, settings: settings)
         }
@@ -1241,7 +1254,7 @@ private enum KeyboardSpeech {
             options: SpeechAnalyzer.Options(priority: .userInitiated, modelRetention: .whileInUse)
         )
         let file = try AVAudioFile(forReading: url)
-        // Learn how I type's meant words, best effort, as the app does for custom vocabulary.
+        // Custom vocabulary and Learn how I type's meant words, best effort, as the app does.
         if !hints.isEmpty {
             let context = AnalysisContext()
             context.contextualStrings[.general] = hints

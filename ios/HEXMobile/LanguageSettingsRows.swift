@@ -117,7 +117,9 @@ struct DictationLanguageRow: View {
         options = await AppleSpeechLanguages.options()
         refreshLanguageChoices()
         automaticName = await AppleSpeechLanguages.automatic().map {
-            HinglishSettings().name(for: $0.identifier) ?? SpeechLanguagePicker.displayName(for: $0.identifier)
+            HinglishSettings().name(for: $0.identifier)
+                ?? GreeklishSettings().name(for: $0.identifier)
+                ?? SpeechLanguagePicker.displayName(for: $0.identifier)
         }
     }
 
@@ -160,6 +162,7 @@ struct DictationLanguageRow: View {
 
     private func name(for id: String) -> String {
         if let hinglish = HinglishSettings().name(for: id) { return hinglish }
+        if let greeklish = GreeklishSettings().name(for: id) { return greeklish }
         return SpeechLanguagePicker.shortNames(for: options.map(\.id))[id]
             ?? SpeechLanguagePicker.displayName(for: id)
     }
@@ -345,8 +348,8 @@ struct KeyboardLanguagesPage: View {
         }
     }
 
-    /// The languages whose keys the keyboard shows and whose layout is named in Settings:
-    /// Khmerism and languages with a choice. English and Spanish together use the first
+    /// Shows Khmerism and languages with a layout choice, using Automatic's language when
+    /// none is chosen. English and Spanish or English and German can share the first
     /// language's keys (`KeyboardLanguageList.layout`).
     private var arranged: [KeyboardLanguage] {
         let typing = chosen.isEmpty ? [automatic] : chosen

@@ -7,6 +7,8 @@
 //! and is hidden while off.
 
 mod group;
+#[cfg(target_os = "macos")]
+mod hud_height;
 #[cfg(all(target_os = "macos", hex_capture))]
 pub(super) mod screenshots;
 mod signature;
@@ -231,6 +233,10 @@ pub(super) struct Store {
     pub(super) signature: TextEdit,
     /// Whether `signature` started from the saved line.
     pub(super) signature_synced: bool,
+    /// Labs › HUD height's slider while it drags: the point gap shown
+    /// before release saves it.
+    #[cfg_attr(not(target_os = "macos"), allow(dead_code))]
+    pub(super) hud_gap: Option<u16>,
     /// The lab a `hex://labs/<feature>` link named and when, so its card
     /// shows a focus border for [`FLASH`].
     pub(super) flash: Option<(&'static str, std::time::Instant)>,
@@ -495,11 +501,20 @@ fn shown(ui: &Ui) -> Vec<Row> {
         .collect()
 }
 
-pub(super) fn offered(ui: &Ui, feature: Feature) -> bool {
-    feature.audience() == crate::labs::Audience::Everyone
-        && shown(ui)
-            .iter()
-            .any(|row| row.lab.id() == feature.name() && !row.locked)
+/// Every lab this build offers anyone: its audience is everyone, it shows on
+/// this OS, and nothing locks it, each with the icon its card draws. What's
+/// new lists its newest entries from this.
+pub(super) fn offered_labs(ui: &Ui) -> Vec<(Feature, &'static Icon)> {
+    shown(ui)
+        .into_iter()
+        .filter(|row| !row.locked)
+        .filter_map(|row| match row.lab {
+            Lab::Feature(feature) if feature.audience() == crate::labs::Audience::Everyone => {
+                Some((feature, row.icon))
+            }
+            _ => None,
+        })
+        .collect()
 }
 
 /// Search only the cards the current store can reveal. This also covers
@@ -675,6 +690,8 @@ fn rows(ui: &Ui) -> Vec<Row> {
             // macOS's app menu Quit Hex closes the window instead.
             // macOS's HUD reads the screen's notch from NSScreen.
             rows.push(row(Feature::NotchIndicator, Some(&WAVE)));
+            // macOS's HUD reads its bottom gap from the saved setting.
+            rows.push(row(Feature::HudHeight, Some(&PANEL)));
             // Hex's session tap takes the shortcut; ScreenCaptureKit shoots.
             #[cfg(hex_capture)]
             rows.push(row(Feature::Screenshots, Some(&CAMERA)));
@@ -1019,6 +1036,7 @@ fn row_key(lab: Lab) -> &'static str {
         Feature::CursorContext => "lab-cursor-context",
         Feature::StopPhrase => "lab-stop-phrase",
         Feature::Signature => "lab-signature",
+        Feature::HudHeight => "lab-hud-height",
         Feature::HoldThroughKeys => "lab-hold-through-keys",
         Feature::ModesEditor => "lab-modes-editor",
         Feature::DropTranscribe => "lab-drop-transcribe",
@@ -1158,6 +1176,8 @@ fn extras(ui: &Ui, p: Paint, entry: &Row, layer: &mut Vec<El>) -> Option<El> {
         Lab::Feature(Feature::VoicePrompt) => Some(voice_prompt::body(ui, p)),
         Lab::Feature(Feature::StopPhrase) => Some(stop_phrase::body(ui, p)),
         Lab::Feature(Feature::Signature) => Some(signature::body(ui, p)),
+        #[cfg(target_os = "macos")]
+        Lab::Feature(Feature::HudHeight) => Some(hud_height::body(ui, p)),
         Lab::Feature(Feature::DictationStyle) => Some(
             row()
                 .key("dictation-style-row")

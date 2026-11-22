@@ -54,6 +54,8 @@ final class KeyboardViewController: UIInputViewController {
     /// Learn how I type: what becomes of each dictation Hex inserts.
     private let dictationEdits = DictationEditTracker()
     private lazy var documentTarget = DocumentProxyTextTarget { [weak self] in self?.textDocumentProxy }
+    /// Type as I speak: the live words in the field while recording.
+    private lazy var liveTyping = KeyboardLiveTyping(target: documentTarget)
     /// Record typing logs: the process's logger while the experiment is on.
     private var typingLog: TypingLogger?
     /// The field the current typing log session is for.
@@ -203,6 +205,8 @@ final class KeyboardViewController: UIInputViewController {
         // keyboard does, and iOS gives up on a keyboard slow to draw.
         let autoStart = DispatchWorkItem { [weak self] in
             self?.autoStartDictationIfPending()
+            // Experiments › Speech model in keyboard: last, and it loads off the main thread.
+            if let self, self.isShown, self.hasFullAccess, !self.memoryWarned { KeyboardParakeet.shared.warmUp() }
         }
         launchWork = [lexicon, optional, autoStart]
         DispatchQueue.main.asyncAfter(deadline: .now() + KeyboardLaunchWork.afterFirstFrame, execute: lexicon)
@@ -254,6 +258,7 @@ final class KeyboardViewController: UIInputViewController {
         fullKeyboard?.engine.commitHangulComposition()
         closeBarEmojiPanel()
         // A dictation under way finishes without the keyboard, and the next one delivers it.
+        liveTyping.keyboardWillHide()
         localDictation.keyboardWillHide()
         endTypingLogSession(reason: "disappear", settleDictation: editContext)
         pollTimer?.invalidate()
@@ -373,7 +378,6 @@ final class KeyboardViewController: UIInputViewController {
         typingLogTraits = traits
         log.beginSession(typingLogSessionInfo(trigger: trigger, traits: traits))
         attachTypingLog()
-        syncLoggingMark()
     }
 
     /// `settleDictation` is the text the last dictation's outcome is judged on (nil: where
@@ -386,15 +390,6 @@ final class KeyboardViewController: UIInputViewController {
         fullKeyboard?.typingLog = nil
         log.endSession(reason: reason)
         typingLogTraits = nil
-        syncLoggingMark()
-    }
-
-    /// Both keyboards show a small mark the whole time typing logs record this field.
-    private func syncLoggingMark() {
-        let logging = typingLog?.isRecording == true
-        if viewModel.isLoggingTyping != logging {
-            viewModel.isLoggingTyping = logging
-        }
     }
 
     private func attachTypingLog() {
@@ -627,6 +622,7 @@ final class KeyboardViewController: UIInputViewController {
         isRetired = true
         launchWork.forEach { $0.cancel() }
         launchWork = []
+        liveTyping.keyboardWillHide()
         localDictation.keyboardWillHide()
         endTypingLogSession(reason: "superseded", settleDictation: nil)
         pollTimer?.invalidate()
@@ -670,6 +666,13 @@ final class KeyboardViewController: UIInputViewController {
             return TypingJournal.sharedIfEnabled()?.dictationCorrections(language: language) ?? []
         }
         localDictation.currentDocument = { [weak self] in self?.currentDocument }
+        localDictation.liveText = viewModel.liveText
+        liveTyping.attach(viewModel.liveText)
+        liveTyping.mayType = { [weak self] in self?.fullKeyboard?.engine.hasPendingSelectionDictation != true }
+        liveTyping.didEdit = { [weak self] in
+            self?.fullKeyboard?.engine.forgetTextAroundKeys()
+            self?.fullKeyboard?.engine.textDidChange()
+        }
         viewModel.onPasteDictation = { [weak self] in self?.pasteOfferedDictation() }
         viewModel.onDictateTap = { [weak self] in self?.startWarmDictation() }
         viewModel.onHexKeyPress = { [weak self] at in self?.hexKeyPressed(at: at) }
@@ -787,6 +790,9 @@ final class KeyboardViewController: UIInputViewController {
         }
         viewModel.onOpenURL = { [weak self] url in
             guard let self else { return }
+            if url == self.viewModel.coldStartURL, let reason = self.opensHexFor {
+                KeyboardSelfDictation().recordHandedToHex(reason)
+            }
             ContainingAppOpener.open(url, from: self)
         }
 
@@ -914,7 +920,6 @@ final class KeyboardViewController: UIInputViewController {
         hapticStrength = FullKeyboardSettings().hapticStrength
         fullKeyboard?.syncSettings()
         syncTypingLogEnabled()
-        syncLoggingMark()
         let effectiveFullAccess = dictationAccess(now: now)
         syncLocalDictationAvailability(access: effectiveFullAccess)
 
@@ -1005,7 +1010,10 @@ final class KeyboardViewController: UIInputViewController {
             translationFailure: snap.translationFailure,
             source: source
         )
-        if source == "keyboard" { localDictation.markDelivered(resultID: resultID) }
+        if source == "keyboard" {
+            localDictation.markDelivered(resultID: resultID)
+            KeyboardSelfDictation().clearHandedToHex()
+        }
         return true
     }
 
@@ -1075,7 +1083,8 @@ final class KeyboardViewController: UIInputViewController {
         // it; either way, the context below is read after that, so spacing sees the result.
         fullKeyboard?.engine.commitHangulComposition()
         fullKeyboard?.applyPendingSelectionDictation()
-        let context = editContext
+        // Type as I speak's words come out first: the text goes in where and as it would without them.
+        let context = liveTyping.handOver() ?? editContext
         let insertion = TranscriptFormatter.insertionText(
             for: transcript,
             beforeContext: context.before,
@@ -1193,6 +1202,8 @@ final class KeyboardViewController: UIInputViewController {
 
     /// Whether the Dictate and Hex keys dictate in the keyboard; nil until first decided.
     private var localDictationAvailable: Bool?
+    /// Why Dictate opens Hex while it can't dictate here, recorded as it does (`KeyboardSelfDictation`).
+    private var opensHexFor: KeyboardSelfDictation.Reason?
     private var lastAvailabilityNote: TimeInterval = 0
 
     /// In-keyboard dictation (iOS 26) needs memory for its capture web view and recording
@@ -1214,8 +1225,10 @@ final class KeyboardViewController: UIInputViewController {
         }
         let multilingual = MultilingualParakeetSettings()
         let multilingualOpensHex = multilingual.keyboardOpensHex(language: multilingual.language())
+            && !KeyboardParakeet.shared.dictatesMultilingualHere
         let needsHex = !localDictation.isActive && (LanguageSettings().keyboardNeedsHex() || multilingualOpensHex)
         let available = localDictation.isActive || (!needsHex && localDictation.hasMemoryToStart)
+        opensHexFor = available ? nil : multilingualOpensHex ? .multilingual : needsHex ? .speechModel : .memory
         guard available != localDictationAvailable else { return }
         // Noted at most every 5 s, as the footprint can hover at the line.
         let now = Date().timeIntervalSince1970
@@ -1289,15 +1302,16 @@ final class KeyboardViewController: UIInputViewController {
         let translationLanguage: String? = if #available(iOS 26.0, *) { translation.targetLanguage } else { nil }
         let translationLanguages = Self.translationLanguages
         let hinglish = HinglishSettings().isEnabled
+        let greeklish = GreeklishSettings().isEnabled
         let signature = [
             explicit ?? "", automatic ?? "", recent.joined(separator: ","), removed.joined(separator: ","),
             "\(supported.count)",
-            target ?? "", "\(hinglish)",
+            target ?? "", "\(hinglish)", "\(greeklish)",
             translationLanguage ?? "", "\(translationLanguages?.count ?? -1)",
         ].joined(separator: "|")
         guard signature != languageSignature else { return }
         languageSignature = signature
-        let choices = settings.keyboardLanguageChoices(hinglish: hinglish)
+        let choices = settings.keyboardLanguageChoices(hinglish: hinglish, greeklish: greeklish)
         let more = DictationLanguageSwitch.more(choices: choices, preferred: Locale.preferredLanguages, supported: supported)
         if viewModel.dictationLanguage != explicit { viewModel.dictationLanguage = explicit }
         if viewModel.automaticLanguage != automatic { viewModel.automaticLanguage = automatic }

@@ -9,7 +9,12 @@ struct DictationSettingsPage: View {
     @State private var lowercase = DictationLowercaseSettings().isEnabled
     @State private var formatLists = DictationListSettings().isEnabled
     @State private var spokenPunctuation = DictationPunctuationSettings().isEnabled
+    @State private var numbersAsDigits = DictationNumberSettings().isEnabled
     @State private var endsWithPeriod = DictationPeriodSettings().isEnabled
+    @State private var showsWhatISay = LiveDictationSettings().showsPreview
+    @State private var typesAsISpeak = LiveDictationSettings().typesIntoField
+    /// Keep mic warm stays on the page once picked, even Off where it would hide.
+    @State private var keepsWarmRow = false
 
     var body: some View {
         SettingsPageScaffold(title: "Dictation") {
@@ -65,6 +70,15 @@ struct DictationSettingsPage: View {
 
                 SettingsDivider()
 
+                // Before Clean up what I say, on every path but Verbatim (`SpokenNumbers`).
+                SettingsToggleRow(
+                    title: String(localized: "Numbers as digits"),
+                    detail: String(localized: "“Five point five” becomes 5.5"),
+                    isOn: $numbersAsDigits
+                )
+
+                SettingsDivider()
+
                 // Inside the style, on every path but Verbatim (`TranscriptFormatter`).
                 SettingsToggleRow(
                     title: String(localized: "End with a period"),
@@ -73,6 +87,21 @@ struct DictationSettingsPage: View {
                 )
 
                 DictationLanguageRow(dictation: dictation)
+            }
+
+            // While the keyboard records by itself (iOS 26 and later): its live words.
+            if #available(iOS 26.0, *) {
+                SettingsCard {
+                    SettingsToggleRow(title: String(localized: "Show what I say"), isOn: $showsWhatISay)
+
+                    SettingsDivider()
+
+                    SettingsToggleRow(
+                        title: String(localized: "Type as I speak"),
+                        detail: String(localized: "Words can change until you stop"),
+                        isOn: $typesAsISpeak
+                    )
+                }
             }
 
             SettingsCard {
@@ -106,24 +135,28 @@ struct DictationSettingsPage: View {
             }
 
             SettingsCard {
-                HStack(spacing: 12) {
-                    SettingsRowLabel(title: String(localized: "Keep mic warm"))
-                    Spacer(minLength: 8)
-                    SettingsSegments(
-                        items: WarmSessionDuration.allCases,
-                        selected: dictation.warmDuration,
-                        label: \.shortLabel,
-                        onSelect: { duration in
-                            withAnimation(HexMotion.settleAnimation(reduceMotion: reduceMotion)) {
-                                dictation.selectWarmDuration(duration)
+                // Hidden where the keyboard dictates by itself and it would say Off.
+                if keepsWarmRow || dictation.showsKeepMicWarm {
+                    HStack(spacing: 12) {
+                        SettingsRowLabel(title: String(localized: "Keep mic warm"))
+                        Spacer(minLength: 8)
+                        SettingsSegments(
+                            items: WarmSessionDuration.allCases,
+                            selected: dictation.warmDuration,
+                            label: \.shortLabel,
+                            onSelect: { duration in
+                                keepsWarmRow = true
+                                withAnimation(HexMotion.settleAnimation(reduceMotion: reduceMotion)) {
+                                    dictation.selectWarmDuration(duration)
+                                }
                             }
-                        }
-                    )
-                }
-                .padding(.horizontal, 16)
-                .frame(minHeight: 50)
+                        )
+                    }
+                    .padding(.horizontal, 16)
+                    .frame(minHeight: 50)
 
-                SettingsDivider()
+                    SettingsDivider()
+                }
 
                 // With a car, headset or headphones connected (`MicrophoneRoute`).
                 HStack(spacing: 12) {
@@ -169,8 +202,17 @@ struct DictationSettingsPage: View {
         .onChange(of: spokenPunctuation) { _, enabled in
             DictationPunctuationSettings().isEnabled = enabled
         }
+        .onChange(of: numbersAsDigits) { _, enabled in
+            DictationNumberSettings().isEnabled = enabled
+        }
         .onChange(of: endsWithPeriod) { _, enabled in
             DictationPeriodSettings().isEnabled = enabled
+        }
+        .onChange(of: showsWhatISay) { _, enabled in
+            LiveDictationSettings().showsPreview = enabled
+        }
+        .onChange(of: typesAsISpeak) { _, enabled in
+            LiveDictationSettings().typesIntoField = enabled
         }
         .onAppear {
             cleanupTagger = CleanupTaggerSettings().isEnabled
@@ -178,7 +220,10 @@ struct DictationSettingsPage: View {
             lowercase = DictationLowercaseSettings().isEnabled
             formatLists = DictationListSettings().isEnabled
             spokenPunctuation = DictationPunctuationSettings().isEnabled
+            numbersAsDigits = DictationNumberSettings().isEnabled
             endsWithPeriod = DictationPeriodSettings().isEnabled
+            showsWhatISay = LiveDictationSettings().showsPreview
+            typesAsISpeak = LiveDictationSettings().typesIntoField
         }
     }
 }
@@ -251,6 +296,9 @@ private enum HexKeySide: CaseIterable {
 struct KeyboardSettingsPage: View {
     /// `KeyboardSetupMonitor.fullAccessOn`.
     let fullAccessOn: Bool
+    var needsAllowPasteSetting = false
+    var onDismissAllowPasteSetting: () -> Void = {}
+    @Environment(\.openURL) private var openURL
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var fullKeyboard = FullKeyboardSettings().isEnabled
     @State private var autoCapitalization = FullKeyboardSettings().autoCapitalization
@@ -258,10 +306,12 @@ struct KeyboardSettingsPage: View {
     @State private var numberRow = FullKeyboardSettings().numberRow
     @State private var autocorrect = FullKeyboardSettings().autocorrect
     @State private var spatialAutocorrect = FullKeyboardSettings().spatialAutocorrect
+    @State private var germanSpatialAutocorrect = FullKeyboardSettings().germanSpatialAutocorrect
     @State private var suggestSwearWords = FullKeyboardSettings().suggestSwearWords
     @State private var keyPopups = FullKeyboardSettings().keyPopups
     @State private var haptics = FullKeyboardSettings().haptics
     @State private var swipeTyping = FullKeyboardSettings().swipeTyping
+    @State private var swipeMoreLanguages = FullKeyboardSettings().swipeMoreLanguages
     @State private var emoji = FullKeyboardSettings().emoji
     @State private var emojiHistoryEmpty = EmojiUsageStore().isEmpty
     @State private var hapticStrength = FullKeyboardSettings().hapticStrength
@@ -274,8 +324,30 @@ struct KeyboardSettingsPage: View {
         fullAccessOn ? nil : String(localized: "Needs Full Access")
     }
 
+    /// Swipe typing's detail: the layouts that swipe. Settings › Experiments › Swipe typing in
+    /// more languages adds French and Polish, and German while its model is on (German spatial
+    /// autocorrect and Spatial autocorrect).
+    private var swipeLanguages: String {
+        guard swipeMoreLanguages else { return String(localized: "English and Spanish only") }
+        guard spatialAutocorrect, germanSpatialAutocorrect else {
+            return String(localized: "English, Spanish, French and Polish")
+        }
+        return String(localized: "English, Spanish, French, Polish and German")
+    }
+
     var body: some View {
         SettingsPageScaffold(title: "Keyboard") {
+            if needsAllowPasteSetting {
+                AllowPasteBanner(
+                    openSettings: {
+                        if let url = URL(string: UIApplication.openSettingsURLString) {
+                            openURL(url)
+                        }
+                    },
+                    dismiss: onDismissAllowPasteSetting
+                )
+            }
+
             SettingsCard {
                 HStack(spacing: 12) {
                     SettingsRowLabel(
@@ -362,7 +434,7 @@ struct KeyboardSettingsPage: View {
 
                         SettingsToggleRow(
                             title: String(localized: "Spatial autocorrect"),
-                            detail: String(localized: "English and Spanish only"),
+                            detail: String(localized: "English, Spanish, French and Polish only"),
                             isOn: $spatialAutocorrect
                         )
                     }
@@ -416,9 +488,7 @@ struct KeyboardSettingsPage: View {
             SettingsCard {
                 SettingsToggleRow(
                     title: String(localized: "Swipe typing"),
-                    detail: fullKeyboard
-                        ? String(localized: "English and Spanish only")
-                        : String(localized: "Needs the full keyboard"),
+                    detail: fullKeyboard ? swipeLanguages : String(localized: "Needs the full keyboard"),
                     isOn: $swipeTyping
                 )
 
@@ -484,10 +554,12 @@ struct KeyboardSettingsPage: View {
             numberRow = FullKeyboardSettings().numberRow
             autocorrect = FullKeyboardSettings().autocorrect
             spatialAutocorrect = FullKeyboardSettings().spatialAutocorrect
+            germanSpatialAutocorrect = FullKeyboardSettings().germanSpatialAutocorrect
             suggestSwearWords = FullKeyboardSettings().suggestSwearWords
             keyPopups = FullKeyboardSettings().keyPopups
             haptics = FullKeyboardSettings().haptics
             swipeTyping = FullKeyboardSettings().swipeTyping
+            swipeMoreLanguages = FullKeyboardSettings().swipeMoreLanguages
             emoji = FullKeyboardSettings().emoji
             emojiHistoryEmpty = EmojiUsageStore().isEmpty
             hapticStrength = FullKeyboardSettings().hapticStrength
@@ -597,6 +669,7 @@ struct PrivacySettingsPage: View {
 struct ExperimentsSettingsPage: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var hinglish = HinglishSettings().isEnabled
+    @State private var greeklish = GreeklishSettings().isEnabled
     @State private var twoLanguageDictation = TwoLanguageDictationSettings().isEnabled
     @State private var appleIntelligenceCleanup = AppleIntelligenceCleanupSettings().isEnabled
     @State private var cleanupAvailability = AppleIntelligenceCleanupAvailability.current
@@ -604,9 +677,14 @@ struct ExperimentsSettingsPage: View {
     @State private var adaptiveTouchStatus = AdaptiveTouchStatus.sessionOnly
     @State private var confirmingTouchReset = false
     @State private var germanSpatialAutocorrect = FullKeyboardSettings().germanSpatialAutocorrect
+    @State private var swipeMoreLanguages = FullKeyboardSettings().swipeMoreLanguages
     @State private var koreanKeyboard = FullKeyboardSettings().koreanKeyboard
     @State private var khmerismNoColors = FullKeyboardSettings().khmerismNoColors
     @State private var khmerismNoSuperscripts = FullKeyboardSettings().khmerismNoSuperscripts
+    @State private var dvorakPunctuation = FullKeyboardSettings().dvorakPunctuation
+    @State private var commaPeriodKeys = FullKeyboardSettings().commaPeriodKeys
+    @State private var quickAccents = FullKeyboardSettings().quickAccents
+    @State private var emojiShortcodes = FullKeyboardSettings().emojiShortcodes
     @State private var emojiLettersUnderEmojiKey = FullKeyboardSettings().emojiLettersUnderEmojiKey
     @State private var keyboardThemes = FullKeyboardSettings().keyboardThemesEnabled
     @State private var keyboardTheme = FullKeyboardSettings().keyboardTheme
@@ -617,64 +695,103 @@ struct ExperimentsSettingsPage: View {
     @State private var learnPerLanguage = TypingJournalSettings().learnsPerLanguage
     @State private var multilingualParakeet = MultilingualParakeetSettings().isEnabled
     private let multilingualParakeetFits = MultilingualParakeetSettings.fits()
+    @State private var keyboardParakeet = KeyboardParakeetSettings().isOn
+    private let keyboardParakeetFits = KeyboardParakeetSettings.fits()
 
     var body: some View {
+        switches
+            .onChange(of: twoThumbSelection) { _, enabled in
+                FullKeyboardSettings().twoThumbSelection = enabled
+            }
+            .onChange(of: deletesSwipedWordsLetterByLetter) { _, enabled in
+                FullKeyboardSettings().deletesSwipedWordsLetterByLetter = enabled
+            }
+            .onChange(of: hideWordSuggestions) { _, enabled in
+                FullKeyboardSettings().hideWordSuggestions = enabled
+            }
+            .onChange(of: joinsKeyboardWhenUnfolded) { _, enabled in
+                FullKeyboardSettings().joinsKeyboardWhenUnfolded = enabled
+            }
+            .onChange(of: learnPerLanguage) { _, enabled in
+                TypingJournalSettings().learnsPerLanguage = enabled
+            }
+            .onChange(of: multilingualParakeet) { _, enabled in
+                guard enabled != MultilingualParakeetSettings().isEnabled else { return }
+                MultilingualParakeetSettings().isEnabled = enabled
+                // On: downloads beside the engine that dictates; off: stops and deletes it.
+                DictationController.shared.multilingualParakeetChanged()
+            }
+            .onChange(of: keyboardParakeet) { _, enabled in
+                guard enabled != KeyboardParakeetSettings().isEnabled else { return }
+                KeyboardParakeetSettings().isEnabled = enabled
+                DictationController.shared.keyboardParakeetChanged()
+            }
+            .onAppear { loadSettings() }
+    }
+
+    /// The page and the switches that only change a stored setting, split into shorter
+    /// modifier chains so the compiler type-checks each one in reasonable time.
+    private var toggles: some View {
+        page
+            .onChange(of: appleIntelligenceCleanup) { _, enabled in
+                AppleIntelligenceCleanupSettings().isEnabled = enabled
+            }
+            .onChange(of: hinglish) { _, enabled in
+                HinglishSettings().isEnabled = enabled
+            }
+            .onChange(of: greeklish) { _, enabled in
+                GreeklishSettings().isEnabled = enabled
+            }
+            .onChange(of: twoLanguageDictation) { _, enabled in
+                TwoLanguageDictationSettings().isEnabled = enabled
+            }
+            .onChange(of: adaptiveTouch) { _, enabled in
+                AdaptiveTouchSettings().isEnabled = enabled
+                refreshAdaptiveTouchStatus()
+            }
+    }
+
+    private var switches: some View {
+        toggles
+            .onChange(of: germanSpatialAutocorrect) { _, enabled in
+                FullKeyboardSettings().germanSpatialAutocorrect = enabled
+            }
+            .onChange(of: swipeMoreLanguages) { _, enabled in
+                FullKeyboardSettings().swipeMoreLanguages = enabled
+            }
+            .onChange(of: koreanKeyboard) { _, enabled in
+                FullKeyboardSettings().koreanKeyboard = enabled
+            }
+            .onChange(of: dvorakPunctuation) { _, enabled in
+                FullKeyboardSettings().dvorakPunctuation = enabled
+            }
+            .onChange(of: commaPeriodKeys) { _, enabled in
+                FullKeyboardSettings().commaPeriodKeys = enabled
+            }
+            .onChange(of: quickAccents) { _, enabled in
+                FullKeyboardSettings().quickAccents = enabled
+            }
+            .onChange(of: emojiShortcodes) { _, enabled in
+                FullKeyboardSettings().emojiShortcodes = enabled
+            }
+            .onChange(of: emojiLettersUnderEmojiKey) { _, enabled in
+                FullKeyboardSettings().emojiLettersUnderEmojiKey = enabled
+            }
+            .onChange(of: keyboardThemes) { _, enabled in
+                FullKeyboardSettings().keyboardThemesEnabled = enabled
+            }
+            .onChange(of: keyboardTheme) { _, theme in
+                FullKeyboardSettings().keyboardTheme = theme
+            }
+    }
+
+    private var page: some View {
         SettingsPageScaffold(title: "Experiments") {
             SettingsCard { rows }
             khmerismExperiments
         }
         .animation(HexMotion.settleAnimation(reduceMotion: reduceMotion), value: adaptiveTouch)
         .animation(HexMotion.settleAnimation(reduceMotion: reduceMotion), value: keyboardThemes)
-        .onChange(of: appleIntelligenceCleanup) { _, enabled in
-            AppleIntelligenceCleanupSettings().isEnabled = enabled
-        }
-        .onChange(of: hinglish) { _, enabled in
-            HinglishSettings().isEnabled = enabled
-        }
-        .onChange(of: twoLanguageDictation) { _, enabled in
-            TwoLanguageDictationSettings().isEnabled = enabled
-        }
-        .onChange(of: adaptiveTouch) { _, enabled in
-            AdaptiveTouchSettings().isEnabled = enabled
-            refreshAdaptiveTouchStatus()
-        }
-        .onChange(of: germanSpatialAutocorrect) { _, enabled in
-            FullKeyboardSettings().germanSpatialAutocorrect = enabled
-        }
-        .onChange(of: koreanKeyboard) { _, enabled in
-            FullKeyboardSettings().koreanKeyboard = enabled
-        }
-        .onChange(of: emojiLettersUnderEmojiKey) { _, enabled in
-            FullKeyboardSettings().emojiLettersUnderEmojiKey = enabled
-        }
-        .onChange(of: keyboardThemes) { _, enabled in
-            FullKeyboardSettings().keyboardThemesEnabled = enabled
-        }
-        .onChange(of: keyboardTheme) { _, theme in
-            FullKeyboardSettings().keyboardTheme = theme
-        }
-        .onChange(of: twoThumbSelection) { _, enabled in
-            FullKeyboardSettings().twoThumbSelection = enabled
-        }
-        .onChange(of: deletesSwipedWordsLetterByLetter) { _, enabled in
-            FullKeyboardSettings().deletesSwipedWordsLetterByLetter = enabled
-        }
-        .onChange(of: hideWordSuggestions) { _, enabled in
-            FullKeyboardSettings().hideWordSuggestions = enabled
-        }
-        .onChange(of: joinsKeyboardWhenUnfolded) { _, enabled in
-            FullKeyboardSettings().joinsKeyboardWhenUnfolded = enabled
-        }
-        .onChange(of: learnPerLanguage) { _, enabled in
-            TypingJournalSettings().learnsPerLanguage = enabled
-        }
-        .onChange(of: multilingualParakeet) { _, enabled in
-            guard enabled != MultilingualParakeetSettings().isEnabled else { return }
-            MultilingualParakeetSettings().isEnabled = enabled
-            // On: downloads beside the engine that dictates; off: stops and deletes it.
-            DictationController.shared.multilingualParakeetChanged()
-        }
-        .onAppear { loadSettings() }
     }
 
     @ViewBuilder
@@ -711,6 +828,14 @@ struct ExperimentsSettingsPage: View {
             title: String(localized: "Hinglish (Hindi in Latin letters)"),
             detail: String(localized: "Adds Hinglish to dictation languages"),
             isOn: $hinglish
+        )
+
+        SettingsDivider()
+
+        SettingsToggleRow(
+            title: String(localized: "Greeklish (Greek in Latin letters)"),
+            detail: String(localized: "Adds Greeklish to dictation languages"),
+            isOn: $greeklish
         )
 
         SettingsDivider()
@@ -781,11 +906,57 @@ struct ExperimentsSettingsPage: View {
 
         SettingsDivider()
 
+        // Off by default: only English and Spanish swipe, and any other language's drag stays
+        // a slide to another key.
+        SettingsToggleRow(
+            title: String(localized: "Swipe typing in more languages"),
+            detail: String(localized: "French and Polish, and German with German spatial autocorrect"),
+            isOn: $swipeMoreLanguages
+        )
+
+        SettingsDivider()
+
         // Off by default: 한국어 isn't offered in Languages and a stored "ko" is ignored.
         SettingsToggleRow(
             title: String(localized: "Korean keyboard (두벌식)"),
             detail: String(localized: "Adds 한국어, composing syllables as you type"),
             isOn: $koreanKeyboard
+        )
+
+        SettingsDivider()
+
+        // Off by default: English's Dvorak keeps Apple's keys until this is on.
+        SettingsToggleRow(
+            title: String(localized: "Dvorak punctuation keys"),
+            detail: String(localized: "Adds comma, period and semicolon keys to the English Dvorak keyboard."),
+            isOn: $dvorakPunctuation
+        )
+
+        SettingsDivider()
+
+        // Off by default: the space bar keeps Apple's width until this is on.
+        SettingsToggleRow(
+            title: String(localized: "Comma and period keys"),
+            detail: String(localized: "Puts comma and period keys beside the space bar on the letters keyboard."),
+            isOn: $commaPeriodKeys
+        )
+
+        SettingsDivider()
+
+        // Off by default: the callout opens on the key's own letter, as before.
+        SettingsToggleRow(
+            title: String(localized: "Quick accents"),
+            detail: String(localized: "Holding a letter selects its main accent, so letting go types it. Slide to pick another."),
+            isOn: $quickAccents
+        )
+
+        SettingsDivider()
+
+        // Off by default: colons type exactly as before.
+        SettingsToggleRow(
+            title: String(localized: "Emoji shortcodes"),
+            detail: String(localized: "Type a colon and a name, like :pizza, to pick an emoji."),
+            isOn: $emojiShortcodes
         )
 
         SettingsDivider()
@@ -878,20 +1049,46 @@ struct ExperimentsSettingsPage: View {
             .padding(.horizontal, 12)
             .padding(.bottom, 12)
         }
+
+        SettingsDivider()
+
+        // On unless turned off: the keyboard's own English dictation transcribes with Parakeet in
+        // the keyboard once downloaded (by itself on Wi-Fi) and compiled there; off, it keeps
+        // Apple's speech recognition.
+        SettingsToggleRow(
+            title: String(localized: "Speech model in keyboard"),
+            detail: keyboardParakeetFits
+                ? String(localized: "For English. Uses about \(KeyboardParakeetDownload.size), downloaded on Wi-Fi. Until then, the keyboard uses Apple's speech recognition.")
+                : String(localized: "Needs an iPhone with 6 GB of memory or more"),
+            isOn: $keyboardParakeet
+        )
+        .disabled(!keyboardParakeetFits)
+
+        if keyboardParakeet {
+            KeyboardParakeetStatus(download: KeyboardParakeetDownload.shared)
+                .padding(.horizontal, 12)
+                .padding(.bottom, 12)
+        }
     }
 
     /// Reads every switch back from its setting, when the page appears.
     private func loadSettings() {
         hinglish = HinglishSettings().isEnabled
+        greeklish = GreeklishSettings().isEnabled
         twoLanguageDictation = TwoLanguageDictationSettings().isEnabled
         appleIntelligenceCleanup = AppleIntelligenceCleanupSettings().isEnabled
         cleanupAvailability = AppleIntelligenceCleanupAvailability.current
         adaptiveTouch = AdaptiveTouchSettings().isEnabled
         refreshAdaptiveTouchStatus()
         germanSpatialAutocorrect = FullKeyboardSettings().germanSpatialAutocorrect
+        swipeMoreLanguages = FullKeyboardSettings().swipeMoreLanguages
         koreanKeyboard = FullKeyboardSettings().koreanKeyboard
         khmerismNoColors = FullKeyboardSettings().khmerismNoColors
         khmerismNoSuperscripts = FullKeyboardSettings().khmerismNoSuperscripts
+        dvorakPunctuation = FullKeyboardSettings().dvorakPunctuation
+        commaPeriodKeys = FullKeyboardSettings().commaPeriodKeys
+        quickAccents = FullKeyboardSettings().quickAccents
+        emojiShortcodes = FullKeyboardSettings().emojiShortcodes
         emojiLettersUnderEmojiKey = FullKeyboardSettings().emojiLettersUnderEmojiKey
         keyboardThemes = FullKeyboardSettings().keyboardThemesEnabled
         keyboardTheme = FullKeyboardSettings().keyboardTheme
@@ -901,6 +1098,7 @@ struct ExperimentsSettingsPage: View {
         joinsKeyboardWhenUnfolded = FullKeyboardSettings().joinsKeyboardWhenUnfolded
         learnPerLanguage = TypingJournalSettings().learnsPerLanguage
         multilingualParakeet = MultilingualParakeetSettings().isEnabled
+        keyboardParakeet = KeyboardParakeetSettings().isOn
     }
 
     private static var multilingualParakeetSize: String {
