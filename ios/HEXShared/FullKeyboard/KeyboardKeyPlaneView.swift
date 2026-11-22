@@ -96,14 +96,18 @@ final class KeyboardKeyPlaneView: UIView {
         let isLandscape = layout.orientation == .landscape && layout.metrics.pad == nil
         let labelScale = layout.keyLabelScale
         let radius = layout.metrics.cornerRadius
-        var pressed = engine.pressedKinds
-        if let lingeringKind { pressed.insert(lingeringKind) }
-        pressed.formUnion(lingeringFunctionKinds)
         // Like Apple's spacebar trackpad, key glyphs fade out while sliding the cursor, and the
         // keycaps fade most of the way to blank (`trackpadKeycapAlpha`).
         let hideGlyphs = engine.isTrackpadActive || (engine.isSelectionActive && !engine.selectionActionsShown)
         let glyphAlpha = currentGlyphAlpha()
         let keycapAlpha = 1 - (1 - Self.trackpadKeycapAlpha) * (1 - glyphAlpha)
+        if layout.language == .khmer {
+            drawKhmerism(in: context, dirty: rect, glyphAlpha: glyphAlpha, keycapAlpha: keycapAlpha)
+            return
+        }
+        var pressed = engine.pressedKinds
+        if let lingeringKind { pressed.insert(lingeringKind) }
+        pressed.formUnion(lingeringFunctionKinds)
         let showGlyphs = { () -> Bool in
             context.setAlpha(glyphAlpha)
             return glyphAlpha > 0
@@ -194,16 +198,7 @@ final class KeyboardKeyPlaneView: UIView {
                 let isPressed = pressed.contains(.shift) && !shift.pressShowsOff
                 context.fillKeycap(frame, fill: isPressed ? palette.functionHeldFill : palette.keyFill, shadow: palette.keyShadow, radius: radius)
                 guard showGlyphs() else { continue }
-                let symbol = if shift.pressShowsOff {
-                    "shift"
-                } else {
-                    switch shift.state {
-                    case .off: shift.isHeld ? "shift.fill" : "shift"
-                    case .on: "shift.fill"
-                    case .locked: "capslock.fill"
-                    }
-                }
-                drawSymbol(symbol, in: labelFrame, color: palette.textBase, pointSize: isLandscape ? 18 : 19, yOffset: isLandscape ? -0.16 : 0.67)
+                drawSymbol(shiftSymbol, in: labelFrame, color: palette.textBase, pointSize: isLandscape ? 18 : 19, yOffset: isLandscape ? -0.16 : 0.67)
             case .delete:
                 let lit = pressed.contains(.delete)
                 context.fillKeycap(frame, fill: lit ? palette.functionHeldFill : palette.keyFill, shadow: palette.keyShadow, radius: radius)
@@ -241,6 +236,103 @@ final class KeyboardKeyPlaneView: UIView {
                 drawSymbol("keyboard.chevron.compact.down", in: labelFrame, color: palette.textBase, pointSize: 19, yOffset: 0)
             }
         }
+    }
+
+    private var shiftSymbol: String {
+        let shift = engine.shift
+        if shift.pressShowsOff { return "shift" }
+        return switch shift.state {
+        case .off: shift.isHeld ? "shift.fill" : "shift"
+        case .on: "shift.fill"
+        case .locked: "capslock.fill"
+        }
+    }
+
+    private func drawKhmerism(in context: CGContext, dirty: CGRect, glyphAlpha: CGFloat, keycapAlpha: CGFloat) {
+        let layout = engine.layout
+        let metrics = layout.metrics
+        let isDark = palette.isDark
+        let neutral = KhmerismAppearance.neutral(isDark: isDark)
+        let pageEdge = CGRect(x: 0, y: metrics.stripArea, width: bounds.width, height: 1)
+        context.setFillColor(KhmerismAppearance.edge(isDark: isDark).cgColor)
+        context.fill(pixelAligned(pageEdge))
+
+        for key in layout.keys where key.kind != .hex && key.frame.intersects(dirty) {
+            let frame = pixelAligned(key.frame)
+            let label = engine.keycapLabel(for: key)
+            let isDisabled = key.kind == .returnKey && !returnIsEnabled
+            let isPressed = engine.touches.values.contains { $0.key == key || $0.slideKey == key }
+            let isSelected = key.kind == .shift && engine.isUppercase
+            let face = if !isDisabled && (isPressed || isSelected || lingeringKind == key.kind || lingeringFunctionKinds.contains(key.kind)) {
+                KhmerismAppearance.selected
+            } else if key.character != nil {
+                KhmerismAppearance.face(for: label, isDark: isDark)
+            } else {
+                neutral
+            }
+
+            context.setAlpha(keycapAlpha)
+            context.fillKeycap(frame, fill: face.fill, radius: metrics.cornerRadius)
+            guard glyphAlpha > 0 else { continue }
+            context.saveGState()
+            context.clip(to: frame)
+            context.setAlpha(glyphAlpha)
+            let ink = isDisabled ? face.ink.withAlphaComponent(0.5) : face.ink
+            let iconSize = min(19, frame.width * 0.75, frame.height * 0.62)
+            switch key.kind {
+            case .character:
+                let title = layout.layer == .letters ? label : Self.keycapLabel(label == "•" ? "⦁" : label)
+                drawKhmerismCharacter(title, alternate: engine.khmerismAlternate(for: key), in: frame, ink: ink)
+            case .shift:
+                drawSymbol(shiftSymbol, in: frame, color: ink, pointSize: iconSize, yOffset: 0.67)
+            case .delete:
+                drawSymbol(isPressed ? "delete.left.fill" : "delete.left", in: frame, color: ink, pointSize: iconSize, yOffset: 0.33)
+            case .emoji:
+                drawEmojiFace(in: frame, diameter: iconSize, context: context, keyFill: face.fill, color: ink)
+            case .globe:
+                drawSymbol("globe", in: frame, color: ink, pointSize: iconSize, yOffset: -1)
+            case .dismiss:
+                drawSymbol("keyboard.chevron.compact.down", in: frame, color: ink, pointSize: iconSize)
+            case .returnKey:
+                drawSymbol(returnStyle.symbol, in: frame, color: ink, pointSize: iconSize, yOffset: -0.33)
+            case .space, .layerSwitch:
+                let title = key.kind == .space ? (spaceLabel ?? label) : label
+                let size = min(13, frame.height * 0.6)
+                drawText(title, in: frame, font: KhmerismAppearance.font(for: title, size: size), color: ink)
+            case .hex:
+                break
+            }
+            context.restoreGState()
+        }
+        context.setAlpha(1)
+    }
+
+    private func drawKhmerismCharacter(_ title: String, alternate: String?, in frame: CGRect, ink: UIColor) {
+        let layout = engine.layout
+        // The saved designer draws its 440 pt phone in a 327 px viewport.
+        let width = min(440, layout.width - 2 * layout.horizontalInset)
+        let scale = width / 327
+        let size = min(max(12, width * 0.053), frame.height * 0.62)
+        let font = KhmerismAppearance.font(for: title, size: size)
+        guard let alternate else {
+            drawText(title, in: frame, font: font, color: ink)
+            return
+        }
+        let attributes: [NSAttributedString.Key: Any] = [.font: font, .foregroundColor: ink]
+        let text = title as NSString
+        let advance = text.size(withAttributes: attributes)
+        text.draw(at: CGPoint(
+            x: frame.minX + width * 0.0042 + scale, y: frame.midY - advance.height / 2 + 2 * scale
+        ), withAttributes: attributes)
+
+        let cornerFont = KhmerismAppearance.font(for: alternate, size: min(8 * scale, frame.height * 0.25))
+        let cornerAttributes: [NSAttributedString.Key: Any] = [.font: cornerFont, .foregroundColor: ink.withAlphaComponent(0.8)]
+        let corner = alternate as NSString
+        let cornerAdvance = corner.size(withAttributes: cornerAttributes)
+        corner.draw(at: CGPoint(
+            x: frame.maxX - width * 0.008 - scale - cornerAdvance.width,
+            y: frame.minY + width * 0.0017 + scale
+        ), withAttributes: cornerAttributes)
     }
 
     /// `rect` with its edges on this screen's pixel grid.
@@ -287,8 +379,8 @@ final class KeyboardKeyPlaneView: UIView {
     /// features cut out); 2 x 2.67 eyes 2.78 either side and 2.13 above the centre; a mouth 12.33
     /// wide, its top 0.5 below the centre at the corners and 1.5 in the middle, its bottom an arc
     /// 6.5 down; teeth a 1 pt band 1 under its top, always the light colour.
-    private func drawEmojiFace(in frame: CGRect, diameter: CGFloat, context: CGContext, keyFill: UIColor) {
-        let ink = palette.textBase.cgColor
+    private func drawEmojiFace(in frame: CGRect, diameter: CGFloat, context: CGContext, keyFill: UIColor, color: UIColor? = nil) {
+        let ink = (color ?? palette.textBase).cgColor
         context.saveGState()
         context.translateBy(x: frame.midX, y: frame.midY - 0.67)
         let k = diameter / 19
@@ -704,7 +796,7 @@ final class KeyboardKeyPlaneView: UIView {
             MainActor.assumeIsolated {
                 guard let self else { return }
                 self.accentHoldWork.removeValue(forKey: id)
-                if self.engine.openAccentMenuIfEligible(forTouch: id) {
+                if self.engine.handleCharacterHold(forTouch: id) {
                     self.onAccentMenuOpened?()
                 }
             }

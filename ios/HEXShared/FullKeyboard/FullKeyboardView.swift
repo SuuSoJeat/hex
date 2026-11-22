@@ -332,7 +332,8 @@ final class FullKeyboardView: UIView {
     /// The strip and the keys, without the lift.
     private var keysHeight: CGFloat {
         KeyboardLayout.height(
-            for: orientation, posture: engine.posture, phoneSize: engine.phoneSize, pad: engine.pad, numberRow: engine.hasNumberRow
+            for: orientation, posture: engine.posture, phoneSize: engine.phoneSize, pad: engine.pad,
+            numberRow: engine.hasNumberRow, language: engine.layout.language
         )
     }
 
@@ -490,16 +491,20 @@ final class FullKeyboardView: UIView {
             hostController?.primaryLanguage = identifier
         }
         guard list != languages || engine.language != list.current || engine.letterLayout != letters else { return }
+        let oldHeight = preferredHeight
+        let wasKhmer = engine.layout.language == .khmer
         languages = list
         engine.switchesLanguage = list.switches
         engine.layoutLanguage = list.layout == list.current ? nil : list.layout
         engine.letterLayout = letters
         engine.language = list.current
         engine.partnerLanguage = list.partner(available: Self.spellCheckLanguages)
+        if wasKhmer != (engine.layout.language == .khmer) { applyAppearance() }
         syncSpatialAutocorrect()
         refreshSpaceLabel()
         syncSwipeTyping()
         setNeedsLayout()
+        if preferredHeight != oldHeight { onPreferredHeightChange?() }
     }
 
     /// A swipe along the space bar: the next or previous language (its letters, accents and
@@ -522,7 +527,8 @@ final class FullKeyboardView: UIView {
     /// With two or more languages the space bar names the keyboard's; otherwise, with Full
     /// Access, the dictation language's.
     private func refreshSpaceLabel() {
-        plane.spaceLabel = languages.spaceLabel ?? (model.hasFullAccess ? model.languageSummary : nil)
+        plane.spaceLabel = languages.spaceLabel ?? (engine.layout.language == .khmer ? KeyboardLanguage.khmer.shortName
+            : model.hasFullAccess ? model.languageSummary : nil)
     }
 
     func syncSettings() {
@@ -780,13 +786,16 @@ final class FullKeyboardView: UIView {
     private func applyAppearance() {
         let isDark = appearanceOverride
             ?? FullKeyboardPalette.isDark(traits: traitCollection)
+        let khmerism = engine.layout.language == .khmer
         let next = FullKeyboardPalette(isDark: isDark, theme: keyboardTheme)
         // A theme paints its own opaque panel, so the system glass behind the keys never
         // shows through. The panel, not this view, keeps the glass panel's corners;
         // Automatic leaves both clear as before.
-        backgroundColor = drawsBackdrop ? next.backdrop : .clear
-        themePanel.isHidden = !next.drawsOwnBackground
-        themePanel.backgroundColor = next.drawsOwnBackground ? next.backdrop : .clear
+        let backdrop = khmerism ? KhmerismAppearance.plate(isDark: next.isDark) : next.backdrop
+        let drawsPanel = khmerism || next.drawsOwnBackground
+        backgroundColor = drawsBackdrop ? backdrop : .clear
+        themePanel.isHidden = !drawsPanel
+        themePanel.backgroundColor = drawsPanel ? backdrop : .clear
         stripView.inSystemPlatter = !drawsBackdrop
         guard next != palette || !didApplyPalette else { return }
         didApplyPalette = true
@@ -1110,7 +1119,8 @@ final class FullKeyboardView: UIView {
         let layout = engine.layout
         if engine.showsKeyPopups, let key = engine.previewKey, let balloon = layout.balloon(for: key) {
             endCalloutLinger()
-            let label = KeyboardKeyPlaneView.keycapLabel(engine.displayLabel(for: key))
+            let label = engine.layout.language == .khmer ? engine.displayLabel(for: key)
+                : KeyboardKeyPlaneView.keycapLabel(engine.displayLabel(for: key))
             callout.show(balloon, label: label, style: KeyCalloutView.style(for: label))
             shownPreviewKind = key.kind
         } else if let kind = shownPreviewKind, calloutLingerWork == nil, engine.touches.isEmpty {

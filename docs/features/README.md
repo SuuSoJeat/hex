@@ -2913,6 +2913,18 @@ iOS prototype (`HEXMobile`) -> Record/transcribe/copy and keyboard handoff
 │   dictionary behind its autocorrect (a missing accent is the cheapest fix, "koszonom" →
 │   "köszönöm", while a word of its own such as "meg" keeps its spelling), English as its
 │   bilingual partner through the Latin-script rule, and no typing (spatial) model
+├── Khmer (ភាសាខ្មែរ) → Layout → Khmerism: a regular keyboard language (`km-KH`).
+│   Its five rows use Hex's key height and corner radius, with teal marks, green
+│   independent vowels, and rose digits in light and dark. Tap for the main glyph
+│   or hold for the corner glyph. Shift swaps the two until toggled off. Space shows
+│   ខ្មែរ and uses the regular language swipe. The emoji key opens Hex's picker.
+│   123 and #+= use English rows and keep the two punctuation keys beside Space.
+│   They leave the top slot free so the footer stays in place when switching pages.
+│   On #+=, hold ។ or ៖ for ៙ or ៚. កខគ returns to the letters. Khmer marks insert
+│   as entered, including coeng (្), and the host handles backspace. The five-row
+│   letter plane stays joined on the unfolded Duo. Khmerism has no Khmer word
+│   autocorrection or swipe typing. Checks: `KhmerKeyboardLanguageTests`,
+│   `KeyboardLayoutTests`, `FullKeyboardEngineTests`.
 ├── Korean keyboard (두벌식) (off by default, `experiments.koreanKeyboard`): Settings ›
 │   Experiments adds 한국어 to Settings › Keyboard › Languages, typed on the standard two-set
 │   rows (ㅂㅈㄷㄱㅅㅛㅕㅑㅐㅔ / ㅁㄴㅇㄹㅎㅗㅓㅏㅣ / ㅋㅌㅊㅍㅠㅜㅡ, shift's ㅃㅉㄸㄲㅆ and ㅒㅖ, no
