@@ -1,0 +1,103 @@
+name: iOS unit tests (scratch)
+
+# Throwaway: compiles and runs the HEXMobile unit tests for a branch on a
+# GitHub-hosted macOS runner. Not for the default branch.
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - ios-greeklish-ci-scratch3
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: macos-26
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Select the newest Xcode
+        run: |
+          ls /Applications | grep -i xcode || true
+          newest=$(ls -d /Applications/Xcode*.app 2>/dev/null | sort -V | tail -1 || true)
+          if [ -n "$newest" ]; then
+            sudo xcode-select -s "$newest"
+          fi
+          xcode-select -p
+          xcodebuild -version
+          xcrun simctl list runtimes
+
+      - name: Install XcodeGen
+        run: |
+          command -v xcodegen >/dev/null 2>&1 || brew install xcodegen
+          xcodegen --version
+
+      - name: Fetch the cleanup model and generate the project
+        working-directory: ios
+        run: |
+          scripts/fetch-cleanup-model.sh
+          xcodegen generate
+
+      - name: Pick an iPhone simulator
+        id: sim
+        run: |
+          udid=$(xcrun simctl list devices available -j | python3 -c '
+          import json, sys, re
+          data = json.load(sys.stdin)["devices"]
+          def version(runtime):
+              m = re.search(r"iOS-(\d+)-(\d+)", runtime)
+              return (int(m.group(1)), int(m.group(2))) if m else (0, 0)
+          best = None
+          for runtime in sorted(data, key=version, reverse=True):
+              if "iOS" not in runtime:
+                  continue
+              for device in data[runtime]:
+                  if device.get("isAvailable") and device["name"].startswith("iPhone"):
+                      best = (runtime, device["name"], device["udid"])
+                      break
+              if best:
+                  break
+          if not best:
+              sys.exit("no available iPhone simulator")
+          print(best[2])
+          ')
+          echo "udid=$udid" >> "$GITHUB_OUTPUT"
+          echo "simulator: $udid"
+          xcrun simctl list devices available | grep -F "$udid" || true
+
+      - name: xcodebuild test (HEXMobileTests)
+        id: tests
+        continue-on-error: true
+        working-directory: ios
+        run: |
+          set -o pipefail
+          xcodebuild test -project HEXMobile.xcodeproj -scheme HEXMobile \
+            -destination "id=${{ steps.sim.outputs.udid }}" \
+            -enableCodeCoverage NO \
+            CODE_SIGNING_ALLOWED=NO -allowProvisioningUpdates 2>&1 \
+            | tee "$RUNNER_TEMP/xcodebuild.log" \
+            | grep --line-buffered -E '^(Test Suite|Test Case).*(passed|failed)|^Test Suite|error:|Executed [0-9]+ test|TEST (SUCCEEDED|FAILED)|Testing failed|\*\* TEST' || true
+          tail -40 "$RUNNER_TEMP/xcodebuild.log"
+
+      - name: Summarize the result
+        run: |
+          log="$RUNNER_TEMP/xcodebuild.log"
+          {
+            echo '### xcodebuild summary'
+            grep -E 'Executed [0-9]+ test|\*\* TEST|Testing failed|error:' "$log" | tail -40 || true
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload the log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: xcodebuild-log
+          path: ${{ runner.temp }}/xcodebuild.log
+
+      - name: Fail when the tests failed
+        if: steps.tests.outcome == 'failure'
+        run: exit 1
