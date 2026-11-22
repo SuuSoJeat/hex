@@ -5,7 +5,7 @@ import UIKit
 /// `--snap-state full-keyboard-<state>[-dark|-dark-field]` is passed on Simulator.
 /// `-dark` is a dark app; `-dark-field` is a light app whose field asks for a dark keyboard.
 /// The layout follows `--dictation-language` (Automatic, English, without it), or
-/// `--keyboard-layout nb|es|de|it|fr|fr-CA|fr-CH|pt|pl|cs|hu|ro|ru|uk|el|sr-Latn|ko|km|en` pins it; drafts are in the layout's language.
+/// `--keyboard-layout nb|es|de|it|fr|fr-CA|fr-CH|pt|pl|cs|hu|ro|ru|uk|el|sr-Latn|ko|en` pins it; drafts are in the layout's language.
 /// `--keyboard-letters qwerty|qwertz|azerty|dvorak|own` arranges its letters (its own without it).
 /// `--accent-key ø` (or Cyrillic `е`, `ь`, `ʼ`, Greek `α`, `σ`, `t` on Romanian, or `o` on Hungarian) picks the key the `accents` state holds; `--emoji-query kiss` what `emoji-search` types.
 /// Emoji states (`emoji`, `emoji-search`, `emoji-tones`, `emoji-food`, `emoji-strip`) turn
@@ -200,8 +200,6 @@ struct FullKeyboardSnapshotStage: View {
             case "accents": "한"
             default: "10분 늦어요. "
             }
-        case .khmer:
-            return "សួស្តី!"
         case .english:
             break
         }
@@ -239,9 +237,7 @@ struct FullKeyboardSnapshotStage: View {
                 .padding(.horizontal, 14)
                 .padding(.bottom, 10)
             FullKeyboardFixture(state: state, draft: draft, darkKeyboard: darkApp || darkField)
-                .frame(height: KeyboardLayout.height(
-                    for: .portrait, numberRow: FullKeyboardSettings().numberRow, language: Self.layout
-                )
+                .frame(height: KeyboardLayout.height(for: .portrait, numberRow: FullKeyboardSettings().numberRow)
                     + (state == "emoji-search" ? KeyboardMetrics.portrait.stripHeight : 0))
                 .background(Color(uiColor: backdrop).ignoresSafeArea(edges: .bottom))
         }
@@ -317,7 +313,6 @@ private struct FullKeyboardFixture: UIViewRepresentable {
         // `--typing-log-mark`: Record typing logs is recording this field.
         model.isLoggingTyping = ProcessInfo.processInfo.arguments.contains("--typing-log-mark")
         let view = FullKeyboardView(model: model, target: context.coordinator.target)
-        if FullKeyboardSnapshotStage.layout == .khmer { view.emojiOverride = true }
         if state.hasPrefix("emoji") {
             view.emojiOverride = true
             let usage = EmojiFixture.usage()
@@ -365,10 +360,6 @@ private struct FullKeyboardFixture: UIViewRepresentable {
                     view.engine.touchBegan(id: 901, at: center(of: kind, in: view))
                     view.engine.touchEnded(id: 901, at: center(of: kind, in: view))
                 }
-            case "shift" where FullKeyboardSnapshotStage.layout == .khmer:
-                let shift = center(of: .shift, in: view)
-                view.engine.touchBegan(id: 902, at: shift)
-                view.engine.touchEnded(id: 902, at: shift)
             case "capslock":
                 view.engine.touchBegan(id: 902, at: center(of: .shift, in: view))
                 view.engine.touchEnded(id: 902, at: center(of: .shift, in: view))

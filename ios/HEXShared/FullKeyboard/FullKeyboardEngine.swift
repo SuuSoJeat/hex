@@ -27,7 +27,6 @@ final class FullKeyboardEngine {
     static let stripTouchGuard: TimeInterval = 0.25
     /// How far along the space bar a language swipe must go; a shorter one types a space.
     static let languageSwipeDistance: CGFloat = 24
-    static let khmerismSwipeDistance: CGFloat = 15
 
     private(set) var shift = ShiftStateMachine()
     var layerState = KeyboardLayerState()
@@ -159,17 +158,13 @@ final class FullKeyboardEngine {
             commitHangulComposition()
             cancelAllTouches()
             autocorrect.setLanguage(language)
-            rebuildLanguageLayout()
+            rebuildLayout(cause: "language")
             refreshSuggestions()
         }
     }
     /// The letters and long presses on the keys when not `language`'s (`KeyboardLanguageList.layout`).
     var layoutLanguage: KeyboardLanguage? {
-        didSet {
-            guard layoutLanguage != oldValue else { return }
-            cancelAllTouches()
-            rebuildLanguageLayout()
-        }
+        didSet { if layoutLanguage != oldValue { cancelAllTouches(); rebuildLayout(cause: "language") } }
     }
     /// How the keys' language arranges its letters (Settings › Keyboard › Languages › Layout);
     /// nil, or one it doesn't offer, is its own.
@@ -234,7 +229,7 @@ final class FullKeyboardEngine {
 
     /// What the field asks for, or no automatic capitals with Auto-capitalization off.
     var autoCapitalizationMode: AutoCapitalization.Mode {
-        guard language.supportsAutoCapitalization, layout.language != .khmer, autoCapitalizes else { return .none }
+        guard language != .korean, autoCapitalizes else { return .none }
         return AutoCapitalization.Mode(target.autocapitalizationType)
     }
 
@@ -315,8 +310,6 @@ final class FullKeyboardEngine {
     }
 
     func refreshAutoCapitalization() {
-        // Shift selects a persistent second page on Khmerism.
-        guard layout.language != .khmer else { return }
         let before = shift
         shift.refreshAutoCapitalization(
             AutoCapitalization.shouldCapitalize(
@@ -486,7 +479,7 @@ final class FullKeyboardEngine {
                 activeAccentMenu = nil
                 activeAccentTouchID = nil
             } else {
-                commitCharacterTouch(touch)
+                commitCharacter(touch.key, at: touch.startPoint, down: touch.downPoint)
             }
             touch.committed = true
             touches[other] = touch
@@ -506,15 +499,13 @@ final class FullKeyboardEngine {
         }
         switch key.kind {
         case .shift:
-            if layout.language != .khmer {
-                shift.shiftDown(now: clock())
-                logState("shift_key")
-            }
+            shift.shiftDown(now: clock())
+            logState("shift_key")
         case .delete:
             deleteBackward()
         case .layerSwitch(let next):
             commitHangulComposition()
-            if next != layerState.layer { touch.returnLayer = layerState.layer }
+            touch.returnLayer = layerState.layer
             layerState.switchTo(next)
             if next == .letters { shift.reset() }
             rebuildLayout(cause: "layer_key")
@@ -619,7 +610,7 @@ final class FullKeyboardEngine {
         // 3. Holding 123, #+= or shift and sliding: the character key under the finger shows its
         // pop-up; over any other key, or off the keys, none does. Never a swipe: swipes start on
         // letters only.
-        if Self.slidesToType(touch), layout.language != .khmer || touch.key.kind != .shift {
+        if Self.slidesToType(touch) {
             let next = slideTarget(for: touch, at: point)
             if next?.kind != touch.slideKey?.kind {
                 touch.slideKey = next
@@ -634,7 +625,7 @@ final class FullKeyboardEngine {
 
         // 4. Sliding across character keys updates the active key and re-anchors the hold timer.
         // A letter the next-letter odds claimed keeps the touch while it stays within reach.
-        if layout.language != .khmer, touch.key.character != nil, !touch.committed,
+        if touch.key.character != nil, !touch.committed,
            let under = layout.hitTest(point), under.character != nil, under.kind != touch.key.kind,
            !(touch.claimed && Self.distance(from: point, to: touch.key.hitFrame) < letterReach) {
             touch.claimed = false
@@ -706,16 +697,9 @@ final class FullKeyboardEngine {
         switch touch.key.kind {
         case .character:
             if !touch.committed {
-                commitCharacterTouch(touch)
+                commitCharacter(touch.key, at: touch.startPoint, down: touch.downPoint)
             }
         case .shift:
-            if layout.language == .khmer {
-                if layout.hitTest(point)?.kind == .shift {
-                    shift = ShiftStateMachine(state: shift.state == .off ? .on : .off)
-                    logState("shift_key")
-                }
-                break
-            }
             // Hold shift, slide to a letter, let go: a capital, as on Apple's keyboard.
             if let under = slideTarget(for: touch, at: point) {
                 commitCharacter(under, at: point)
@@ -757,7 +741,7 @@ final class FullKeyboardEngine {
             onReturn?()
             // A text replacement goes in on return too, as on Apple's keyboard; the new line
             // goes in on its own, so a field's return (Send, Search) still sees just "\n".
-            if layout.language != .khmer { _ = applyTextReplacement(ending: "") }
+            _ = applyTextReplacement(ending: "")
             insert("\n", source: nil)
             typingLog?.context("return")
         case .layerSwitch:
@@ -765,9 +749,7 @@ final class FullKeyboardEngine {
             // a slide: nothing, and back too. Off the keys: nothing, and the page stays.
             if let returnLayer = touch.returnLayer {
                 if let under = slideTarget(for: touch, at: point), let character = under.character {
-                    if layout.language == .khmer {
-                        commitCharacter(under, at: point)
-                    } else if dropsSuggestionSpace(before: character) || !correctWord(endingWith: character) {
+                    if dropsSuggestionSpace(before: character) || !correctWord(endingWith: character) {
                         insert(character, source: "slide")
                     }
                     layerState.switchTo(returnLayer)
@@ -911,23 +893,9 @@ final class FullKeyboardEngine {
 
     // MARK: - Typing
 
-    private func commitCharacterTouch(_ touch: ActiveTouch) {
-        if layout.language == .khmer, touch.downPoint.y - touch.point.y >= Self.khmerismSwipeDistance {
-            if let alternate = khmerismAlternate(for: touch.key) {
-                insert(alternate, source: "key")
-            }
-            return
-        }
-        commitCharacter(touch.key, at: touch.startPoint, down: touch.downPoint)
-    }
-
     /// `down`: where a tap's finger went down, for Adaptive touch (nil for a slide from shift).
     private func commitCharacter(_ key: KeyboardKey, at point: CGPoint, down: CGPoint? = nil) {
         guard let character = key.character else { return }
-        if layout.language == .khmer {
-            insert(isUppercase ? key.shifted ?? character : character, source: "key")
-            return
-        }
         if typeHangul(character) {
             shift.didTypeOneShot()
             return
@@ -1163,10 +1131,6 @@ final class FullKeyboardEngine {
 
     /// `point` is where the space bar was tapped, as on the unsplit keyboard.
     private func typeSpace(at point: CGPoint? = nil) {
-        if layout.language == .khmer {
-            insert(" ", source: "key")
-            return
-        }
         commitHangulComposition()
         // Space never autocorrects a swiped word: it is a reading, not a typo.
         let afterSwipe = swipedWord != nil
@@ -1274,7 +1238,7 @@ final class FullKeyboardEngine {
         rememberTypingContext(before: contextBefore, inserted: text)
         typeIntoField(text, source: source)
         lastSpaceAt = nil
-        if layout.language != .khmer { layerState.didInsert(text) }
+        layerState.didInsert(text)
         rebuildLayoutIfNeeded()
         didEdit()
     }
@@ -1447,14 +1411,6 @@ final class FullKeyboardEngine {
     }
 
     // MARK: - Layout
-
-    private func rebuildLanguageLayout() {
-        let wasKhmer = layout.language == .khmer
-        let isKhmer = (layoutLanguage ?? language) == .khmer
-        if wasKhmer != isKhmer { shift.reset() }
-        rebuildLayout(cause: "language")
-        if wasKhmer && !isKhmer { refreshAutoCapitalization() }
-    }
 
     func rebuildLayoutIfNeeded() {
         if layout.layer != layerState.layer {
