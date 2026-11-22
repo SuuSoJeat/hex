@@ -568,6 +568,9 @@ final class FullKeyboardView: UIView {
             keyboardTheme = theme
             applyAppearance()
         }
+        let settings = FullKeyboardSettings()
+        plane.showsKhmerismColors = !settings.khmerismNoColors
+        plane.showsKhmerismSuperscripts = !settings.khmerismNoSuperscripts
         hapticStrength = FullKeyboardSettings().hapticStrength
         syncHexPlacement()
         syncNumberRow()

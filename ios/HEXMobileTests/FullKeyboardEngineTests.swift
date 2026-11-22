@@ -1930,6 +1930,7 @@ final class FullKeyboardEngineTests: XCTestCase {
     /// while you type, so the suggestions never see the touch.
     func testTheKeysTakeTheStripsLowerHalfWhileTyping() {
         let view = FullKeyboardView(model: KeyboardViewModel(), target: target)
+        view.languageOverride = .english
         var clock: TimeInterval = 50
         view.engine.clock = { clock }
         view.frame = CGRect(x: 0, y: 0, width: 402, height: 262)
@@ -2052,6 +2053,7 @@ final class FullKeyboardEngineTests: XCTestCase {
     /// whatever Haptics is set to.
     func testEveryKeyClicksOnTouchDown() {
         let view = FullKeyboardView(model: KeyboardViewModel(), target: FixtureTextTarget())
+        view.languageOverride = .english
         view.frame = CGRect(x: 0, y: 0, width: 393, height: 262)
         view.layoutIfNeeded()
         var clicks = 0

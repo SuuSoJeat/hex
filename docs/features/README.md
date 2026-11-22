@@ -2924,8 +2924,12 @@ iOS prototype (`HEXMobile`) -> Record/transcribe/copy and keyboard handoff
 │   On #+=, hold ។ or ៖ for ៙ or ៚. កខគ returns to the letters. Khmer marks insert
 │   as entered, including coeng (្), and the host handles backspace. The five-row
 │   letter plane stays joined on the unfolded Duo. Khmerism has no Khmer word
-│   autocorrection or swipe typing. Checks: `KhmerKeyboardLanguageTests`,
+│   suggestions, autocorrection, or swipe typing. Checks: `KhmerKeyboardLanguageTests`,
 │   `KeyboardLayoutTests`, `FullKeyboardEngineTests`.
+│   Settings › Experiments › Khmerism (both off by default, App Group, `FullKeyboardSettingsTests`)
+│   ├── No colors (`experiments.khmerismNoColors`) → every cap uses the keyboard theme
+│   └── No superscripts (`experiments.khmerismNoSuperscripts`) → hide corner labels,
+│       center the main glyph, and keep hold-to-type and its pop-up
 ├── Korean keyboard (두벌식) (off by default, `experiments.koreanKeyboard`): Settings ›
 │   Experiments adds 한국어 to Settings › Keyboard › Languages, typed on the standard two-set
 │   rows (ㅂㅈㄷㄱㅅㅛㅕㅑㅐㅔ / ㅁㄴㅇㄹㅎㅗㅓㅏㅣ / ㅋㅌㅊㅍㅠㅜㅡ, shift's ㅃㅉㄸㄲㅆ and ㅒㅖ, no

@@ -15,6 +15,8 @@ final class KeyboardKeyPlaneView: UIView {
     }
     var returnStyle = ReturnKeyStyle(.default) { didSet { if returnStyle != oldValue { setNeedsDisplay() } } }
     var returnIsEnabled = true { didSet { if returnIsEnabled != oldValue { setNeedsDisplay() } } }
+    var showsKhmerismColors = true { didSet { if showsKhmerismColors != oldValue { setNeedsDisplay() } } }
+    var showsKhmerismSuperscripts = true { didSet { if showsKhmerismSuperscripts != oldValue { setNeedsDisplay() } } }
     /// Drawn faintly on the space bar: the keyboard's language while it switches between two
     /// or more ("Français"), else the dictation language's name ("English", "Norsk"), with
     /// the language dictations paste in while they're translated ("Español → English").
@@ -265,7 +267,7 @@ final class KeyboardKeyPlaneView: UIView {
             let isHighlighted = !isDisabled && (isPressed || lingeringKind == key.kind || lingeringFunctionKinds.contains(key.kind))
             let face = if isHighlighted {
                 KhmerismAppearance.Face(fill: heldFill(for: key.kind), ink: palette.textBase)
-            } else if key.character != nil {
+            } else if showsKhmerismColors, key.character != nil {
                 KhmerismAppearance.face(for: label, isDark: isDark) ?? neutral
             } else {
                 neutral
@@ -282,7 +284,8 @@ final class KeyboardKeyPlaneView: UIView {
             switch key.kind {
             case .character:
                 let title = layout.layer == .letters ? label : Self.keycapLabel(label == "•" ? "⦁" : label)
-                drawKhmerismCharacter(title, alternate: engine.khmerismAlternate(for: key), in: frame, ink: ink)
+                let cornerLabel = showsKhmerismSuperscripts ? engine.khmerismAlternate(for: key) : nil
+                drawKhmerismCharacter(title, alternate: cornerLabel, in: frame, ink: ink)
             case .shift:
                 drawSymbol(shiftSymbol, in: frame, color: ink, pointSize: iconSize, yOffset: 0.67)
             case .delete:

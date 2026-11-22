@@ -1017,6 +1017,9 @@ never at a launch by itself.
   switches languages with the standard swipe. Emoji opens Hex's picker. The five
   letter rows use Hex's key height and corner radius, with teal, green and rose
   keys in light and dark. The background and press colors follow the keyboard theme.
+  Under **Settings › Experiments › Khmerism**, **No colors** uses the keyboard theme
+  for every key, and **No superscripts** hides the small corner labels while keeping
+  hold-to-type. Both switches are off by default.
 - **Layout per language (Settings › Keyboard › Languages › Layout):** each language the keys
   show (every chosen one, Automatic's while none is, and only the first of English and
   Español together) gets a menu of the layouts Apple's Keyboard Layout list offers for it

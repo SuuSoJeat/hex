@@ -2922,6 +2922,27 @@ final class FullKeyboardSettingsTests: XCTestCase {
         XCTAssertEqual(defaults.object(forKey: "experiments.hideWordSuggestions") as? Bool, true)
     }
 
+    func testKhmerismExperimentsDefaultOffAndPersistIndependently() throws {
+        let suite = "FullKeyboardSettingsTests-\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let settings = FullKeyboardSettings(defaults: defaults)
+
+        XCTAssertFalse(settings.khmerismNoColors)
+        XCTAssertFalse(settings.khmerismNoSuperscripts)
+        XCTAssertFalse(FullKeyboardSettings(defaults: nil).khmerismNoColors)
+        XCTAssertFalse(FullKeyboardSettings(defaults: nil).khmerismNoSuperscripts)
+
+        settings.khmerismNoColors = true
+        XCTAssertTrue(FullKeyboardSettings(defaults: defaults).khmerismNoColors)
+        XCTAssertFalse(FullKeyboardSettings(defaults: defaults).khmerismNoSuperscripts)
+
+        settings.khmerismNoSuperscripts = true
+        settings.khmerismNoColors = false
+        XCTAssertTrue(FullKeyboardSettings(defaults: defaults).khmerismNoSuperscripts)
+        XCTAssertFalse(FullKeyboardSettings(defaults: defaults).khmerismNoColors)
+    }
+
     /// The experiment is off until its switch is turned on, and it keeps its App Group key.
     func testDeleteSwipedWordsLetterByLetterIsOffByDefaultAndKeepsItsAppGroupKey() throws {
         let suite = "FullKeyboardSettingsTests-\(UUID().uuidString)"

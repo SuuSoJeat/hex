@@ -4113,6 +4113,49 @@
         }
       }
     },
+    "Khmerism" : {
+      "shouldTranslate" : false
+    },
+    "No colors" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "关闭按键配色"
+          }
+        }
+      }
+    },
+    "Use the keyboard theme for all Khmerism keys" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "所有 Khmerism 按键均使用当前键盘主题的颜色"
+          }
+        }
+      }
+    },
+    "No superscripts" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "隐藏上标"
+          }
+        }
+      }
+    },
+    "Hide the corner labels. Holding a key still types its alternate." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "隐藏按键角标。长按仍可输入备用字符。"
+          }
+        }
+      }
+    },
     "Navy" : {
       "localizations" : {
         "en" : {
