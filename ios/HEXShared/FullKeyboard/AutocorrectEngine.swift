@@ -9,6 +9,8 @@ nonisolated struct KeyboardSuggestion: Equatable, Sendable {
         case primary(autoReplace: Bool)
         /// Right slot: runner-up completion or spelling guess.
         case secondary
+        /// A Khmer word whose remaining characters can be appended at the caret.
+        case khmerCompletion
         /// A word that can follow the one just finished. Only an explicit pick inserts it.
         case nextWord
         /// An emoji for the word just finished (Settings › Keyboard › Emoji), offered after a space,

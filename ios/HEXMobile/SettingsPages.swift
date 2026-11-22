@@ -607,6 +607,7 @@ struct ExperimentsSettingsPage: View {
     @State private var koreanKeyboard = FullKeyboardSettings().koreanKeyboard
     @State private var khmerismNoColors = FullKeyboardSettings().khmerismNoColors
     @State private var khmerismNoSuperscripts = FullKeyboardSettings().khmerismNoSuperscripts
+    @State private var khmerAutocomplete = FullKeyboardSettings().khmerAutocomplete
     @State private var emojiLettersUnderEmojiKey = FullKeyboardSettings().emojiLettersUnderEmojiKey
     @State private var keyboardThemes = FullKeyboardSettings().keyboardThemesEnabled
     @State private var keyboardTheme = FullKeyboardSettings().keyboardTheme
@@ -695,12 +696,23 @@ struct ExperimentsSettingsPage: View {
                 detail: String(localized: "Hide the corner labels. Holding a key still types its alternate."),
                 isOn: $khmerismNoSuperscripts
             )
+
+            SettingsDivider()
+
+            SettingsToggleRow(
+                title: String(localized: "Autocomplete"),
+                detail: String(localized: "Tap a suggestion to complete a Khmer word."),
+                isOn: $khmerAutocomplete
+            )
         }
         .onChange(of: khmerismNoColors) { _, enabled in
             FullKeyboardSettings().khmerismNoColors = enabled
         }
         .onChange(of: khmerismNoSuperscripts) { _, enabled in
             FullKeyboardSettings().khmerismNoSuperscripts = enabled
+        }
+        .onChange(of: khmerAutocomplete) { _, enabled in
+            FullKeyboardSettings().khmerAutocomplete = enabled
         }
     }
 
@@ -892,6 +904,7 @@ struct ExperimentsSettingsPage: View {
         koreanKeyboard = FullKeyboardSettings().koreanKeyboard
         khmerismNoColors = FullKeyboardSettings().khmerismNoColors
         khmerismNoSuperscripts = FullKeyboardSettings().khmerismNoSuperscripts
+        khmerAutocomplete = FullKeyboardSettings().khmerAutocomplete
         emojiLettersUnderEmojiKey = FullKeyboardSettings().emojiLettersUnderEmojiKey
         keyboardThemes = FullKeyboardSettings().keyboardThemesEnabled
         keyboardTheme = FullKeyboardSettings().keyboardTheme

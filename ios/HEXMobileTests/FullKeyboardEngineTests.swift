@@ -231,6 +231,67 @@ final class FullKeyboardEngineTests: XCTestCase {
         XCTAssertEqual(engine.layout.layer, .numbers)
     }
 
+    func testKhmerAutocompleteIsOptInAndAppendsOnlyTheMissingScalars() async throws {
+        engine.language = .khmer
+        engine.autocorrect.isEnabled = false
+        for character in ["ក", "ម", "្"] { tap(.character(character)) }
+        XCTAssertEqual(target.text, "កម្")
+        XCTAssertTrue(engine.suggestions.isEmpty)
+
+        engine.isKhmerAutocompleteEnabled = true
+        await engine.khmerAutocompleteLoad?.value
+        let completion = try XCTUnwrap(engine.suggestions.first)
+        XCTAssertEqual(completion.kind, .khmerCompletion)
+        XCTAssertEqual(completion.displayText, "កម្ពុជា")
+        XCTAssertEqual(completion.replacement, "ពុជា")
+        XCTAssertFalse(completion.willAutoReplace)
+
+        engine.acceptSuggestion(completion)
+        XCTAssertEqual(target.text.unicodeScalars.map(\.value), "កម្ពុជា".unicodeScalars.map(\.value))
+        engine.acceptSuggestion(completion)
+        XCTAssertEqual(target.text, "កម្ពុជា")
+    }
+
+    func testKhmerAutocompleteConditionsAndStalePicks() async throws {
+        engine.language = .khmer
+        engine.isKhmerAutocompleteEnabled = true
+        await engine.khmerAutocompleteLoad?.value
+        target.insertText("កម្")
+        engine.textDidChange()
+        let completion = try XCTUnwrap(engine.suggestions.first)
+
+        target.selectedText = "ក"
+        engine.acceptSuggestion(completion)
+        XCTAssertEqual(target.text, "កម្")
+        XCTAssertTrue(engine.suggestions.isEmpty)
+
+        target.selectedText = nil
+        target.autocorrectionType = .no
+        engine.textDidChange()
+        XCTAssertTrue(engine.suggestions.isEmpty)
+        target.autocorrectionType = .default
+        engine.textDidChange()
+        XCTAssertFalse(engine.suggestions.isEmpty)
+
+        target.insertText("។")
+        engine.acceptSuggestion(completion)
+        XCTAssertEqual(target.text, "កម្។")
+        XCTAssertTrue(engine.suggestions.isEmpty)
+
+        target.deleteBackward()
+        engine.textDidChange()
+        tap(.space)
+        XCTAssertEqual(target.text, "កម្ ")
+        XCTAssertTrue(engine.suggestions.isEmpty)
+
+        target.deleteBackward()
+        target.insertText("ជ")
+        target.adjustTextPosition(byCharacterOffset: -1)
+        engine.textDidChange()
+        XCTAssertEqual(target.documentContextBeforeInput, "កម្")
+        XCTAssertTrue(engine.suggestions.isEmpty, "The caret is inside a Khmer word")
+    }
+
     func testDoubleTapShiftLocks() {
         tap(.shift)
         now += 0.1

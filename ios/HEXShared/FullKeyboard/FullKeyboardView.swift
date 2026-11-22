@@ -571,6 +571,7 @@ final class FullKeyboardView: UIView {
         let settings = FullKeyboardSettings()
         plane.showsKhmerismColors = !settings.khmerismNoColors
         plane.showsKhmerismSuperscripts = !settings.khmerismNoSuperscripts
+        engine.isKhmerAutocompleteEnabled = settings.khmerAutocomplete
         hapticStrength = FullKeyboardSettings().hapticStrength
         syncHexPlacement()
         syncNumberRow()

@@ -4156,6 +4156,26 @@
         }
       }
     },
+    "Autocomplete" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "自动补全"
+          }
+        }
+      }
+    },
+    "Tap a suggestion to complete a Khmer word." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "轻点建议词以补全高棉语单词。"
+          }
+        }
+      }
+    },
     "Navy" : {
       "localizations" : {
         "en" : {

@@ -349,6 +349,8 @@ final class TypingLogger {
                 fields.append(TypingLogField("auto", .bool(auto)))
             case .secondary:
                 fields.append(TypingLogField("kind", .string("secondary")))
+            case .khmerCompletion:
+                fields.append(TypingLogField("kind", .string("khmer_completion")))
             case .nextWord:
                 fields.append(TypingLogField("kind", .string("next_word")))
             case .emoji:

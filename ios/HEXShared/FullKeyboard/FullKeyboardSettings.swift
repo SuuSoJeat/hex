@@ -73,6 +73,7 @@ struct FullKeyboardSettings {
         static let koreanKeyboard = KoreanKeyboardExperiment.key
         static let khmerismNoColors = "experiments.khmerismNoColors"
         static let khmerismNoSuperscripts = "experiments.khmerismNoSuperscripts"
+        static let khmerAutocomplete = "experiments.khmerAutocomplete"
         static let keyPopups = "settings.keyboardKeyPopups"
         static let haptics = "settings.keyboardHaptics"
         static let hapticStrength = "settings.keyboardHapticStrength"
@@ -164,6 +165,12 @@ struct FullKeyboardSettings {
     var khmerismNoSuperscripts: Bool {
         get { defaults?.object(forKey: Key.khmerismNoSuperscripts) as? Bool ?? false }
         nonmutating set { defaults?.set(newValue, forKey: Key.khmerismNoSuperscripts) }
+    }
+
+    /// Settings › Experiments › Khmerism › Autocomplete: tap a suggestion to complete a word.
+    var khmerAutocomplete: Bool {
+        get { defaults?.object(forKey: Key.khmerAutocomplete) as? Bool ?? false }
+        nonmutating set { defaults?.set(newValue, forKey: Key.khmerAutocomplete) }
     }
 
     /// The typing model the keyboard may read `language`'s taps with: its bundled model, with

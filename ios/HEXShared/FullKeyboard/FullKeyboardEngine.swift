@@ -85,6 +85,11 @@ final class FullKeyboardEngine {
     /// types the key's own); then the cell under the finger is the one.
     private var accentOpenCell: Int?
     private(set) var suggestions: [KeyboardSuggestion] = []
+    var isKhmerAutocompleteEnabled = false {
+        didSet { if isKhmerAutocompleteEnabled != oldValue { refreshSuggestions() } }
+    }
+    private var khmerAutocomplete: KhmerAutocomplete?
+    private(set) var khmerAutocompleteLoad: Task<Void, Never>?
 
     let target: KeyboardTextTarget
     let autocorrect: AutocorrectEngine
@@ -336,12 +341,20 @@ final class FullKeyboardEngine {
 
     func refreshSuggestions() {
         syncLearning()
+        // Prepare the bundled index off the typing path, once an opted-in Khmer layout opens.
+        if isKhmerAutocompleteEnabled, layout.language == .khmer, khmerAutocompleteLoad == nil {
+            khmerAutocompleteLoad = Task { [weak self] in
+                let index = await Task.detached(priority: .utility) { KhmerAutocomplete.bundled }.value
+                self?.khmerAutocomplete = index
+                self?.refreshSuggestions()
+            }
+        }
         let next: [KeyboardSuggestion]
         if let swipeSuggestions {
             next = displayed(swipeSuggestions)
         } else {
             autocorrect.decoderTaps = currentTokenTaps
-            next = displayed(offeringRevert(autocorrect.suggestions(
+            let usualSuggestions = displayed(offeringRevert(autocorrect.suggestions(
                 beforeInput: stripBefore,
                 field: field,
                 autocorrectionType: target.autocorrectionType,
@@ -353,6 +366,7 @@ final class FullKeyboardEngine {
                     language: layout.language
                 )
             )))
+            next = usualSuggestions.isEmpty ? khmerCompletions() : usualSuggestions
         }
         if next != suggestions {
             suggestions = next
@@ -362,6 +376,15 @@ final class FullKeyboardEngine {
     }
 
     func acceptSuggestion(_ suggestion: KeyboardSuggestion) {
+        if suggestion.kind == .khmerCompletion {
+            // Read the live prefix before appending, in case the caret or field has changed.
+            guard suggestions.contains(suggestion), khmerCompletions(live: true).contains(suggestion) else {
+                refreshSuggestions()
+                return
+            }
+            insert(suggestion.replacement, source: "khmer_completion")
+            return
+        }
         // `typeHeldSpace` asks `spacePending`, so the record stays until the pick's own insert
         // replaces it; every delete below counts the token in the host's text (`textBefore`).
         typeHeldSpace(before: suggestion)
@@ -423,6 +446,17 @@ final class FullKeyboardEngine {
             }
         }
         insertPicked(suggestion.replacement)
+    }
+
+    private func khmerCompletions(live: Bool = false) -> [KeyboardSuggestion] {
+        guard isKhmerAutocompleteEnabled, layout.language == .khmer,
+              let index = khmerAutocomplete,
+              TypingJournal.allows(field: field, target: target), target.isSecureTextEntry != true,
+              (target.selectedText ?? "").isEmpty,
+              !KhmerAutocomplete.startsWithWordText(target.documentContextAfterInput) else { return [] }
+        return index.suggestions(beforeInput: live ? textBefore : typingContext).map {
+            KeyboardSuggestion(displayText: $0.word, replacement: $0.suffix, kind: .khmerCompletion)
+        }
     }
 
     /// Types an emoji from the emoji panel: no spacing or autocorrect around it.
