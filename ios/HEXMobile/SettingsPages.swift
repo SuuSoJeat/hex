@@ -605,6 +605,7 @@ struct ExperimentsSettingsPage: View {
     @State private var confirmingTouchReset = false
     @State private var germanSpatialAutocorrect = FullKeyboardSettings().germanSpatialAutocorrect
     @State private var koreanKeyboard = FullKeyboardSettings().koreanKeyboard
+    @State private var khmerismKeyboard = FullKeyboardSettings().khmerismKeyboard
     @State private var emojiLettersUnderEmojiKey = FullKeyboardSettings().emojiLettersUnderEmojiKey
     @State private var keyboardThemes = FullKeyboardSettings().keyboardThemesEnabled
     @State private var keyboardTheme = FullKeyboardSettings().keyboardTheme
@@ -640,6 +641,9 @@ struct ExperimentsSettingsPage: View {
         }
         .onChange(of: koreanKeyboard) { _, enabled in
             FullKeyboardSettings().koreanKeyboard = enabled
+        }
+        .onChange(of: khmerismKeyboard) { _, enabled in
+            FullKeyboardSettings().khmerismKeyboard = enabled
         }
         .onChange(of: emojiLettersUnderEmojiKey) { _, enabled in
             FullKeyboardSettings().emojiLettersUnderEmojiKey = enabled
@@ -760,6 +764,14 @@ struct ExperimentsSettingsPage: View {
 
         SettingsDivider()
 
+        SettingsToggleRow(
+            title: String(localized: "Khmerism keyboard"),
+            detail: String(localized: "Adds ភាសាខ្មែរ to keyboard languages"),
+            isOn: $khmerismKeyboard
+        )
+
+        SettingsDivider()
+
         // Off by default: the emoji panel's ABC stays where it always was.
         SettingsToggleRow(
             title: String(localized: "ABC under the emoji key"),
@@ -860,6 +872,7 @@ struct ExperimentsSettingsPage: View {
         refreshAdaptiveTouchStatus()
         germanSpatialAutocorrect = FullKeyboardSettings().germanSpatialAutocorrect
         koreanKeyboard = FullKeyboardSettings().koreanKeyboard
+        khmerismKeyboard = FullKeyboardSettings().khmerismKeyboard
         emojiLettersUnderEmojiKey = FullKeyboardSettings().emojiLettersUnderEmojiKey
         keyboardThemes = FullKeyboardSettings().keyboardThemesEnabled
         keyboardTheme = FullKeyboardSettings().keyboardTheme

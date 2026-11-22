@@ -702,7 +702,7 @@ never at a launch by itself.
     by default) with its Typing logs viewer while it's on.
   - **Experiments:** Hinglish (Hindi in Latin letters), Two-language dictation,
     Clean up with Apple Intelligence, Adaptive touch (its status and Reset touch learning
-    below the switch), German spatial autocorrect, Korean keyboard (두벌식), ABC under the
+    below the switch), German spatial autocorrect, Korean keyboard (두벌식), Khmerism keyboard, ABC under the
     emoji key, Keyboard themes (its Theme menu below the switch while it's on), Two-thumb
     selection, Delete swiped words letter by letter, Hide word suggestions, Join the
     keyboard when unfolded, and Multilingual model (Parakeet).
@@ -1008,6 +1008,15 @@ never at a launch by itself.
   the experiment off the language isn't listed, Automatic never picks it, and a stored "ko" is
   ignored. Unit tests only (`HangulComposerTests`, `HangulKeyboardTests`,
   `KoreanKeyboardGatingTests`): no CI compiles the iOS targets and no device run checks it.
+  **ភាសាខ្មែរ (Khmerism):** Turn on **Khmerism keyboard** in Settings › Experiments,
+  then choose **ភាសាខ្មែរ** in Settings › Keyboard › Languages. Tap a key to type its
+  main character and swipe up from it to type the small character in its corner. Shift
+  keeps its page selected until you tap Shift again or tap **ខ្មែរ**. **123** and **#+=**
+  open the number and symbol pages, and the emoji key opens Hex's emoji picker when enabled.
+  The keyboard types Khmer marks as entered, including the subscript sign ្, and uses the
+  host field's backspace. Its five rows include Khmer digits and stay together on the
+  unfolded Duo. The optional Number row, word autocorrect, suggestions, and swipe typing
+  don't apply to this layout.
 - **Layout per language (Settings › Keyboard › Languages › Layout):** each language the keys
   show (every chosen one, Automatic's while none is, and only the first of English and
   Español together) gets a menu of the layouts Apple's Keyboard Layout list offers for it

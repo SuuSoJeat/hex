@@ -115,7 +115,7 @@ final class KeyboardKeyPlaneView: UIView {
             // Keycaps on whole device pixels, as Apple draws them: crisp edges, not half-covered ones.
             let frame = pixelAligned(key.frame)
             // Row 4's labels sit where they would on Apple's taller row 4 (`bottomRowTrim`).
-            let labelFrame = key.row == 3
+            let labelFrame = key.row == layout.bottomRowIndex
                 ? CGRect(x: frame.minX, y: frame.minY, width: frame.width, height: frame.height + layout.metrics.bottomRowTrim)
                 : frame
             switch key.kind {
@@ -126,6 +126,10 @@ final class KeyboardKeyPlaneView: UIView {
                 let fill = pressed.contains(key.kind) ? palette.keyHeldFill : palette.keyFill
                 context.fillKeycap(frame, fill: fill, shadow: palette.keyShadow, radius: radius)
                 guard showGlyphs() else { continue }
+                if layout.language == .khmer {
+                    drawKhmerismKey(key, in: labelFrame, scale: labelScale)
+                    continue
+                }
                 if let upper = key.shifted, let lower = key.character {
                     // The docked iPad's two-symbol keys: the shifted one over the one typed, as Apple's.
                     let font = UIFont.systemFont(ofSize: 18, weight: .regular)
@@ -154,9 +158,9 @@ final class KeyboardKeyPlaneView: UIView {
                 // Apple's space bar unshades as it becomes the trackpad.
                 let fill = pressed.contains(.space) && !hideGlyphs ? palette.spaceHeldFill : palette.keyFill
                 context.fillKeycap(frame, fill: fill, shadow: palette.keyShadow, radius: radius)
-                guard showGlyphs(), let spaceLabel else { continue }
+                guard showGlyphs(), let label = layout.language == .khmer ? (spaceLabel ?? key.label) : spaceLabel else { continue }
                 drawText(
-                    spaceLabel,
+                    label,
                     in: labelFrame,
                     font: .systemFont(ofSize: isLandscape ? 13 : 14.5, weight: .regular),
                     color: palette.textMuted
@@ -214,11 +218,11 @@ final class KeyboardKeyPlaneView: UIView {
                 context.fillKeycap(frame, fill: lit ? palette.keyHeldFill : palette.keyFill, shadow: palette.keyShadow, radius: radius)
                 guard showGlyphs() else { continue }
                 var style = isLandscape
-                    ? (key.label == "123" && key.row == 3 ? LabelStyle(size: 15.5, weight: UIFont.Weight(rawValue: -0.05), yOffset: 0)
-                        : key.row == 3 ? LabelStyle(size: 17.75, weight: UIFont.Weight(rawValue: 0.08), yOffset: -0.83)
+                    ? (key.label == "123" && key.row == layout.bottomRowIndex ? LabelStyle(size: 15.5, weight: UIFont.Weight(rawValue: -0.05), yOffset: 0)
+                        : key.row == layout.bottomRowIndex ? LabelStyle(size: 17.75, weight: UIFont.Weight(rawValue: 0.08), yOffset: -0.83)
                         : key.label == "#+=" ? LabelStyle(size: 12.25, weight: UIFont.Weight(rawValue: 0.2), yOffset: -1.33)
                         : LabelStyle(size: 15.5, weight: UIFont.Weight(rawValue: -0.05), yOffset: 0))
-                    : key.row == 3 ? LabelStyle.pageKey
+                    : key.row == layout.bottomRowIndex ? LabelStyle.pageKey
                     : key.label == "#+=" ? LabelStyle.symbolsPageKey
                     : LabelStyle(size: 15.5, yOffset: 0)
                 style = style.scaled(by: labelScale)
@@ -465,6 +469,20 @@ final class KeyboardKeyPlaneView: UIView {
         case "\"": "\u{201D}"
         case "'": "\u{2019}"
         default: label
+        }
+    }
+
+    private func drawKhmerismKey(_ key: KeyboardKey, in frame: CGRect, scale: CGFloat) {
+        // iOS's Khmer font supplies a dotted circle when it shapes a standalone mark.
+        let alternate = engine.khmerismAlternate(for: key)
+        let size = min(22 * scale, frame.width * 0.72, frame.height * 0.61)
+        drawText(
+            engine.keycapLabel(for: key), in: frame, font: .systemFont(ofSize: size), color: palette.textBase,
+            yOffset: alternate == nil ? 0 : frame.height * 0.12
+        )
+        if let alternate {
+            let corner = CGRect(x: frame.midX - 1, y: frame.minY, width: frame.width / 2, height: frame.height * 0.39)
+            drawText(alternate, in: corner, font: .systemFont(ofSize: size * 0.51), color: palette.textMuted)
         }
     }
 
