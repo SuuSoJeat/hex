@@ -1,5 +1,12 @@
 /// The standard Khmer key arrangement observed on the iOS 27.2 keyboard.
 nonisolated enum KhmerLayout {
+    struct Key {
+        let text: String
+        var shifted: String? = nil
+        var alternate: String? = nil
+        var shiftedAlternate: String? = nil
+    }
+
     static let letters = [
         row("១ ២ ៣ ៤ ៥ ៦ ៧ ៨ ៩ ០ ឥ ឲ", shifted: "! ៗ \" ៛ % ៍ ័ ៏ ឰ ឳ ៌ ៎"),
         row("ឆ ឹ េ រ ត យ ុ ិ ោ ផ ៀ ឪ", shifted: "ឈ ឺ ែ ឬ ទ ួ ូ ី ៅ ភ ឿ ឧ"),
@@ -19,8 +26,12 @@ nonisolated enum KhmerLayout {
         glyphs(". , ' ? !"),
     ]
 
-    private static func row(_ base: String, shifted: String) -> [KhmerismLayout.Key] {
-        zip(glyphs(base), glyphs(shifted)).map { KhmerismLayout.Key(text: $0, shifted: $1) }
+    /// A Khmerism letter offers the other layer's character on an upward flick.
+    static func row(_ base: String, shifted: String, flicksBetweenLayers: Bool = false) -> [Key] {
+        zip(glyphs(base), glyphs(shifted)).map { main, shift in
+            Key(text: main, shifted: shift, alternate: flicksBetweenLayers ? shift : nil,
+                shiftedAlternate: flicksBetweenLayers ? main : nil)
+        }
     }
 
     private static func glyphs(_ row: String) -> [String] {

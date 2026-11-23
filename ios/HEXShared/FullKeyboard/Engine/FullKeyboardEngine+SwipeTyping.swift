@@ -214,6 +214,18 @@ extension FullKeyboardEngine {
     /// (a straight quote and opening brackets included) starts the next word.
     static let swipeJoiners: Set<Character> = [",", ".", "!", "?", ";", ":", ")", "]", "}", "'", "’", "-", "/"]
 
+    struct KhmerSwipeChoices {
+        var words: [String]
+        var before: String?
+        var after: String?
+        var document: UUID
+        var route: Int
+    }
+
+    func dismissKhmerSwipeChoices() {
+        pendingKhmerSwipeChoices = nil
+    }
+
     var khmerSwipeChoicesAreCurrent: Bool {
         guard let choices = pendingKhmerSwipeChoices else { return false }
         return layout.language == .khmer && allowsSwipes

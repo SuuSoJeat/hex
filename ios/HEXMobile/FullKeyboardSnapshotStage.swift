@@ -353,7 +353,6 @@ private struct FullKeyboardFixture: UIViewRepresentable {
 
         DictationLanguageFixture.apply(to: model)
         let view = FullKeyboardView(model: model, target: context.coordinator.target)
-        if FullKeyboardSnapshotStage.layout == .khmer { view.emojiOverride = true }
         if state.hasPrefix("emoji") {
             view.emojiOverride = true
             let usage = EmojiFixture.usage()

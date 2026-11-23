@@ -51,22 +51,13 @@ struct ExperimentsSettingsPage: View {
         return settings.autocorrect && settings.spatialAutocorrect
     }
 
-    private var khmerLetterLayout: KeyboardLetterLayout? {
-        _ = revision
-        let settings = LanguageSettings()
-        let languages = settings.keyboardLanguages
-        guard FullKeyboardSettings().isEnabled,
-              languages.isEmpty ? automaticKeyboardLanguage() == .khmer : languages.contains(.khmer) else { return nil }
-        return settings.letterLayout(for: .khmer)
-    }
-
     var body: some View {
         SettingsPageScaffold(title: "Experiments") {
             dictationSection
             languagesSection
             layoutSection
             typingSection
-            if let khmerLetterLayout {
+            if FullKeyboardSettings().isEnabled, let khmerLetterLayout = configuredKhmerLayout() {
                 khmerSection
                 if khmerLetterLayout == .khmerism { khmerismSection }
             }

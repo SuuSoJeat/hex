@@ -1070,7 +1070,7 @@ final class FullKeyboardView: UIView {
             endCalloutLinger()
             let label = layout.language == .khmer ? preview.label : KeyboardKeyPlaneView.keycapLabel(preview.label)
             let style = KeyCalloutView.style(for: label)
-            let khmerFont = label.unicodeScalars.contains { (0x1780...0x17FF).contains($0.value) }
+            let khmerFont = KhmerismAppearance.containsKhmer(label)
                 ? KhmerismAppearance.font(for: label, size: min(style.size, balloon.bubble.height * 0.56))
                 : nil
             callout.show(balloon, label: label, style: style, font: khmerFont)

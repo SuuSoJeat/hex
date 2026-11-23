@@ -44,8 +44,8 @@ list starts at the top. The pages, one file each in `HEXMobile/Settings/`
   chosen, and Languages, Hex key and Number row (off by default) while Full is; under
   **Typing**, only while Full is chosen, Auto-capitalization, Autocorrect (with Spatial
   autocorrect below it while it's on), Swipe typing, Suggest swear words and Vocabulary (Hex's
-  custom vocabulary list, how many words it holds); under **Feedback**, Key
-  pop-ups (Full only), Haptics (the dictation bar uses it too; Strength below it while it's on: Light, the
+  custom vocabulary list, how many words it holds); under **Feedback**, Key pop-ups (Full
+  only), Haptics (the dictation bar uses it too; Strength below it while it's on: Light, the
   default until you choose, Medium or Strong) and Emoji (Clear emoji history while it's on,
   which asks first); and a field to try the keyboard in.
 - **Privacy:** "Everything stays on this iPhone", Learn how I type (what it

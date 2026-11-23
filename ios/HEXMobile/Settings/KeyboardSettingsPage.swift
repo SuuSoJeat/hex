@@ -112,18 +112,12 @@ struct KeyboardSettingsPage: View {
         fullAccessOn ? nil : String(localized: "Needs Full Access")
     }
 
-    private var usesKhmer: Bool {
-        _ = revision
-        let chosen = LanguageSettings().keyboardLanguages
-        return chosen.isEmpty ? automaticKeyboardLanguage() == .khmer : chosen.contains(.khmer)
-    }
-
     /// Swipe typing's detail: the layouts that swipe.
     private var swipeLanguages: String {
         _ = revision
         let settings = FullKeyboardSettings()
         let includesGerman = settings.spatialAutocorrect && settings.germanSpatialAutocorrect
-        guard usesKhmer, settings.swipesIn(.khmer) else {
+        guard settings.swipesIn(.khmer), configuredKhmerLayout() != nil else {
             guard settings.swipeMoreLanguages else { return String(localized: "English and Spanish only") }
             if includesGerman { return String(localized: "English, Spanish, French, Polish and German") }
             return String(localized: "English, Spanish, French and Polish")
@@ -251,8 +245,8 @@ struct KeyboardSettingsPage: View {
 
                         SettingsToggleRow(
                             title: String(localized: "Spatial autocorrect"),
-                            detail: usesKhmer
-                                ? String(localized: "Ranks Khmer spelling suggestions by where you tap")
+                            detail: configuredKhmerLayout() != nil
+                                ? String(localized: "English, Spanish, French and Polish. In Khmer, ranks spelling suggestions by where you tap.")
                                 : String(localized: "English, Spanish, French and Polish only"),
                             isOn: binding(\.spatialAutocorrect)
                         )

@@ -3220,12 +3220,12 @@
         }
       }
     },
-    "Ranks Khmer spelling suggestions by where you tap" : {
+    "English, Spanish, French and Polish. In Khmer, ranks spelling suggestions by where you tap." : {
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "根据点按位置对高棉语拼写建议排序"
+            "value" : "支持英语、西班牙语、法语和波兰语。使用高棉语时，根据点按位置对拼写建议排序。"
           }
         }
       }

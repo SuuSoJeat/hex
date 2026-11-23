@@ -486,13 +486,13 @@ extension FullKeyboardEngineTests {
         }
     }
 
-    func testEnglishSwipeContextSurvivesTheHostReportingItsDocumentIdentifier() throws {
+    func testKhmerSwipeContextTracksTheHostReportingItsDocumentIdentifier() throws {
         let field = LaggingField()
-        let (_, plane) = try swipeKeyboard(target: field)
-        swipe("this", on: plane)
+        let (_, plane) = try swipeKeyboard(language: .khmer, target: field, letters: .khmerism)
+        swipe("បាន", on: plane)
         field.documentIdentifier = UUID()
         plane.engine.textDidChange()
-        XCTAssertEqual(plane.engine.typingContext, "this")
+        XCTAssertEqual(plane.engine.typingContext, "បាន")
         field.documentIdentifier = UUID()
         plane.engine.textDidChange()
         XCTAssertEqual(plane.engine.typingContext, field.documentContextBeforeInput)
