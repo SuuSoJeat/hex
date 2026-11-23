@@ -2949,10 +2949,12 @@ iOS prototype (`HEXMobile`) -> Record/transcribe/copy and keyboard handoff
 │   letter plane stays joined on the unfolded Duo. Checks: `KhmerKeyboardLanguageTests`,
 │   `KeyboardLayoutTests`, `FullKeyboardEngineTests`.
 │   The suggestion strip offers up to three offline completions from a bundled
-│   SIL/Keyman dictionary. Tap one to append the missing characters. With Autocorrect
-│   on, the same dictionary suggests nearby spellings for one-edit typos. Space
-│   accepts a confident correction and leaves the words joined. Space types a literal
-│   space when no automatic correction is pending. A quick double Space after a word
+│   SIL/Keyman dictionary. It draws each Khmer suggestion as one word so coeng
+│   and its following consonant shape together. Tap one to append the missing
+│   characters. With Autocorrect on, the same dictionary suggests nearby spellings
+│   for one-edit typos. Space accepts a confident correction and leaves the words
+│   joined. Space types a literal space when no automatic correction is pending.
+│   A quick double Space after a word
 │   types ។ and a space. iOS Text Replacement uses the shared shortcut behavior.
 │   Closing punctuation applies the
 │   correction and types the punctuation. Other dictionary guesses are tap-to-accept.

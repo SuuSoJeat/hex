@@ -680,8 +680,8 @@ final class KeyboardStripView: UIView {
             // Letters both words start with stay, unless a bubble came or went (its ink changes).
             var shared = 0
             if !reduced, let target, target.box == nil, current.allSatisfy({ $0.box == nil }), current.first?.font == target.font {
-                let new = Array(target.text).map(String.init)
-                while shared < min(current.count, new.count), current[shared].text == new[shared] { shared += 1 }
+                while shared < min(current.count, target.glyphs.count),
+                      current[shared].text == target.glyphs[shared].text { shared += 1 }
             }
             let x = wordX.value(t)
             if shared == 0 {
@@ -796,7 +796,6 @@ final class KeyboardStripView: UIView {
         }
 
         private struct Word {
-            let text: String
             let font: UIFont
             let origin: CGPoint
             let width: CGFloat
@@ -818,12 +817,14 @@ final class KeyboardStripView: UIView {
                 let origin = CGPoint(x: textMidX - size.width / 2, y: midY - size.height / 2)
                 var glyphs: [Glyph] = []
                 var prefix = ""
-                for character in text {
+                // Khmer shaping can span Swift Characters, including across coeng and its consonant.
+                let runs = Self.containsKhmer(text) ? [text] : text.map(String.init)
+                for run in runs {
                     let offset = (prefix as NSString).size(withAttributes: [.font: font]).width
-                    glyphs.append(Glyph(text: String(character), font: font, offset: offset, y: origin.y, box: nil))
-                    prefix.append(character)
+                    glyphs.append(Glyph(text: run, font: font, offset: offset, y: origin.y, box: nil))
+                    prefix.append(run)
                 }
-                return Word(text: text, font: font, origin: origin, width: size.width, box: nil, glyphs: glyphs)
+                return Word(font: font, origin: origin, width: size.width, box: nil, glyphs: glyphs)
             }
             let small = UIFont.systemFont(ofSize: 15, weight: .regular)
             let smallSize = (text as NSString).size(withAttributes: [.font: small])
@@ -831,7 +832,11 @@ final class KeyboardStripView: UIView {
             let origin = CGPoint(x: textMidX - width / 2, y: midY - smallSize.height / 2)
             let box = CGSize(width: width, height: smallSize.height)
             let glyph = Glyph(text: text, font: small, offset: 0, y: origin.y, box: box)
-            return Word(text: text, font: small, origin: origin, width: width, box: box, glyphs: [glyph])
+            return Word(font: small, origin: origin, width: width, box: box, glyphs: [glyph])
+        }
+
+        private static func containsKhmer(_ text: String) -> Bool {
+            text.utf16.contains { (0x1780...0x17FF).contains($0) }
         }
 
         static let chipPadding: CGFloat = 12
@@ -850,7 +855,7 @@ final class KeyboardStripView: UIView {
                 let word = layout(suggestion)
                 let arrowRoom = suggestion.kind == .revert ? Self.revertArrowSize + Self.revertArrowGap : 0
                 let normalHeight = chipHeight ?? max(22, bounds.height - 2 * pillInset)
-                let needsKhmerMarkRoom = suggestion.displayText.utf16.contains { (0x1780...0x17FF).contains($0) }
+                let needsKhmerMarkRoom = Self.containsKhmer(suggestion.displayText)
                 let chipH = needsKhmerMarkRoom ? min(bounds.height, max(26, normalHeight)) : normalHeight
                 let chipW = min(bounds.width, word.width + arrowRoom + 2 * Self.chipPadding)
                 let midY = textCenterY ?? bounds.height * 0.5
