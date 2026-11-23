@@ -89,6 +89,8 @@ final class FullKeyboardEngine {
     var khmerAutocompleteLoad: Task<Void, Never>?
     var isAfterKhmerCoeng = false
     var khmerSmartRun: KhmerSmartRun?
+    var khmerPickedWord: (word: String, caret: KhmerPredictionCaret)?
+    var khmerStripCaret: KhmerPredictionCaret?
     var khmerSpatialSuggestions = false {
         didSet {
             guard oldValue != khmerSpatialSuggestions else { return }
@@ -395,6 +397,7 @@ final class FullKeyboardEngine {
             )
             next = displayed(offeringRevert(usualSuggestions.isEmpty ? khmerSuggestionChoices() : usualSuggestions))
         }
+        khmerStripCaret = layout.language == .khmer && !next.isEmpty ? khmerPredictionCaret(before: typingContext) : nil
         let suggestionsChanged = next != suggestions
         if suggestionsChanged {
             suggestions = next
@@ -1438,6 +1441,7 @@ final class FullKeyboardEngine {
         let wasKhmer = layout.language == .khmer
         let isKhmer = (layoutLanguage ?? language) == .khmer
         if wasKhmer != isKhmer {
+            khmerPickedWord = nil
             shift.reset()
             clearKhmerSmartRun()
             clearKhmerSpatialTaps()

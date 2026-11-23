@@ -93,17 +93,21 @@ options each default off. Hiding corner labels preserves hold-to-type.
 - Insert Khmer in typing order. With Autocorrect off, two presses on a vowel
   insert the vowel twice. Shape an entire suggestion together so that a
   highlighted prefix can end in coeng without separating the subscript.
-- Offer up to three offline completions, including with Autocorrect off.
-  Choosing one appends the missing suffix with no separator. With Autocorrect
-  on, Space accepts a confident repair and leaves the next word joined. A
-  second Space after that repair inserts a literal space. Closing punctuation
+- At the start of a sentence, offer **ខ្ញុំ**, **សូម** and **តើ**. Show up to
+  three offline completions from the first letter, including when the letters
+  already spell a word. Choosing a completion appends only its missing suffix.
+  After a choice, suggest words that can follow it. Tapping **ខ្ញុំ** then
+  **ចង់** writes **ខ្ញុំចង់**. Predictions and completions work with Autocorrect off.
+- With Autocorrect on, Space accepts a confident repair and leaves the next word
+  joined. A second Space after that repair inserts a literal space. Closing punctuation
   accepts the repair and inserts the typed mark. The double-space punctuation
   shortcut after a word produces **។** followed by a space.
 - Offer uncertain spellings for an explicit tap. The quoted spelling keeps
   what was typed. Allow undo in the original field, immediately for a
   Space-accepted correction and after deleting the closing mark for a
-  punctuation-accepted one. Spatial autocorrect can use near-edge taps to rank
-  candidates. Those rankings apply to the user's choice in the strip.
+  punctuation-accepted one. When a near-edge tap favors a different repair
+  from the dictionary, the strip offers the typed spelling and both repairs.
+  Tap the spelling you want. Space keeps an uncertain spelling as typed.
 - Holding or swiping Backspace left deletes a word at a known boundary,
   including trailing punctuation and whitespace. A held Backspace falls back
   to ordinary host deletion at an uncertain boundary. Sliding back restores
@@ -146,6 +150,8 @@ Both layouts use the existing **Autocorrect** and **Swipe typing** switches in
 
 | Try this in the Full keyboard | Expected result |
 | --- | --- |
+| In an empty field, tap **ខ្ញុំ**, then **ចង់**. Type **។**. | The field reads **ខ្ញុំចង់។** and the three sentence starters reappear. |
+| Type **ក**, then try **សា** in a fresh field. | **ក** offers **ការ**, **ក្នុង** and **កម្ពុជា**. **សា** offers **សាលា** and stays as typed until a choice is tapped. |
 | Enter **ស + ◌្** on each layout. On Khmer, tap **ថ**. On Khmerism, tap the position that usually types **◌ោ**. | Both give **ស្ថ**. The Khmerism key then shows **◌ោ** again. |
 | Tap **ញ + ◌ំ** in an ordinary text field with the default settings. Repeat with Autocorrect off. | **ខ្ញុំ** first, then literal **ញំ**. |
 | With Autocorrect off, type **កម្** and choose **កម្ពុជា**. | The keyboard appends **ពុជា** once, preserving the coeng in the prefix. |

@@ -150,6 +150,7 @@ extension FullKeyboardEngine {
     /// A delete, a cursor move, a pick or a field change: what Hex typed is no longer what the
     /// host should report.
     func forgetTypingContext() {
+        khmerPickedWord = nil
         clearKhmerSmartRun()
         clearKhmerSpatialTaps()
         expectedTypingContext = nil
@@ -167,6 +168,7 @@ extension FullKeyboardEngine {
     /// host still reporting the text from before the insert keeps it for the next key.
     func settleTypingContext() {
         guard expectedTypingContext != nil, !hostIsBehind else { return }
+        if khmerPickedWord != nil { _ = khmerPrefixAfterPick(at: khmerPredictionCaret(before: textBefore)) }
         expectedTypingContext = nil
     }
 

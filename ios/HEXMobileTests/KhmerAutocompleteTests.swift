@@ -23,6 +23,29 @@ final class KhmerAutocompleteTests: XCTestCase {
         XCTAssertEqual(model.suggestions(beforeInput: prefix, limit: 1), Array(results.prefix(1)))
     }
 
+    func testFirstLetterCompletesAloneAndAfterAJoinedWord() {
+        let model = KhmerAutocomplete(wordlist: "ខ្ញុំ\t100\nក\t200\nការ\t10\nក្នុង\t30\nកម្ពុជា\t40\nកើត\t20")
+        for prefix in ["ក", "ខ្ញុំក"] {
+            let ranked = model.suggestions(beforeInput: prefix)
+            XCTAssertEqual(ranked.map(\.word), ["កម្ពុជា", "ក្នុង", "កើត"])
+            XCTAssertEqual(ranked.map(\.suffix), ["ម្ពុជា", "្នុង", "ើត"])
+            let filtered = model.suggestions(beforeInput: prefix, personalWords: ["ការ"]) { $0 != "កម្ពុជា" }
+            XCTAssertEqual(filtered.map(\.word), ["ការ", "ក្នុង", "កើត"])
+            XCTAssertNil(model.correction(beforeInput: prefix))
+        }
+        XCTAssertTrue(model.suggestions(beforeInput: "្").isEmpty)
+    }
+
+    func testCompleteWordCanExtendWithoutOfferingItsOwnSpellingOrSplittingIt() {
+        let model = KhmerAutocomplete(wordlist: "អរ\t100\nអរគុណ\t50\nអរុណ\t20\nរ\t30\nរក\t80")
+        XCTAssertEqual(model.suggestions(beforeInput: "អរ"), [
+            .init(word: "អរគុណ", suffix: "គុណ"),
+            .init(word: "អរុណ", suffix: "ុណ"),
+        ])
+        XCTAssertTrue(model.suggestions(beforeInput: "អរ") { _ in false }.isEmpty)
+        XCTAssertNil(model.correction(beforeInput: "អរ"))
+    }
+
     func testUsesLongestUnfinishedWordAfterKnownKhmerWords() {
         let results = model.suggestions(beforeInput: "ខ្ញុំស្រឡា")
         XCTAssertEqual(results.map(\.word), ["ស្រឡាញ់", "ស្រឡាង"])
@@ -181,7 +204,8 @@ final class KhmerAutocompleteTests: XCTestCase {
         let input = "ខ្ញុំ" + typed
         let frequent = KhmerAutocomplete.Correction(typed: typed, replacement: "ចំណាក", automaticallyApplies: false)
         let spatial = KhmerAutocomplete.Correction(
-            typed: typed, replacement: "ចំណែក", automaticallyApplies: false, rankedByTapPosition: true
+            typed: typed, replacement: "ចំណែក", automaticallyApplies: false, rankedByTapPosition: true,
+            dictionaryAlternative: "ចំណាក"
         )
 
         XCTAssertEqual(model.correction(beforeInput: input, substitutionGain: { _, _, _ in nil }), frequent)
@@ -205,6 +229,9 @@ final class KhmerAutocompleteTests: XCTestCase {
             model.correction(beforeInput: typed, substitutionGain: score, mayOffer: { $0 != blocked }),
             .init(typed: typed, replacement: "ចំណាក", automaticallyApplies: false)
         )
+        let spatialOnly = model.correction(beforeInput: typed, substitutionGain: score, mayOffer: { $0 == blocked })
+        XCTAssertEqual(spatialOnly?.replacement, blocked)
+        XCTAssertNil(spatialOnly?.dictionaryAlternative)
         XCTAssertNil(model.correction(beforeInput: typed, substitutionGain: score, canCorrect: { _ in false }))
     }
 
