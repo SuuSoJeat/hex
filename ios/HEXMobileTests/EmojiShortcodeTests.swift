@@ -123,6 +123,7 @@ final class EmojiShortcodeTests: XCTestCase {
         let target = FixtureTextTarget(text: ":pizza")
         let engine = FullKeyboardEngine(target: target)
         engine.language = .khmer
+        engine.letterLayout = .khmerism
         let library = try library()
         engine.emojiShortcode = { before in
             guard let completion = EmojiShortcode.completion(before: before, library: library) else { return nil }

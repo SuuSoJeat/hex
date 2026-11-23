@@ -557,8 +557,12 @@ final class FullKeyboardEngine {
         }
     }
 
+    private var allowsKhmerSmartTyping: Bool {
+        khmerismSmartMode && allowsKhmerSuggestions && target.isSecureTextEntry != true
+    }
+
     private var currentKhmerSmartRun: KhmerSmartRun? {
-        guard let run = khmerSmartRun, target.isSecureTextEntry != true,
+        guard let run = khmerSmartRun, allowsKhmerSmartTyping,
               (target.selectedText ?? "").isEmpty, target.documentIdentifier == run.context.document,
               target.documentContextAfterInput == run.context.after, let before = typingContext else { return nil }
         if before.utf16.elementsEqual(run.context.expected.utf16) { return run }
@@ -604,7 +608,7 @@ final class FullKeyboardEngine {
     }
 
     private func typeKhmerSmartKey(_ text: String, source: String, at point: CGPoint?, directTap: Bool) -> Bool {
-        guard khmerismSmartMode, layerState.layer == .letters, target.isSecureTextEntry != true,
+        guard allowsKhmerSmartTyping, layerState.layer == .letters,
               (target.selectedText ?? "").isEmpty, let unit = text.utf16.first, text.utf16.count == 1 else { return false }
         let run = currentKhmerSmartRun
         let before = typingContext
@@ -712,6 +716,12 @@ final class FullKeyboardEngine {
         case removed(prefix: String)
     }
 
+    private struct KhmerDeleteCaret {
+        let document: UUID?
+        let routeRevision: Int
+        let after: String?
+    }
+
     private func removeKhmerSuffix(_ suffix: String, from before: String) -> String? {
         guard case .removed(let prefix) = deleteKhmerSuffix(suffix, from: before) else { return nil }
         return prefix
@@ -726,22 +736,34 @@ final class FullKeyboardEngine {
               (target.selectedText ?? "").isEmpty else { return .rejected }
         let original = Array(rawBefore.utf16)
         let boundary = original.count - suffix.utf16.count
-        let document = target.documentIdentifier
-        let after = target.documentContextAfterInput
+        let caret = KhmerDeleteCaret(
+            document: target.documentIdentifier,
+            routeRevision: target.inputRouteRevision,
+            after: target.documentContextAfterInput
+        )
         // With text to the right, a nil prefix after deleting to the start is ambiguous.
-        guard boundary != 0 || after?.isEmpty != false else { return .rejected }
+        guard boundary != 0 || caret.after?.isEmpty != false else { return .rejected }
         var end = original.count
         var previous = rawBefore
         while end > boundary {
             target.deleteBackward()
             var confirmed: (text: String, end: Int)?
             for _ in 0..<3 {
-                guard sameKhmerDeleteCaret(document: document, after: after) else { return .interrupted }
+                guard sameKhmerDeleteCaret(caret) else {
+                    // The original key's fallback runs before the next turn of the main actor.
+                    // Do not let it send text to the field that took over during deletion.
+                    khmerDeleteRecovery = Task { [weak self] in self?.finishKhmerDeleteRecovery(at: caret) }
+                    return .interrupted
+                }
                 confirmed = observedKhmerDelete(in: original, before: previous, end: end)
                 if confirmed != nil { break }
             }
             guard let confirmed else {
-                recoverKhmerDelete(in: original, before: previous, end: end, document: document, after: after)
+                // A synchronously verified edit can work with an unnamed host. A delayed
+                // write needs a known document to rule out moving to another unnamed host.
+                if caret.document != nil {
+                    recoverKhmerDelete(in: original, before: previous, end: end, at: caret)
+                }
                 return .interrupted
             }
             end = confirmed.end
@@ -754,9 +776,9 @@ final class FullKeyboardEngine {
         return .removed(prefix: SmartPunctuation.plain(previous))
     }
 
-    private func sameKhmerDeleteCaret(document: UUID?, after: String?) -> Bool {
-        target.documentIdentifier == document && target.documentContextAfterInput == after
-            && (target.selectedText ?? "").isEmpty
+    private func sameKhmerDeleteCaret(_ caret: KhmerDeleteCaret) -> Bool {
+        target.documentIdentifier == caret.document && target.inputRouteRevision == caret.routeRevision
+            && target.documentContextAfterInput == caret.after && (target.selectedText ?? "").isEmpty
     }
 
     private func observedKhmerDelete(in original: [UInt16], before: String, end: Int) -> (text: String, end: Int)? {
@@ -775,46 +797,46 @@ final class FullKeyboardEngine {
 
     /// The proxy may need a run loop to publish a delete. Stop the edit and recover the
     /// original spelling before sending any literal key text waiting behind it.
-    private func recoverKhmerDelete(in original: [UInt16], before: String, end: Int, document: UUID?, after: String?) {
+    private func recoverKhmerDelete(in original: [UInt16], before: String, end: Int, at caret: KhmerDeleteCaret) {
         khmerDeleteRecovery = Task { [weak self] in
             for attempt in 0..<5 {
                 if attempt > 0 { try? await Task.sleep(for: .milliseconds(12 << (attempt - 1))) }
                 guard let self else { return }
-                guard self.sameKhmerDeleteCaret(document: document, after: after) else {
-                    self.finishKhmerDeleteRecovery()
-                    return
-                }
+                guard self.sameKhmerDeleteCaret(caret) else { break }
                 if let confirmed = self.observedKhmerDelete(in: original, before: before, end: end) {
-                    self.finishKhmerDeleteRecovery(restoring: String(decoding: original.dropFirst(confirmed.end), as: UTF16.self))
+                    let removed = String(decoding: original.dropFirst(confirmed.end), as: UTF16.self)
+                    self.finishKhmerDeleteRecovery(restoring: removed, at: caret)
                     return
                 }
                 if attempt == 4, let live = self.target.documentContextBeforeInput,
                    live.utf16.elementsEqual(before.utf16) {
                     // The host still has the last confirmed spelling. Restore only the
                     // characters known to have been removed.
-                    self.finishKhmerDeleteRecovery(restoring: String(decoding: original.dropFirst(end), as: UTF16.self))
+                    let removed = String(decoding: original.dropFirst(end), as: UTF16.self)
+                    self.finishKhmerDeleteRecovery(restoring: removed, at: caret)
                     return
                 }
             }
-            // There is no confirmed boundary to restore. Send waiting literal input if
-            // the document, selection and text after the caret still match.
-            self?.finishKhmerDeleteRecovery(restoring: "")
+            self?.finishKhmerDeleteRecovery(at: caret)
         }
     }
 
-    private func finishKhmerDeleteRecovery(restoring restored: String? = nil) {
+    private func finishKhmerDeleteRecovery(restoring restored: String? = nil, at caret: KhmerDeleteCaret) {
         let input = khmerRecoveryInput
         khmerRecoveryInput = ""
         khmerDeleteRecovery = nil
         forgetTypingContext()
-        if let restored {
-            if !restored.isEmpty { target.insertText(restored) }
-            if !input.isEmpty {
-                insert(input, source: "key")
-                return
-            }
+        guard let restored, caret.document != nil, sameKhmerDeleteCaret(caret) else {
+            didEdit()
+            return
         }
-        didEdit()
+        if !restored.isEmpty { target.insertText(restored) }
+        // An insertion may trigger a synchronous focus or route change.
+        if !input.isEmpty, sameKhmerDeleteCaret(caret) {
+            insert(input, source: "key")
+        } else {
+            didEdit()
+        }
     }
 
     /// Types an emoji from the emoji panel: no spacing or autocorrect around it.
@@ -906,7 +928,7 @@ final class FullKeyboardEngine {
             deleteBackward()
         case .layerSwitch(let next):
             commitHangulComposition()
-            if next != layerState.layer { touch.returnLayer = layerState.layer }
+            if layout.language != .khmer || next != layerState.layer { touch.returnLayer = layerState.layer }
             layerState.switchTo(next)
             if next == .letters { shift.reset() }
             rebuildLayout(cause: "layer_key")
@@ -1227,7 +1249,7 @@ final class FullKeyboardEngine {
         }
         guard let touch = touches.removeValue(forKey: id) else { return }
         touchOrder.removeAll { $0 == id }
-        if touch.key.kind == .shift {
+        if layout.language == .khmer, touch.key.kind == .shift {
             shift.shiftUp()
             logState("cancel")
         }
@@ -1965,7 +1987,7 @@ final class FullKeyboardEngine {
         if !isKhmer {
             for _ in 0..<swiped.word.count { target.deleteBackward() }
         }
-        target.insertText(rendered)
+        target.insertText(isKhmer ? rendered : smartened(text))
         swiped.inserted = isKhmer ? text : String(swiped.inserted.dropLast(swiped.word.count)) + text
         swiped.alternatives = Array(([swiped.word] + swiped.alternatives.filter { $0 != text }).prefix(3))
         swiped.word = text

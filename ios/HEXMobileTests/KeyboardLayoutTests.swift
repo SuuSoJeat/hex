@@ -268,13 +268,13 @@ final class KeyboardLayoutTests: XCTestCase {
                 layouts.append(KeyboardLayout(width: 801, layer: layer, field: field, showsGlobe: true, showsEmoji: true, posture: .unfoldedWide, windowInset: 75))
             }
         }
-        for language in KeyboardLanguage.allCases where language != .khmer {
+        for language in KeyboardLanguage.allCases {
             layouts.append(KeyboardLayout(width: 801, language: language, posture: .unfoldedWide, windowInset: 75))
         }
         for layout in layouts {
             let split = layout.split!
             let area = layout.touchAreaFrame
-            for row in 0..<4 {
+            for row in 0..<layout.metrics.keyRowCount {
                 let keys = layout.keys.filter { $0.row == row }
                 let y = keys[0].hitFrame.midY
                 XCTAssertNil(layout.hitTest(CGPoint(x: split.middle, y: y)), "\(describe(layout)) row \(row) middle")
@@ -536,7 +536,7 @@ final class KeyboardLayoutTests: XCTestCase {
         XCTAssertEqual(layout.bottomRowIndex, 4)
         XCTAssertEqual(layout.keys.filter { $0.row == 3 }.first?.kind, .shift)
         XCTAssertEqual(layout.keys.filter { $0.row == 3 }.last?.kind, .delete)
-        XCTAssertEqual(layout.keys.filter { $0.row == 4 }.map(\.kind), [.layerSwitch(.numbers), .emoji, .space, .returnKey])
+        XCTAssertEqual(layout.keys.filter { $0.row == 4 }.map(\.kind), [.layerSwitch(.numbers), .globe, .emoji, .space, .returnKey])
 
         let numbers = makeLayout(.numbers)
         XCTAssertEqual(numbers.bottomRowIndex, 3)
@@ -550,6 +550,96 @@ final class KeyboardLayoutTests: XCTestCase {
         XCTAssertEqual(letters(symbols, row: 0), ["[", "]", "{", "}", "#", "%", "^", "*", "+", "="])
         XCTAssertEqual(letters(symbols, row: 1), ["-", "_", ":", ";", "<", ">", "$", "£", "€", "•"])
         XCTAssertEqual(letters(symbols, row: 2), [".", ",", "'", "?", "!"])
+    }
+
+    func testStandardKhmerKeepsTheSharedHexAndGlobePlacement() throws {
+        for placement in HexKeyPlacement.allCases {
+            let layout = KeyboardLayout(
+                width: 402, showsGlobe: true, language: .khmer, letters: .khmer, hexPlacement: placement
+            )
+            let globe = try XCTUnwrap(layout.key(.globe))
+            let hex = try XCTUnwrap(layout.key(.hex))
+            let space = try XCTUnwrap(layout.key(.space))
+            XCTAssertEqual(layout.hexPlacement, placement)
+            XCTAssertEqual(globe.row, layout.bottomRowIndex)
+            XCTAssertLessThan(globe.frame.midX, space.frame.midX)
+            if placement.isInStrip {
+                let english = KeyboardLayout(width: 402, hexPlacement: placement)
+                XCTAssertEqual(hex, english.key(.hex))
+                XCTAssertEqual(layout.stripFrame, english.stripFrame)
+            } else {
+                XCTAssertEqual(hex.row, layout.bottomRowIndex)
+                XCTAssertEqual(hex.frame.midX < space.frame.midX, placement == .leftOfSpace)
+            }
+        }
+
+        for layer in layers {
+            let pad = KeyboardLayout(
+                width: 744, layer: layer, showsGlobe: true, showsEmoji: true,
+                language: .khmer, letters: .khmer, pad: .docked(.mini), commaPeriodKeys: true
+            )
+            let footer = pad.keys.filter { $0.row == pad.bottomRowIndex }.map(\.kind)
+            let page: KeyKind = .layerSwitch(layer == .letters ? .numbers : .letters)
+            XCTAssertEqual(pad.hexPlacement, .leftOfSpace)
+            XCTAssertEqual(footer, [.globe, page, .hex, .space, .returnKey, .emoji, .dismiss])
+            XCTAssertFalse(pad.commaPeriodKeys)
+            XCTAssertEqual(pad.stripFrame, pad.stripBarFrame)
+        }
+    }
+
+    func testStandardKhmerFollowsTheDuoSplitPreferenceOnEveryPage() throws {
+        for layer in layers {
+            let split = KeyboardLayout(
+                width: 801, layer: layer, field: .email, showsGlobe: true, showsEmoji: true,
+                language: .khmer, letters: .khmer, posture: .unfoldedWide, windowInset: 75, numberRow: true
+            )
+            let joined = KeyboardLayout(
+                width: 801, layer: layer, field: .email, showsGlobe: true, showsEmoji: true,
+                language: .khmer, letters: .khmer, posture: .unfoldedWide, windowInset: 75, numberRow: true,
+                joinsUnfoldedKeyboard: true
+            )
+            let gap = try XCTUnwrap(split.split)
+            XCTAssertFalse(joined.isSplit)
+            XCTAssertEqual(split.totalHeight, joined.totalHeight, accuracy: 0.001)
+            XCTAssertEqual(split.bottomRowIndex, layer == .letters ? 4 : 3)
+            XCTAssertEqual(split.keys.filter { $0.kind == .space }.count, 2)
+            XCTAssertEqual(joined.keys.filter { $0.kind == .space }.count, 1)
+            XCTAssertEqual(split.key(.globe)?.row, split.bottomRowIndex)
+            XCTAssertEqual(joined.key(.globe)?.row, joined.bottomRowIndex)
+            XCTAssertEqual(split.keys.filter(\.isNumberRow).map(\.label), layer == .numbers ? [] : KeyboardLayout.numberRowDigits)
+            XCTAssertEqual(Array(split.keys.filter { $0.row == split.bottomRowIndex }.suffix(3).map(\.kind)),
+                           [.character("@"), .character("."), .returnKey])
+            for row in 0..<split.bottomRowIndex {
+                let expected = joined.keys.filter { $0.row == row && $0.character != nil }
+                let actual = split.keys.filter { $0.row == row && $0.character != nil }
+                let halves = SplitGeometry.halves(expected.map(\.label))
+                XCTAssertEqual(actual.map(\.label), halves.left + halves.right)
+                for key in actual {
+                    XCTAssertEqual(key.shifted, expected.first { $0.label == key.label }?.shifted)
+                    XCTAssertEqual(split.hitTest(CGPoint(x: key.frame.midX, y: key.frame.midY)), key)
+                }
+                XCTAssertNil(split.hitTest(CGPoint(x: gap.middle, y: actual[0].frame.midY)))
+            }
+        }
+    }
+
+    func testStandardKhmerAddsOptionalCommaAndPeriodBesideSpace() throws {
+        let phone = KeyboardLayout(width: 375, showsGlobe: true, showsEmoji: true, language: .khmer, letters: .khmer, commaPeriodKeys: true)
+        let split = KeyboardLayout(
+            width: 801, showsGlobe: true, showsEmoji: true, language: .khmer, letters: .khmer,
+            posture: .unfoldedWide, windowInset: 75, commaPeriodKeys: true
+        )
+        for layout in [phone, split] {
+            let comma = try XCTUnwrap(layout.key(.character(",")))
+            let period = try XCTUnwrap(layout.key(.character(".")))
+            let spaces = layout.keys.filter { $0.kind == .space }
+            let gap = layout.isSplit ? SplitGeometry.gap : layout.metrics.gap
+            XCTAssertEqual(comma.row, layout.bottomRowIndex)
+            XCTAssertEqual(period.row, layout.bottomRowIndex)
+            XCTAssertEqual(comma.frame.maxX + gap, spaces[0].frame.minX, accuracy: 0.001)
+            XCTAssertEqual(period.frame.minX, spaces[spaces.count - 1].frame.maxX + gap, accuracy: 0.001)
+            XCTAssertTrue(spaces.allSatisfy { $0.frame.width >= comma.frame.width })
+        }
     }
 
     func testKhmerismLaysOutEveryPageWithReachableControls() {
@@ -567,14 +657,14 @@ final class KeyboardLayoutTests: XCTestCase {
             for layer in layers {
                 let layout = KeyboardLayout(
                     width: width, orientation: orientation, layer: layer, showsGlobe: true, showsEmoji: true,
-                    language: .khmer, posture: posture, windowInset: windowInset, phoneSize: phoneSize, pad: pad
+                    language: .khmer, letters: .khmerism, posture: posture, windowInset: windowInset, phoneSize: phoneSize, pad: pad
                 )
                 let label = "\(width) \(layer)"
                 XCTAssertFalse(layout.isSplit, label)
                 XCTAssertFalse(layout.hasNumberRow, label)
                 XCTAssertEqual(layout.totalHeight, KeyboardLayout.height(
                     for: orientation, posture: posture, phoneSize: phoneSize, pad: pad, language: .khmer, innerWidth: width,
-                    layer: layer
+                    layer: layer, letters: .khmerism
                 ), accuracy: 0.001, label)
                 let footerRow = layer == .letters ? 4 : 3
                 XCTAssertEqual(layout.bottomRowIndex, footerRow, label)
@@ -621,7 +711,7 @@ final class KeyboardLayoutTests: XCTestCase {
     }
 
     func testKhmerismWebSearchKeepsKhmerPunctuationAndAddsAPeriod() {
-        let layout = KeyboardLayout(width: 402, layer: .numbers, field: .webSearch, language: .khmer)
+        let layout = KeyboardLayout(width: 402, layer: .numbers, field: .webSearch, language: .khmer, letters: .khmerism)
         let footer = layout.keys.filter { $0.row == layout.bottomRowIndex }.map(\.kind)
         XCTAssertTrue(footer.contains(.character(".")))
         XCTAssertTrue(footer.contains(.character("។")))
@@ -645,7 +735,7 @@ final class KeyboardLayoutTests: XCTestCase {
     }
 
     func testKhmerismMatchesTheDesignerAtProMaxWidth() {
-        let layout = KeyboardLayout(width: 440, showsGlobe: true, showsEmoji: true, language: .khmer, phoneSize: .large)
+        let layout = KeyboardLayout(width: 440, showsGlobe: true, showsEmoji: true, language: .khmer, letters: .khmerism, phoneSize: .large)
         let native = KeyboardMetrics.phonePortrait(.large)
         XCTAssertEqual(layout.metrics.keyHeight, native.keyHeight, accuracy: 0.001)
         XCTAssertEqual(layout.metrics.rowGap, native.rowGap, accuracy: 0.001)
@@ -662,10 +752,12 @@ final class KeyboardLayoutTests: XCTestCase {
     }
 
     func testKhmerismNumericCapsUseEnglishGeometry() {
-        let base = KeyboardLayout(width: 440, showsEmoji: true, language: .khmer, phoneSize: .large)
+        let base = KeyboardLayout(width: 440, showsEmoji: true, language: .khmer, letters: .khmerism, phoneSize: .large)
         let pitch = base.metrics.keyHeight + base.metrics.rowGap
         for layer in [KeyboardLayer.numbers, .symbols] {
-            let numeric = KeyboardLayout(width: 440, layer: layer, showsEmoji: true, language: .khmer, phoneSize: .large)
+            let numeric = KeyboardLayout(
+                width: 440, layer: layer, showsEmoji: true, language: .khmer, letters: .khmerism, phoneSize: .large
+            )
             let english = KeyboardLayout(width: 440, layer: layer, showsEmoji: true, phoneSize: .large)
             XCTAssertEqual(numeric.totalHeight, english.totalHeight, accuracy: 0.001)
             XCTAssertEqual(base.totalHeight - numeric.totalHeight, pitch, accuracy: 0.001)
@@ -683,14 +775,16 @@ final class KeyboardLayoutTests: XCTestCase {
                 assertSameRect(actual.hitFrame, expectedHit, actual.label)
             }
         }
-        let symbols = KeyboardLayout(width: 440, layer: .symbols, language: .khmer, phoneSize: .large)
+        let symbols = KeyboardLayout(width: 440, layer: .symbols, language: .khmer, letters: .khmerism, phoneSize: .large)
         XCTAssertEqual(symbols.keys.filter { $0.row == 3 }.compactMap(\.alternate), ["៙", "៚"])
     }
 
     func testKhmerismUsesTheSharedNumberRowOnEveryPage() throws {
         for layer in layers {
-            let enabled = KeyboardLayout(width: 440, layer: layer, language: .khmer, phoneSize: .large, numberRow: true)
-            let disabled = KeyboardLayout(width: 440, layer: layer, language: .khmer, phoneSize: .large)
+            let enabled = KeyboardLayout(
+                width: 440, layer: layer, language: .khmer, letters: .khmerism, phoneSize: .large, numberRow: true
+            )
+            let disabled = KeyboardLayout(width: 440, layer: layer, language: .khmer, letters: .khmerism, phoneSize: .large)
             let english = KeyboardLayout(width: 440, layer: layer, phoneSize: .large, numberRow: true)
             let pitch = english.metrics.numberRowPitch
             let digits = enabled.keys.filter(\.isNumberRow)
@@ -712,13 +806,15 @@ final class KeyboardLayoutTests: XCTestCase {
             }
         }
 
-        let pad = KeyboardLayout(width: 744, language: .khmer, pad: .docked(.mini), numberRow: true)
+        let pad = KeyboardLayout(width: 744, language: .khmer, letters: .khmerism, pad: .docked(.mini), numberRow: true)
         XCTAssertFalse(pad.hasNumberRow)
     }
 
     func testKhmerismKeepsTheEmojiHitTargetInsideItsCap() throws {
         for layer in layers {
-            let layout = KeyboardLayout(width: 440, layer: layer, showsEmoji: true, language: .khmer, phoneSize: .large)
+            let layout = KeyboardLayout(
+                width: 440, layer: layer, showsEmoji: true, language: .khmer, letters: .khmerism, phoneSize: .large
+            )
             let emoji = try XCTUnwrap(layout.key(.emoji))
             XCTAssertEqual(layout.hitTest(CGPoint(x: emoji.frame.midX, y: emoji.frame.midY))?.kind, .emoji)
             for point in [
@@ -747,7 +843,9 @@ final class KeyboardLayoutTests: XCTestCase {
     func testKhmerismLegendsFitWithSpaceBetweenMainAndCorner() throws {
         for (width, phoneSize) in [(420.0, KeyboardPhoneSize.large), (375, .homeButton), (320, .homeButton)] {
             for layer in layers {
-                let layout = KeyboardLayout(width: width, layer: layer, showsEmoji: true, language: .khmer, phoneSize: phoneSize)
+                let layout = KeyboardLayout(
+                    width: width, layer: layer, showsEmoji: true, language: .khmer, letters: .khmerism, phoneSize: phoneSize
+                )
                 for key in layout.keys where key.character != nil {
                     let labels = [(key.label, key.alternate), (key.shifted ?? key.label, key.shiftedAlternate)]
                     let safeFrame = key.frame.insetBy(dx: 2, dy: 2)
@@ -773,10 +871,11 @@ final class KeyboardLayoutTests: XCTestCase {
         let target = FixtureTextTarget()
         let view = FullKeyboardView(model: KeyboardViewModel(), target: target)
         view.languageOverride = .khmer
+        view.letterLayoutOverride = .khmerism
         let fiveRowHeight = view.preferredHeight
         view.frame = CGRect(x: 0, y: 0, width: 393, height: fiveRowHeight)
         view.layoutIfNeeded()
-        let fourRowHeight = KeyboardLayout.height(for: .portrait, language: .khmer, layer: .numbers)
+        let fourRowHeight = KeyboardLayout.height(for: .portrait, language: .khmer, layer: .numbers, letters: .khmerism)
         var requested: [CGFloat] = []
         view.onPreferredHeightChange = { [weak view] in
             guard let view else { return }
@@ -809,9 +908,9 @@ final class KeyboardLayoutTests: XCTestCase {
     }
 
     func testKhmerismFitsFiveRowsIntoAShorterView() {
-        let full = KeyboardLayout(width: 375, language: .khmer, phoneSize: .homeButton)
+        let full = KeyboardLayout(width: 375, language: .khmer, letters: .khmerism, phoneSize: .homeButton)
         let height = full.totalHeight - 30
-        let short = KeyboardLayout(width: 375, language: .khmer, phoneSize: .homeButton, availableHeight: height)
+        let short = KeyboardLayout(width: 375, language: .khmer, letters: .khmerism, phoneSize: .homeButton, availableHeight: height)
         XCTAssertEqual(short.totalHeight, height, accuracy: 0.001)
         XCTAssertEqual(full.stripFrame.height, KeyboardMetrics.appleBarHeight)
         XCTAssertEqual(short.stripFrame.height, KeyboardMetrics.stripBarHeight)
@@ -1098,7 +1197,7 @@ final class KeyboardLayoutTests: XCTestCase {
             .czech: [.own, .qwerty],
             .hungarian: [.own, .qwerty],
             .korean: [.own],
-            .khmer: [.khmerism, .khmer],
+            .khmer: [.khmer, .khmerism],
         ]
         for language in KeyboardLanguage.allCases {
             XCTAssertEqual(language.letterLayouts, offered[language], "\(language)")
@@ -1510,8 +1609,8 @@ final class KeyboardLayoutTests: XCTestCase {
                 XCTAssertEqual(on.keys, off.keys, "\(pad) \(orientation)")
             }
         }
-        let khmer = KeyboardLayout(width: 402, language: .khmer)
-        let khmerWithOption = KeyboardLayout(width: 402, language: .khmer, commaPeriodKeys: true)
+        let khmer = KeyboardLayout(width: 402, language: .khmer, letters: .khmerism)
+        let khmerWithOption = KeyboardLayout(width: 402, language: .khmer, letters: .khmerism, commaPeriodKeys: true)
         XCTAssertEqual(khmerWithOption, khmer)
 
         // Dvorak punctuation already puts comma and period on row 1, so they aren't added again

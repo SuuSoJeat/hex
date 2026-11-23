@@ -6,7 +6,7 @@ extension FullKeyboardEngineTests {
     func testKhmerSwipesJoinAndUndoStopsAtTheLastWordsBoundary() throws {
         let field = KhmerScalarDeletingTarget(text: "")
         field.laggingReadsAfterDeleting = 2
-        let (_, plane) = try swipeKeyboard(language: .khmer, target: field)
+        let (_, plane) = try swipeKeyboard(language: .khmer, target: field, letters: .khmerism)
         swipe("បាន", on: plane)
         swipe("ខ្ញុំ", on: plane)
         XCTAssertEqual(field.text, "បានខ្ញុំ")
@@ -19,7 +19,7 @@ extension FullKeyboardEngineTests {
     func testRegularKhmerSwipesJoinAndUndoAfterSwitchingLayouts() throws {
         let field = KhmerScalarDeletingTarget(text: "")
         field.laggingReadsAfterDeleting = 2
-        let (_, plane) = try swipeKeyboard(language: .khmer, target: field)
+        let (_, plane) = try swipeKeyboard(language: .khmer, target: field, letters: .khmerism)
         swipe("បាន", on: plane)
         plane.engine.letterLayout = .khmer
         swipe("ខ្ញុំ", on: plane)
@@ -30,7 +30,7 @@ extension FullKeyboardEngineTests {
 
     func testAmbiguousKhmerSwipeWaitsForPickAndCanReplaceIt() throws {
         let field = KhmerScalarDeletingTarget(text: "បាន")
-        let (_, plane) = try swipeKeyboard(language: .khmer, target: field)
+        let (_, plane) = try swipeKeyboard(language: .khmer, target: field, letters: .khmerism)
         swipe("ដៃ", on: plane)
         XCTAssertEqual(field.text, "បាន")
         let first = try XCTUnwrap(plane.engine.suggestions.first { $0.replacement == "ដៃ" })
@@ -44,7 +44,7 @@ extension FullKeyboardEngineTests {
     }
 
     func testAmbiguousKhmerSwipeDoesNotInsertAfterHostTextChanges() throws {
-        let (field, plane) = try swipeKeyboard("បាន", language: .khmer)
+        let (field, plane) = try swipeKeyboard("បាន", language: .khmer, letters: .khmerism)
         swipe("ដៃ", on: plane)
         let reading = try XCTUnwrap(plane.engine.suggestions.first { $0.replacement == "ដៃ" })
         field.insertText("ទៅ")
@@ -54,7 +54,7 @@ extension FullKeyboardEngineTests {
     }
 
     func testAmbiguousKhmerSwipeInsertsBestReadingWhenSuggestionsAreHidden() throws {
-        let (field, plane) = try swipeKeyboard(language: .khmer)
+        let (field, plane) = try swipeKeyboard(language: .khmer, letters: .khmerism)
         plane.engine.khmerSwipeOffersChoices = false
         swipe("ដៃ", on: plane)
         XCTAssertEqual(field.text, "ដ៏")
@@ -65,6 +65,7 @@ extension FullKeyboardEngineTests {
         let view = FullKeyboardView(model: KeyboardViewModel(), target: field)
         view.frame = CGRect(x: 0, y: 0, width: 390, height: 300)
         view.languageOverride = .khmer
+        view.letterLayoutOverride = .khmerism
         view.swipeOverride = true
         view.layoutIfNeeded()
         view.didInsertDictation("បាន")
@@ -80,6 +81,7 @@ extension FullKeyboardEngineTests {
         let view = FullKeyboardView(model: KeyboardViewModel(), target: field)
         view.frame = CGRect(x: 0, y: 0, width: 390, height: 300)
         view.languageOverride = .khmer
+        view.letterLayoutOverride = .khmerism
         view.swipeOverride = true
         view.layoutIfNeeded()
 
@@ -100,6 +102,7 @@ extension FullKeyboardEngineTests {
         let view = FullKeyboardView(model: model, target: field)
         view.frame = CGRect(x: 0, y: 0, width: 390, height: 300)
         view.languageOverride = .khmer
+        view.letterLayoutOverride = .khmerism
         view.swipeOverride = true
         view.layoutIfNeeded()
 
@@ -127,6 +130,7 @@ extension FullKeyboardEngineTests {
         let view = FullKeyboardView(model: KeyboardViewModel(), target: field)
         view.frame = CGRect(x: 0, y: 0, width: 390, height: 300)
         view.languageOverride = .khmer
+        view.letterLayoutOverride = .khmerism
         view.emojiOverride = true
         view.swipeOverride = true
         view.layoutIfNeeded()
@@ -151,7 +155,7 @@ extension FullKeyboardEngineTests {
     }
 
     func testSwitchingAwayFromKhmerClearsSwipeAlternatives() throws {
-        let (field, plane) = try swipeKeyboard("បាន", language: .khmer)
+        let (field, plane) = try swipeKeyboard("បាន", language: .khmer, letters: .khmerism)
         swipe("ដៃ", on: plane)
         let pick = try XCTUnwrap(plane.engine.suggestions.first { $0.replacement == "ដៃ" })
         plane.engine.acceptSuggestion(pick)
@@ -188,8 +192,18 @@ extension FullKeyboardEngineTests {
         XCTAssertEqual(field.text, "ខ្ញុំ")
     }
 
+    func testEnglishSwipeReplacementCurlsQuotesAgainstTheResultingContext() throws {
+        let (field, plane) = try swipeKeyboard("I'm")
+        field.smartQuotesType = .yes
+        plane.engine.autocorrect.loadLexiconEntries([("home", "\"at my house\"")])
+        swipe("home", on: plane)
+        let replacement = try XCTUnwrap(plane.engine.suggestions.first { $0.replacement == "\"at my house\"" })
+        plane.engine.acceptSuggestion(replacement)
+        XCTAssertEqual(field.text, "I'm “at my house”")
+    }
+
     func testKhmerSwipeLeavesTapsAndCornerHoldsAvailable() throws {
-        let (field, plane) = try swipeKeyboard(language: .khmer)
+        let (field, plane) = try swipeKeyboard(language: .khmer, letters: .khmerism)
         tap(.character("ប"), on: plane)
         let key = try XCTUnwrap(plane.engine.layout.key(.character("ិ")))
         let centre = CGPoint(x: key.frame.midX, y: key.frame.midY)
@@ -425,6 +439,15 @@ extension FullKeyboardEngineTests {
             swipe("test", on: plane)
             XCTAssertEqual(field.text, "This is a test", "\(lag)")
         }
+    }
+
+    func testEnglishSwipeContextSurvivesTheHostReportingItsDocumentIdentifier() throws {
+        let field = LaggingField()
+        let (_, plane) = try swipeKeyboard(target: field)
+        swipe("this", on: plane)
+        field.documentIdentifier = UUID()
+        plane.engine.textDidChange()
+        XCTAssertEqual(plane.engine.typingContext, "this")
     }
 
     /// A host that stays behind longer than the keys believe one (`typingContextLifetime`)

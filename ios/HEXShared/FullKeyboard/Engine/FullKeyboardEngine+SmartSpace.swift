@@ -27,7 +27,9 @@ extension FullKeyboardEngine {
     var textAfterSeparates: Bool {
         guard let first = target.documentContextAfterInput.map(SmartPunctuation.plain)?.first else { return false }
         if first.isWhitespace { return !first.isNewline }
-        guard Self.closingMarks.contains(first) || Self.khmerClosingMarks.contains(first) else { return false }
+        guard Self.closingMarks.contains(first) || (layout.language == .khmer && Self.khmerClosingMarks.contains(first)) else {
+            return false
+        }
         let french = [KeyboardLanguage.french, .frenchCanadian, .frenchSwiss].contains(layout.language)
         return !(french && Self.frenchSpacedMarks.contains(first))
     }
@@ -92,7 +94,8 @@ extension FullKeyboardEngine {
     /// but a mark in `swipeJoiners`); else a swiped word's (`spaceAfterSwipedWord`).
     func spaceBeforeNextWord(_ text: String) {
         guard spacePending, let first = text.first,
-              !Self.swipeJoiners.contains(first), !Self.khmerClosingMarks.contains(first) else {
+              !Self.swipeJoiners.contains(first),
+              layout.language != .khmer || !Self.khmerClosingMarks.contains(first) else {
             return spaceAfterSwipedWord(before: text)
         }
         suggestionSpaceBefore = nil

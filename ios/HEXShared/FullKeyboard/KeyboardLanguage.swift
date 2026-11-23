@@ -245,7 +245,7 @@ nonisolated enum KeyboardLanguage: String, CaseIterable, Sendable {
         // QWERTZ it always typed on as the default.
         case .serbianLatin: [.qwertz, .qwerty, .azerty]
         case .norwegian, .russian, .ukrainian, .greek, .korean: [.own]
-        case .khmer: [.khmerism, .khmer]
+        case .khmer: [.khmer, .khmerism]
         }
     }
 

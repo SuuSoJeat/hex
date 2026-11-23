@@ -1,6 +1,6 @@
 # LDNOOBW (CC BY 4.0), curated by Hex. Attribution and source revision: Settings › Acknowledgements (AcknowledgementsView.swift). Same entries as android/app/src/main/assets/typing/never-suggest.tsv.
 # layout<TAB>slur|swear<TAB>whole spelling (or an exact two-word expression).
-# * = shared loanword with the same restriction in every layout.
+# * = shared loanword with the same restriction in all four layouts.
 *	slur	faggot
 *	slur	faggots
 *	slur	nigga

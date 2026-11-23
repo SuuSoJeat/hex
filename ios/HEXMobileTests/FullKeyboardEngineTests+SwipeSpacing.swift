@@ -464,7 +464,7 @@ extension FullKeyboardEngineTests {
         view.swipeOverride = true
         for language in KeyboardLanguage.allCases {
             view.languageOverride = language
-            XCTAssertEqual(view.plane.swipe != nil, language == .khmer || FullKeyboardSettings().swipesIn(language), language.rawValue)
+            XCTAssertEqual(view.plane.swipe != nil, FullKeyboardSettings().swipesIn(language), language.rawValue)
             if let swipe = view.plane.swipe {
                 XCTAssertEqual(swipe.model.language, language.rawValue)
             }

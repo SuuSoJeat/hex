@@ -359,7 +359,8 @@ final class FullKeyboardView: UIView {
     private var keysHeight: CGFloat {
         KeyboardLayout.height(
             for: orientation, posture: engine.posture, phoneSize: engine.phoneSize, pad: engine.pad,
-            numberRow: engine.hasNumberRow, language: engine.layout.language, layer: engine.layout.layer
+            numberRow: engine.hasNumberRow, language: engine.layout.language, layer: engine.layout.layer,
+            letters: engine.layout.letters
         )
     }
 

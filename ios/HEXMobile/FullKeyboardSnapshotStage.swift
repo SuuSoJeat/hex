@@ -25,6 +25,11 @@ struct FullKeyboardSnapshotStage: View {
             )
     }
 
+    static var letters: KeyboardLetterLayout {
+        let requested = argument(after: "--keyboard-letters").flatMap(KeyboardLetterLayout.init(rawValue:))
+        return layout.offered(requested)
+    }
+
     static var accentKey: String {
         argument(after: "--accent-key") ?? "e"
     }
@@ -252,7 +257,7 @@ struct FullKeyboardSnapshotStage: View {
         let backdrop = FullKeyboardPalette(isDark: darkKeyboard).backdrop
         let metrics = KeyboardMetrics.for(
             .portrait, phoneSize: phoneSize, numberRow: FullKeyboardSettings().numberRow,
-            language: Self.layout, layer: layer
+            language: Self.layout, layer: layer, letters: Self.letters
         )
         let searchHeight = state == "emoji-search" ? metrics.stripHeight : 0
         // `--short-by 20` simulates a host that gives the keyboard less height, as in Spotlight.
@@ -359,8 +364,7 @@ private struct FullKeyboardFixture: UIViewRepresentable {
             view.hexPlacementOverride = HexKeyPlacement(rawValue: args[p + 1])
         }
         view.languageOverride = FullKeyboardSnapshotStage.layout
-        view.letterLayoutOverride = FullKeyboardSnapshotStage.argument(after: "--keyboard-letters")
-            .flatMap(KeyboardLetterLayout.init(rawValue:)) ?? FullKeyboardSnapshotStage.layout.defaultLetterLayout
+        view.letterLayoutOverride = FullKeyboardSnapshotStage.letters
         view.appearanceOverride = darkKeyboard
         view.orientationOverride = .portrait
         view.drawsBackdrop = true

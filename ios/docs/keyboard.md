@@ -621,12 +621,13 @@ name it (`letters`).
 ## Khmer keyboard layouts
 
 Choose **ភាសាខ្មែរ** under **Settings › Keyboard › Languages**. Its **Layout** menu
-offers **Khmerism** by default and **Khmer** for the iPhone's Khmer key arrangement.
+defaults to the iPhone-style **Khmer** layout and also offers **Khmerism**.
 
 **Khmer** follows the iPhone's main, Shift, 123 and #+= key order using Hex's
 keyboard theme. The first row includes Khmer digits. The 123 page has Arabic
 digits and Khmer symbols, and **ក** returns to letters. Coeng keeps the letter
-positions fixed.
+positions fixed. Khmer follows Hex's Globe and Hex key placement, the **Comma and
+period keys** experiment, and the Duo's **Join the keyboard when unfolded** setting.
 
 On **Khmerism**, tap a key for its main character and
 hold it for its corner character, shown in the pop-up when enabled. Tap Shift
@@ -643,7 +644,8 @@ combining marks clear on narrow keys.
 When the caret follows coeng (**្**), common subscript consonants move onto the
 main keys and the corner labels hide. Hold a changed key to type its usual
 character. Shift still selects the full shifted layer. The usual labels return
-when the caret moves past or away from coeng.
+when the caret moves past or away from coeng. Khmerism keeps its rows joined and
+places Hex and Globe in the strip to make room for its footer.
 
 Both layouts keep Hex's usual Search, URL and email shortcuts before Return.
 Space switches languages with the standard swipe and shows the active language
@@ -660,7 +662,9 @@ to restore it when iOS identifies the field. After a correction with punctuation
 Backspace reveals that option.
 Hold Backspace or swipe it left to delete a whole word at a known Khmer word
 boundary. When the boundary is uncertain or a word cannot be safely removed, the
-hold uses regular Backspace and the swipe leaves the text in place.
+hold uses regular Backspace and the swipe leaves the text in place. If iOS reports
+a delete late, Hex only restores it when the same identified field and input route
+still confirm the edit.
 
 **Settings › Keyboard › Khmer** appears when Khmer is configured. Both options
 work in either layout and are on by default. Turning off the main **Swipe typing**
@@ -668,7 +672,8 @@ switch also turns off Khmer swipe typing. Saved choices are kept.
 
 - **Smart Mode** adds shortcuts such as **ញ** + **ំ** → **ខ្ញុំ**, adapts the
   diacritic key (**៉** in Khmerism, **៊** in Khmer) after common consonants,
-  and orders marks within the syllable you just typed.
+  and orders marks within the syllable you just typed. These changes apply in
+  fields that accept word corrections. Address and credential fields keep literal keys.
 - **Khmer swipe typing** reads one word from the positions of its characters on your
   layout, including shifted glyphs, coeng and vowel signs. Trace the keys in
   typing order and lift to insert the word. Near-tied spellings wait for a tap in the suggestion
@@ -678,9 +683,9 @@ switch also turns off Khmer swipe typing. Saved choices are kept.
   swipes join without spaces, and Backspace takes back the last swiped word unless letter-by-letter deletion
   is enabled.
 
-Under **Settings › Experiments › Khmerism**, **No colors** uses the keyboard theme
-for every key, and **No superscripts** hides the small corner labels while keeping
-hold-to-type. Both are off by default.
+With the Khmerism layout selected, **Settings › Experiments › Khmerism** offers
+**No colors** to use the keyboard theme for every key and **No superscripts** to
+hide the small corner labels while keeping hold-to-type. Both are off by default.
 
 ## Keyboard layouts (each language's letters)
 

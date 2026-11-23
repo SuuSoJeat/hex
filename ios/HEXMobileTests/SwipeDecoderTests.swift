@@ -66,7 +66,7 @@ final class SwipeDecoderTests: XCTestCase {
     }
 
     func testKhmerSwipesKeepCoengAndCornerGlyphsInTypingOrder() throws {
-        let (decoder, keys) = try decoder(.khmer)
+        let (decoder, keys) = try decoder(.khmer, letters: .khmerism)
         XCTAssertEqual(keys.swipeAliases["ខ"], "ិ")
         XCTAssertNotNil(keys.centres["្"])
         XCTAssertNotNil(keys.centres["ំ"])
@@ -76,7 +76,7 @@ final class SwipeDecoderTests: XCTestCase {
     }
 
     func testKhmerNearTieAtTheSamePositionsOffersAChoice() throws {
-        let (decoder, keys) = try decoder(.khmer)
+        let (decoder, keys) = try decoder(.khmer, letters: .khmerism)
         XCTAssertEqual(SwipePath.through("ដៃ", keys: keys), SwipePath.through("ដ៏", keys: keys))
         let reading = decoder.read(SwipePath.through("ដៃ", keys: keys), keys: keys)
         XCTAssertEqual(Set(reading.candidates.prefix(2).map(\.text)), ["ដៃ", "ដ៏"])
@@ -85,7 +85,7 @@ final class SwipeDecoderTests: XCTestCase {
 
     func testRegularKhmerSwipesUseItsOwnBaseAndShiftedPositions() throws {
         let (decoder, keys) = try decoder(.khmer, letters: .khmer)
-        let (khmerism, khmerismKeys) = try self.decoder(.khmer)
+        let (khmerism, khmerismKeys) = try self.decoder(.khmer, letters: .khmerism)
         XCTAssertTrue(decoder.model === khmerism.model, "one bundled Khmer model")
         XCTAssertNotEqual(SwipePath.through("ខ្ញុំ", keys: keys), SwipePath.through("ខ្ញុំ", keys: khmerismKeys))
         XCTAssertLessThan(keys.pitch.width, khmerismKeys.pitch.width, "regular Khmer fits twelve columns")

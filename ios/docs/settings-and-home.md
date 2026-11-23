@@ -63,8 +63,8 @@ list starts at the top. The pages, one file each in `HEXMobile/Settings/`
   keyboard when unfolded (only on a foldable iPhone, `FullKeyboardView.isFoldable`);
   **Typing**: Adaptive touch (its status and Reset touch learning below the switch),
   Two-thumb selection, Delete swiped words letter by letter, Hide word suggestions, Emoji
-  shortcodes and Learn each language separately. **Khmerism** offers No colors and No
-  superscripts for the Khmerism layout. See [Khmer keyboard layouts](keyboard.md#khmer-keyboard-layouts)
+  shortcodes and Learn each language separately. With the Khmerism layout selected,
+  **Khmerism** offers No colors and No superscripts. See [Khmer keyboard layouts](keyboard.md#khmer-keyboard-layouts)
   for what each switch changes.
 
 Simulator scenes: `--snap-state settings-home` (ready), `setup` (keyboard

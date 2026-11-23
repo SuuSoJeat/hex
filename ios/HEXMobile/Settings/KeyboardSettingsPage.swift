@@ -122,14 +122,18 @@ struct KeyboardSettingsPage: View {
     private var swipeLanguages: String {
         _ = revision
         let settings = FullKeyboardSettings()
+        let includesGerman = settings.spatialAutocorrect && settings.germanSpatialAutocorrect
+        guard usesKhmer, settings.swipesIn(.khmer) else {
+            guard settings.swipeMoreLanguages else { return String(localized: "English and Spanish only") }
+            if includesGerman { return String(localized: "English, Spanish, French, Polish and German") }
+            return String(localized: "English, Spanish, French and Polish")
+        }
         var languages: [KeyboardLanguage] = [.english, .spanish]
         if settings.swipeMoreLanguages {
             languages += [.french, .polish]
-            if settings.spatialAutocorrect, settings.germanSpatialAutocorrect {
-                languages.append(.german)
-            }
+            if includesGerman { languages.append(.german) }
         }
-        if usesKhmer, settings.khmerismSwipeTyping { languages.append(.khmer) }
+        languages.append(.khmer)
         return ListFormatter.localizedString(byJoining: languages.map {
             Locale.current.localizedString(forLanguageCode: $0.rawValue) ?? $0.displayName
         })
