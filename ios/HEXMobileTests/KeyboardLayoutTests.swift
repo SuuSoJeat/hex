@@ -3791,12 +3791,15 @@ final class FullKeyboardSettingsTests: XCTestCase {
 
         XCTAssertFalse(settings.khmerismNoColors)
         XCTAssertFalse(settings.khmerismNoSuperscripts)
-        XCTAssertTrue(settings.khmerismSmartMode)
-        XCTAssertTrue(settings.khmerismSwipeTyping)
+        XCTAssertFalse(settings.khmerismSmartMode)
+        XCTAssertFalse(settings.khmerismSwipeTyping)
+        XCTAssertNil(settings.swipeTypingModel(for: .khmer))
+        XCTAssertNil(defaults.object(forKey: "experiments.khmerismSmartMode"), "Reading the default writes nothing")
+        XCTAssertNil(defaults.object(forKey: "experiments.khmerismSwipeTyping"), "Reading the default writes nothing")
         XCTAssertFalse(FullKeyboardSettings(defaults: nil).khmerismNoColors)
         XCTAssertFalse(FullKeyboardSettings(defaults: nil).khmerismNoSuperscripts)
-        XCTAssertTrue(FullKeyboardSettings(defaults: nil).khmerismSmartMode)
-        XCTAssertEqual(FullKeyboardSettings(defaults: nil).swipeTypingModel(for: .khmer)?.language, "km")
+        XCTAssertFalse(FullKeyboardSettings(defaults: nil).khmerismSmartMode)
+        XCTAssertNil(FullKeyboardSettings(defaults: nil).swipeTypingModel(for: .khmer))
 
         settings.khmerismNoColors = true
         XCTAssertTrue(FullKeyboardSettings(defaults: defaults).khmerismNoColors)
@@ -3807,7 +3810,12 @@ final class FullKeyboardSettingsTests: XCTestCase {
         XCTAssertTrue(FullKeyboardSettings(defaults: defaults).khmerismNoSuperscripts)
         XCTAssertFalse(FullKeyboardSettings(defaults: defaults).khmerismNoColors)
 
-        XCTAssertEqual(settings.swipeTypingModel(for: .khmer)?.language, "km")
+        settings.khmerismSmartMode = true
+        settings.khmerismSwipeTyping = true
+        XCTAssertEqual(defaults.object(forKey: "experiments.khmerismSmartMode") as? Bool, true)
+        XCTAssertEqual(defaults.object(forKey: "experiments.khmerismSwipeTyping") as? Bool, true)
+        XCTAssertTrue(FullKeyboardSettings(defaults: defaults).khmerismSmartMode)
+        XCTAssertEqual(FullKeyboardSettings(defaults: defaults).swipeTypingModel(for: .khmer)?.language, "km")
         settings.swipeTyping = false
         XCTAssertNil(settings.swipeTypingModel(for: .khmer), "The main switch disables Khmer swipe typing")
         XCTAssertNil(settings.swipeTypingModel(for: .english))

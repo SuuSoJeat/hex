@@ -136,6 +136,7 @@ final class FullKeyboardEngineTests: XCTestCase {
         letters: KeyboardLetterLayout? = nil
     ) throws -> (FixtureTextTarget, KeyboardKeyPlaneView) {
         let field = target ?? FixtureTextTarget(text: text)
+        if target == nil, language == .khmer { field.documentIdentifier = UUID() }
         field.autocapitalizationType = UITextAutocapitalizationType.none
         let keys = FullKeyboardEngine(
             target: field,
@@ -236,6 +237,7 @@ final class FullKeyboardEngineTests: XCTestCase {
     }
 
     private func useKhmerism() {
+        target.documentIdentifier = target.documentIdentifier ?? UUID()
         engine.language = .khmer
         engine.letterLayout = .khmerism
     }
@@ -260,6 +262,7 @@ final class FullKeyboardEngineTests: XCTestCase {
     func testStandardKhmerShiftAndSmartModeUseTheSameTypingRules() {
         for smartMode in [false, true] {
             smartField(language: .khmer)
+            target.documentIdentifier = UUID()
             engine.letterLayout = .khmer
             engine.khmerismSmartMode = smartMode
             tap(.shift)
@@ -547,6 +550,16 @@ final class FullKeyboardEngineTests: XCTestCase {
         XCTAssertFalse(engine.shift.isHeld)
         tap(key)
         XCTAssertEqual(target.text, "១ហ")
+    }
+
+    func testCancellingHeldEnglishShiftReleasesTheChord() {
+        let key = KeyKind.character("a")
+        down(10, .shift)
+        tap(key)
+        engine.touchCancelled(id: 10)
+        XCTAssertFalse(engine.shift.isHeld)
+        tap(key)
+        XCTAssertEqual(target.text, "Aa")
     }
 
     func testKhmerismCornerHoldTypesOnceAndPreservesUnicodeScalars() throws {
@@ -1011,7 +1024,7 @@ final class FullKeyboardEngineTests: XCTestCase {
         XCTAssertFalse(engine.suggestions.contains { $0.kind == .revert })
     }
 
-    func testKhmerDeleteRecoveryDoesNotWriteWithoutADocumentIdentifier() async {
+    func testKhmerAutocorrectPreservesTextWithoutADocumentIdentifier() async {
         let textTarget = KhmerScalarDeletingTarget(text: "ខ្ញុំចំនុច")
         textTarget.laggingReadsAfterDeleting = 6
         target = textTarget
@@ -1021,11 +1034,8 @@ final class FullKeyboardEngineTests: XCTestCase {
 
         tap(.space)
 
-        let immediateText = target.text
-        XCTAssertTrue(immediateText.hasSuffix(" "), "The literal space did not wait for a delayed edit")
+        XCTAssertEqual(target.text, "ខ្ញុំចំនុច ")
         XCTAssertNil(engine.khmerDeleteRecovery)
-        await engine.khmerDeleteRecovery?.value
-        XCTAssertEqual(target.text, immediateText, "An unidentified field must not receive a delayed edit")
     }
 
     func testKhmerDeleteRecoveryDoesNotWriteAfterTheFieldChanges() async throws {
@@ -1073,6 +1083,7 @@ final class FullKeyboardEngineTests: XCTestCase {
 
     func testKhmerWordDeletionUsesTheEstablishedJoinedBoundary() async {
         target = KhmerScalarDeletingTarget(text: "ខ្ញុំទៅសាលា។ ")
+        target.documentIdentifier = UUID()
         engine = FullKeyboardEngine(target: target, autocorrect: AutocorrectEngine(learnedWords: LearnedWordsStore(defaults: defaults)))
         engine.language = .khmer
         await engine.khmerAutocompleteLoad?.value
@@ -1090,8 +1101,63 @@ final class FullKeyboardEngineTests: XCTestCase {
         XCTAssertEqual(target.text, "ខ្ញុំទៅ")
     }
 
+    func testKhmerDeleteSwipeStopsAfterTheCaretMovesOrTheDocumentChanges() async {
+        for movesCaret in [true, false] {
+            let field = KhmerScalarDeletingTarget(text: "ខ្ញុំទៅសាលា")
+            field.documentIdentifier = UUID()
+            engine = FullKeyboardEngine(target: field)
+            engine.language = .khmer
+            await engine.khmerAutocompleteLoad?.value
+            let swipe = DeleteWordSwipe(engine: engine, touchID: 1, startX: 0)
+            let step = engine.layout.letterWidth
+            XCTAssertTrue(swipe.move(to: -step * 1.2))
+            XCTAssertEqual(field.text, "ខ្ញុំទៅ")
+
+            if movesCaret {
+                field.adjustTextPosition(byCharacterOffset: -1)
+            } else {
+                field.documentIdentifier = UUID()
+            }
+            XCTAssertTrue(swipe.move(to: 0))
+            XCTAssertTrue(swipe.move(to: -step * 3))
+            XCTAssertEqual(field.text, "ខ្ញុំទៅ")
+        }
+    }
+
+    func testKhmerDeleteSwipeRestoresWordsThroughBoundedOrLaggingContext() async {
+        for report in KhmerRestoreReportingTarget.Report.allCases {
+            let prefix = report == .codeUnits ? "abcdefghijk " : "សាលា"
+            let full = prefix + "ខ្ញុំទៅបាន"
+            let field = KhmerRestoreReportingTarget(text: full + "ក")
+            field.documentIdentifier = UUID()
+            engine = FullKeyboardEngine(target: field)
+            engine.language = .khmer
+            await engine.khmerAutocompleteLoad?.value
+            let plane = KeyboardKeyPlaneView(engine: engine)
+            let step = engine.layout.letterWidth
+            plane.began(id: 1, sample: deleteSample(engine))
+            XCTAssertEqual(field.text, full, "The initial Backspace press deletes one character")
+            plane.moved(id: 1, sample: deleteSample(engine, dx: -step * 3.2))
+            XCTAssertEqual(field.text, prefix)
+            field.reportAfterInsert = report
+
+            plane.moved(id: 1, sample: deleteSample(engine, dx: -step * 2.2))
+            XCTAssertEqual(field.text, prefix + "ខ្ញុំ")
+            if report == .oldPrefix || report == .unavailable {
+                plane.moved(id: 1, sample: deleteSample(engine))
+                XCTAssertEqual(field.text, prefix + "ខ្ញុំ", "An unconfirmed restore must not authorize another write")
+                field.reportAfterInsert = nil
+            } else {
+                plane.moved(id: 1, sample: deleteSample(engine))
+            }
+            plane.ended(id: 1, sample: deleteSample(engine))
+            XCTAssertEqual(field.text, full)
+        }
+    }
+
     func testKhmerWordSwipePreservesPrefixWhenTheHostHidesAnEmptyPrefix() async {
         let field = KhmerHiddenEmptyPrefixTarget(text: "សាលា។")
+        field.documentIdentifier = UUID()
         field.adjustTextPosition(byCharacterOffset: -1)
         engine = FullKeyboardEngine(target: field, autocorrect: AutocorrectEngine(learnedWords: LearnedWordsStore(defaults: defaults)))
         engine.language = .khmer
@@ -1106,6 +1172,7 @@ final class FullKeyboardEngineTests: XCTestCase {
 
     func testHeldKhmerBackspaceFallsBackToOneDeleteAtARejectedBoundary() async {
         let field = KhmerHiddenEmptyPrefixTarget(text: "សាលា។")
+        field.documentIdentifier = UUID()
         field.adjustTextPosition(byCharacterOffset: -1)
         engine = FullKeyboardEngine(target: field, autocorrect: AutocorrectEngine(learnedWords: LearnedWordsStore(defaults: defaults)))
         engine.language = .khmer
@@ -1119,6 +1186,7 @@ final class FullKeyboardEngineTests: XCTestCase {
 
     func testKhmerWordDeletionStopsAtTheLatinBoundary() async {
         target = KhmerScalarDeletingTarget(text: "សាលាabc")
+        target.documentIdentifier = UUID()
         engine = FullKeyboardEngine(target: target, autocorrect: AutocorrectEngine(learnedWords: LearnedWordsStore(defaults: defaults)))
         engine.language = .khmer
         await engine.khmerAutocompleteLoad?.value
@@ -1152,18 +1220,19 @@ final class FullKeyboardEngineTests: XCTestCase {
         XCTAssertEqual(target.text, "ចំនុច")
     }
 
-    func testKhmerCorrectionDoesNotOfferUndoWithoutADocumentIdentifier() async {
+    func testKhmerCorrectionDoesNotRewriteOrOfferUndoWithoutADocumentIdentifier() async {
         target.insertText("ចំនុច")
         engine.language = .khmer
         await engine.khmerAutocompleteLoad?.value
 
         tap(.space)
-        XCTAssertEqual(target.text, "ចំណុច")
+        XCTAssertEqual(target.text, "ចំនុច ")
         XCTAssertFalse(engine.suggestions.contains { $0.kind == .revert })
     }
 
     func testKhmerWordDeletionLeavesAnIncompleteRunToNormalBackspace() async {
         target = KhmerScalarDeletingTarget(text: "ខ្ញុំស្")
+        target.documentIdentifier = UUID()
         engine = FullKeyboardEngine(target: target, autocorrect: AutocorrectEngine(learnedWords: LearnedWordsStore(defaults: defaults)))
         engine.language = .khmer
         await engine.khmerAutocompleteLoad?.value
@@ -1179,6 +1248,7 @@ final class FullKeyboardEngineTests: XCTestCase {
 
     func testKhmerCorrectionRestoresExactTextWhenHostDeletesAcrossTheBoundary() async {
         target = KhmerOverDeletingTarget(text: "“ ចំនុច")
+        target.documentIdentifier = UUID()
         engine = FullKeyboardEngine(target: target, autocorrect: AutocorrectEngine(learnedWords: LearnedWordsStore(defaults: defaults)))
         engine.language = .khmer
         await engine.khmerAutocompleteLoad?.value
@@ -1222,6 +1292,7 @@ final class FullKeyboardEngineTests: XCTestCase {
 
     func testKhmerDictionarySpellingGuessRequiresATap() async throws {
         engine.language = .khmer
+        target.documentIdentifier = UUID()
         await engine.khmerAutocompleteLoad?.value
         target.insertText("សួស្ដី")
         engine.textDidChange()
@@ -1249,6 +1320,16 @@ final class FullKeyboardEngineTests: XCTestCase {
                 engine.khmerismSmartMode = true
                 engine.khmerSpatialSuggestions = enabled
                 await engine.khmerAutocompleteLoad?.value
+                let journalSettings = TypingJournalSettings(defaults: defaults)
+                journalSettings.isEnabled = true
+                let journal = TypingJournal(directory: nil, settings: journalSettings)
+                engine.journal = journal
+                if pick {
+                    target.insertText("មាប់")
+                    engine.textDidChange()
+                    for _ in "មាប់" { engine.deleteBackward() }
+                    XCTAssertEqual(target.text, "")
+                }
 
                 tap(.character("ម"))
                 tap(.character("ា"))
@@ -1263,6 +1344,8 @@ final class FullKeyboardEngineTests: XCTestCase {
                 if pick {
                     engine.acceptSuggestion(choice)
                     XCTAssertEqual(target.text, replacement)
+                    tap(.space)
+                    XCTAssertTrue(journal.current.corrections.isEmpty)
                 } else {
                     tap(.space)
                     XCTAssertEqual(target.text, "មាប់ ")
@@ -1328,6 +1411,7 @@ final class FullKeyboardEngineTests: XCTestCase {
 
     func testKhmerAutocorrectHonorsKeepAndTheAutocorrectSwitch() async throws {
         engine.language = .khmer
+        target.documentIdentifier = UUID()
         await engine.khmerAutocompleteLoad?.value
         engine.autocorrect.isEnabled = false
         target.insertText("ចំនុច")
@@ -1844,6 +1928,30 @@ final class KhmerScalarDeletingTarget: FixtureTextTarget {
         super.deleteBackward()
         super.insertText(String(String(cluster).unicodeScalars.dropLast()))
         pendingReports = (0..<laggingReadsAfterDeleting).map { $0.isMultiple(of: 2) ? previous : nil }
+    }
+}
+
+@MainActor
+private final class KhmerRestoreReportingTarget: FixtureTextTarget {
+    enum Report: CaseIterable { case characters, codeUnits, oldPrefix, unavailable }
+    var reportAfterInsert: Report?
+    private var echo: String?
+
+    override var documentContextBeforeInput: String? {
+        let before = super.documentContextBeforeInput
+        guard let echo, let before else { return before }
+        switch reportAfterInsert {
+        case .characters: return String(before.suffix(echo.count))
+        case .codeUnits: return String(decoding: before.utf16.suffix(echo.utf16.count), as: UTF16.self)
+        case .oldPrefix: return echo
+        case .unavailable: return nil
+        case nil: return before
+        }
+    }
+
+    override func insertText(_ text: String) {
+        echo = super.documentContextBeforeInput
+        super.insertText(text)
     }
 }
 

@@ -1,44 +1,5 @@
 import UIKit
 
-/// One slot in the 3-column suggestion strip above the keys.
-nonisolated struct KeyboardSuggestion: Equatable, Sendable {
-    enum Kind: Equatable, Sendable {
-        /// Left slot (`"typed"`): keeps the exact characters and teaches Hex not to rewrite them.
-        case keepLiteral
-        /// Center slot: best replacement or completion (`autoReplace` highlights when Space will apply it).
-        case primary(autoReplace: Bool)
-        /// Right slot: runner-up completion or spelling guess.
-        case secondary
-        /// A Khmer word whose remaining characters can be appended at the caret.
-        case khmerCompletion
-        /// The Khmer spelling as typed, and a replacement that may apply on a word boundary.
-        case khmerKeepLiteral
-        case khmerCorrection(autoReplace: Bool)
-        /// A word that can follow the one just finished. Only an explicit pick inserts it.
-        case nextWord
-        /// An emoji for the word just finished (Settings › Keyboard › Emoji), offered after a space,
-        /// when the strip has no words to show.
-        case emoji
-        /// Another reading of the word just swiped (Settings › Keyboard › Swipe typing): tapping it
-        /// puts it in that word's place.
-        case swiped
-        /// What you typed before autocorrect changed it, offered once the cursor is back at the
-        /// end of the corrected words (delete takes only their space): tapping it puts it back.
-        case revert
-    }
-
-    let displayText: String
-    let replacement: String
-    let kind: Kind
-
-    var willAutoReplace: Bool {
-        switch kind {
-        case .primary(let auto), .khmerCorrection(let auto): auto
-        default: false
-        }
-    }
-}
-
 /// Persists words the user explicitly kept twice, bounded to 2,000 words / 64 KB in the App Group.
 /// Delete what Hex learned removes them, and a keyboard that loaded them earlier drops its copy.
 @MainActor
@@ -305,26 +266,6 @@ final class AutocorrectEngine {
     /// `mayOffer` for a candidate in place of `token`, after the word before it.
     private func mayOffer(_ candidate: String, replacing token: String) -> Bool {
         mayOffer(candidate, after: Self.previousWord(beforeInput ?? "", token: token))
-    }
-
-    func khmerCompletions(using index: KhmerAutocomplete, beforeInput: String?) -> [KhmerAutocomplete.Candidate] {
-        index.suggestions(beforeInput: beforeInput, personalWords: lexiconTerms) { mayOffer($0) }
-    }
-
-    func khmerCorrection(
-        using index: KhmerAutocomplete, beforeInput: String?, substitutionGain: KhmerAutocomplete.SubstitutionGain? = nil
-    ) -> KhmerAutocomplete.Correction? {
-        guard isEnabled else { return nil }
-        return index.correction(
-            beforeInput: beforeInput, personalWords: lexiconTerms, learnedSpellings: learning.typos,
-            substitutionGain: substitutionGain,
-            canCorrect: { typed in
-                let key = typed.lowercased()
-                return !suppressedInSession.contains(key) && !learning.rejected.contains(key) && !learnedWords.contains(key)
-                    && !offensiveWords.blocks(typed, allowSwearing: allowsSwearing)
-            },
-            mayOffer: { mayOffer($0) }
-        )
     }
 
     func loadLexicon(_ lexicon: UILexicon) {

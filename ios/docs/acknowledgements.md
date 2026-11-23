@@ -45,6 +45,16 @@ The app shows these under Settings › Acknowledgements (`HEXMobile/Acknowledgem
   for LibreOffice by Santiago Bosio and contributors (Spain and Mexico), used under the
   [Mozilla Public License 1.1](https://www.mozilla.org/en-US/MPL/1.1/)
   (<https://github.com/sbosio/rla-es>).
+- **SIL/Keyman Khmer lexical model.** Khmer completions and spelling suggestions use the
+  unchanged word frequency list from SIL International's
+  [`sil.km.ggc` model](https://github.com/keymanapp/lexical-models/tree/e3918e6963c616db501ee7bb6b37d6051f3d59b1/release/sil/sil.km.ggc).
+  Hex also builds its Khmer swipe model from that list. Copyright © 2024 SIL International.
+  The keyboard includes the [MIT licence notice](../KhmerLexicon/km-autocomplete-license.txt).
+- **Khmerism keyboard layout.** Hex's Khmerism layout builds on the original
+  [Khmerism Keyboard Project by Lyheng Phuoy](https://solve.mit.edu/solutions/2452).
+  The five-row key map and its integration are documented in the
+  [layout design](https://github.com/SuuSoJeat/hex/pull/4) and
+  [final implementation](https://github.com/SuuSoJeat/hex/pull/6).
 
 Polish's three entries show while the keyboard bundles `pl.hextm`
 (`AcknowledgementsView.polishEntries`):
