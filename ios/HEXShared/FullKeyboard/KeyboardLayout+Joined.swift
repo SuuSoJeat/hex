@@ -1,6 +1,51 @@
 import CoreGraphics
 
 extension KeyboardLayout {
+    /// A letter key's width on a 10-key row. Shift, delete and the bottom row are sized
+    /// from it in every language, as Apple's are.
+    var letterWidth: CGFloat {
+        if isSplit { return SplitGeometry.keyWidth }
+        if let padLetterWidth { return padLetterWidth }
+        return Self.letterWidth(innerWidth: width - 2 * horizontalInset, metrics: metrics)
+    }
+
+    /// The width of this page's character keys: `letterWidth`, or narrower where a row
+    /// holds 11 keys (Norwegian letters).
+    var characterWidth: CGFloat {
+        if isSplit { return SplitGeometry.keyWidth }
+        if let padLetterWidth { return padLetterWidth }
+        if language == .khmer, layer == .letters {
+            let columns = letters == .khmerism ? 11 : 12
+            return Self.letterWidth(innerWidth: width - 2 * horizontalInset, metrics: metrics, columns: columns)
+        }
+        if hasDvorakPunctuationRow { return letterWidth }
+        if layer == .letters, letters == .dvorak {
+            return Self.dvorakLetterWidth(innerWidth: width - 2 * horizontalInset, metrics: metrics)
+        }
+        return Self.letterWidth(
+            innerWidth: width - 2 * horizontalInset,
+            metrics: metrics,
+            columns: Self.columns(Self.characterRows(for: layer, language: language, letters: letters))
+        )
+    }
+
+    static func letterWidth(innerWidth: CGFloat, metrics: KeyboardMetrics, columns: Int = 10) -> CGFloat {
+        (innerWidth - 2 * metrics.side - CGFloat(columns - 1) * metrics.gap) / CGFloat(columns)
+    }
+
+    /// Dvorak's letter keys: narrower than a 10-key row's, so shift and nine letters fill row 3
+    /// edge to edge, as on Apple's (iOS 27.0 simulator: a 38.3 pt pitch where QWERTY's is 39.5 pt
+    /// on a 402 pt iPhone).
+    static func dvorakLetterWidth(innerWidth: CGFloat, metrics: KeyboardMetrics) -> CGFloat {
+        let modifier = modifierWidth(letterWidth: letterWidth(innerWidth: innerWidth, metrics: metrics), gap: metrics.gap, metrics: metrics)
+        return (innerWidth - 2 * metrics.side - modifier) / 9 - metrics.gap
+    }
+
+    /// Keys across the widest of rows 1 and 2, never fewer than 10.
+    static func columns(_ rows: [[String]]) -> Int {
+        max(10, rows.prefix(2).map(\.count).max() ?? 10)
+    }
+
     /// Four rows of Khmer letters plus the layout's weighted footer on every page.
     static func addKhmerRows(
         width: CGFloat,
