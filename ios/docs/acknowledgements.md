@@ -68,6 +68,14 @@ The app shows these under Settings › Acknowledgements (`HEXMobile/Acknowledgem
   and lists the spelling references for additional chanting and Buddhist terms. The
   Wiktionary-derived lists are distributed under [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/).
   The keyboard gives these uncounted spellings lower completion priority than the SIL terms.
+- **Expanded Khmer dictionary.** Hex adds 60,883 spellings from the
+  [ICU Khmer break dictionary](https://github.com/unicode-org/icu/blob/release-78.3/icu4c/source/data/brkitr/dictionaries/khmerdict.txt),
+  1,269 spellings from [Google's Khmer pronunciation dictionary](https://github.com/google/language-resources/blob/a906010/km/data/lexicon.tsv),
+  and 332 English Wiktionary headwords from the [Kaikki Khmer extraction](https://kaikki.org/dictionary/Khmer/index.html).
+  The [bundled notice](../HEXKeyboard/TypingModel/km-expanded-license.txt) credits the
+  contributors and describes how Hex adapted each source. The expanded model uses the
+  same pinned Khmer Wikipedia snapshot as the smaller model. From the repository root,
+  rebuild it with `python3 ios/scripts/count-khmer-word-pairs.py path/to/snapshot.parquet --expanded-dictionary path/to/khmerdict.txt --output ios/HEXKeyboard/TypingModel/km-expanded.hextm`.
 - **Khmerism keyboard layout.** Hex's Khmerism layout builds on the original
   [Khmerism Keyboard Project by Lyheng Phuoy](https://solve.mit.edu/solutions/2452).
   See the [key maps](khmer-keyboards.md#key-maps) for the Hex adaptation.

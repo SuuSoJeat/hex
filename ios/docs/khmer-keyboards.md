@@ -100,7 +100,13 @@ options each default off. Hiding corner labels preserves hold-to-type.
   the local word-pair model. Typing the start of the next word narrows those
   choices. Tapping **សូម**, **អរគុណ**, then **ច្រើន** writes **សូមអរគុណច្រើន**.
   Predictions and completions work with Autocorrect off.
-- The word-pair model uses Khmer Wikipedia counts and preferred continuations
+- The first Khmer code point uses the smaller model's ranking on both layouts.
+  Next-word choices and completions from the second code point can use a
+  memory-mapped dictionary with 83,312 words and 404,360 word pairs. Khmer
+  vowels and marks count as code points even when they share a displayed cluster.
+  For example, choose **ខ្ញុំ**, type **បា**, then choose **បានឃើញ** to write
+  **ខ្ញុំបានឃើញ** without a space.
+  The models use Khmer Wikipedia counts and preferred continuations
   for common conversational phrases. The vocabulary includes Khmer-script Pali
   and Sanskrit. The added spellings complete from a prefix and count as valid
   words. Only terms with measured Khmer dictionary frequencies are eligible
@@ -122,9 +128,9 @@ options each default off. Hiding corner labels preserves hold-to-type.
   that must remove text require an identified field. Moving to another
   field or into emoji search must discard pending edits to the old target.
 
-The prototype uses the SIL/Keyman Khmer word-frequency list for completions,
-spelling candidates and swipe vocabulary. It retains the MIT notice for the
-list. [SIL lexical model](https://github.com/keymanapp/lexical-models/tree/e3918e6963c616db501ee7bb6b37d6051f3d59b1/release/sil/sil.km.ggc)
+The keyboard uses the SIL/Keyman Khmer word-frequency list for common completions,
+spelling candidates and swipe vocabulary. Rarer entries from ICU, Google, and
+Wiktionary extend typing suggestions. [Data sources and notices](acknowledgements.md)
 
 ## Smart typing and swipe typing
 
