@@ -1,8 +1,8 @@
 import CoreGraphics
 
 extension KeyboardLayout {
-    /// Five letter rows and four rows on the English numeric pages with Khmerism's footer.
-    static func buildKhmerismKeys(
+    /// The Khmer layouts use their own letter pages and share the same strip and touch geometry.
+    static func buildKhmerKeys(
         width: CGFloat,
         metrics: KeyboardMetrics,
         layer: KeyboardLayer,
@@ -10,7 +10,8 @@ extension KeyboardLayout {
         inset: CGFloat,
         showsGlobe: Bool,
         showsEmoji: Bool,
-        hexPlacement: HexKeyPlacement
+        hexPlacement: HexKeyPlacement,
+        letters: KeyboardLetterLayout
     ) -> [KeyboardKey] {
         typealias Entry = (kind: KeyKind, label: String, weight: CGFloat, character: KhmerismLayout.Key?)
         typealias Cap = (entry: Entry, x: CGFloat, width: CGFloat)
@@ -24,6 +25,7 @@ extension KeyboardLayout {
         let touchTop = metrics.stripArea - max(metrics.stripBottom, stripTouchBand)
         let firstY = metrics.stripArea + metrics.keysTop
         let numberRow = drawsNumberRow(metrics, layer: layer)
+        let isKhmerism = letters == .khmerism
         var keys: [KeyboardKey] = []
 
         func character(_ key: KhmerismLayout.Key) -> Entry {
@@ -82,7 +84,8 @@ extension KeyboardLayout {
 
         let delete: Entry = (.delete, "delete", 100, nil)
         if layer == .letters {
-            for (row, characters) in KhmerismLayout.base.dropLast().enumerated() {
+            let rows = isKhmerism ? Array(KhmerismLayout.base.dropLast()) : KhmerLayout.letters
+            for (row, characters) in rows.enumerated() {
                 var entries = characters.map(character)
                 if row == footerRow - 1 {
                     entries.insert((.shift, "shift", 100, nil), at: 0)
@@ -91,7 +94,7 @@ extension KeyboardLayout {
                 addRow(weightedCaps(entries), row: row)
             }
         } else {
-            let rows = characterRows(for: layer)
+            let rows = characterRows(for: layer, language: .khmer, letters: letters)
             for (index, letters) in rows.dropLast().enumerated() {
                 addRow(weightedCaps(letters.map { character(.init(text: $0)) }), row: index)
             }
@@ -110,14 +113,15 @@ extension KeyboardLayout {
             addRow(caps, row: footerRow - 1)
         }
 
-        let footerCharacters = switch layer {
+        let khmerismFooter = switch layer {
         case .letters: KhmerismLayout.base.last ?? []
         case .numbers: KhmerismLayout.numbersFooter
         case .symbols: KhmerismLayout.symbolsFooter
         }
+        let footerCharacters = isKhmerism ? khmerismFooter : []
         var footer: [Entry] = [layer == .letters
             ? (.layerSwitch(.numbers), "123", 151, nil)
-            : (.layerSwitch(.letters), "កខគ", 151, nil)]
+            : (.layerSwitch(.letters), isKhmerism ? "កខគ" : "ក", 151, nil)]
         if showsEmoji { footer.append((.emoji, "emoji", 114, nil)) }
         footer.append((.space, "ខ្មែរ", 507, nil))
         for (index, key) in footerCharacters.enumerated() {
@@ -125,11 +129,13 @@ extension KeyboardLayout {
             if index == 0 { entry.weight = 101 }
             footer.append(entry)
         }
-        switch field {
-        case .text: break
-        case .webSearch: footer.append(character(.init(text: ".")))
-        case .url: footer.append(contentsOf: [character(.init(text: ".")), character(.init(text: "/"))])
-        case .email: footer.append(contentsOf: [character(.init(text: "@")), character(.init(text: "."))])
+        if isKhmerism {
+            switch field {
+            case .text: break
+            case .webSearch: footer.append(character(.init(text: ".")))
+            case .url: footer.append(contentsOf: [character(.init(text: ".")), character(.init(text: "/"))])
+            case .email: footer.append(contentsOf: [character(.init(text: "@")), character(.init(text: "."))])
+            }
         }
         footer.append((.returnKey, "↵", 221, nil))
         if metrics.pad?.isDocked == true { footer.append((.dismiss, "dismiss", 100, nil)) }

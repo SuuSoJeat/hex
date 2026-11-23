@@ -373,7 +373,7 @@ final class FullKeyboardEngine {
     }
 
     func refreshAutoCapitalization() {
-        // Khmerism uses Shift for alternate characters, without automatic capitalization.
+        // Khmer uses Shift for alternate characters, without automatic capitalization.
         guard layout.language != .khmer else { return }
         let before = shift
         shift.refreshAutoCapitalization(
@@ -1291,7 +1291,9 @@ final class FullKeyboardEngine {
     private func commitCharacter(_ key: KeyboardKey, at point: CGPoint, down: CGPoint? = nil) {
         guard let character = key.character else { return }
         if layout.language == .khmer {
-            insertKhmerKeyText(displayLabel(for: key), source: "key", at: point, directTap: !isUppercase)
+            // The standard layout puts some Smart Mode inputs, such as ញ and ំ, on Shift.
+            let directTap = !isUppercase || layout.letters == .khmer
+            insertKhmerKeyText(displayLabel(for: key), source: "key", at: point, directTap: directTap)
             return
         }
         if typeHangul(character) {

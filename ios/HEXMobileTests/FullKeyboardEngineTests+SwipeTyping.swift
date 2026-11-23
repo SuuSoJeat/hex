@@ -16,6 +16,18 @@ extension FullKeyboardEngineTests {
         XCTAssertEqual(field.text, "បាន ")
     }
 
+    func testRegularKhmerSwipesJoinAndUndoAfterSwitchingLayouts() throws {
+        let field = KhmerScalarDeletingTarget(text: "")
+        field.lagsAfterDeleting = true
+        let (_, plane) = try swipeKeyboard(language: .khmer, target: field)
+        swipe("បាន", on: plane)
+        plane.engine.letterLayout = .khmer
+        swipe("ខ្ញុំ", on: plane)
+        XCTAssertEqual(field.text, "បានខ្ញុំ")
+        plane.engine.deleteBackward()
+        XCTAssertEqual(field.text, "បាន")
+    }
+
     func testAmbiguousKhmerSwipeWaitsForPickAndCanReplaceIt() throws {
         let field = KhmerScalarDeletingTarget(text: "បាន")
         let (_, plane) = try swipeKeyboard(language: .khmer, target: field)

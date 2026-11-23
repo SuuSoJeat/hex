@@ -25,7 +25,7 @@ import Foundation
 /// on a e i o u (á é í ó ö ő ú ü ű) and the iPhone's hu dictionary behind its autocorrect.
 /// Korean is the standard two-set (Dubeolsik, 두벌식) layout, whose syllables `HangulComposer`
 /// composes as the jamo are typed; it is offered only while Settings › Experiments › Korean
-/// keyboard is on. Khmer uses the five-row Khmerism layout.
+/// keyboard is on. Khmer offers Khmerism and the standard Khmer arrangement.
 nonisolated enum KeyboardLanguage: String, CaseIterable, Sendable {
     case english = "en"
     case norwegian = "nb"
@@ -211,6 +211,8 @@ nonisolated enum KeyboardLanguage: String, CaseIterable, Sendable {
         case .khmerism:
             // Generic consumers index three rows. The dedicated key plane uses all five.
             return KhmerismLayout.base.prefix(3).map { $0.map(\.text) }
+        case .khmer:
+            return KhmerLayout.letters.dropFirst().map { $0.map(\.text) }
         }
         return rows.map { $0.map(String.init) }
     }
@@ -243,7 +245,7 @@ nonisolated enum KeyboardLanguage: String, CaseIterable, Sendable {
         // QWERTZ it always typed on as the default.
         case .serbianLatin: [.qwertz, .qwerty, .azerty]
         case .norwegian, .russian, .ukrainian, .greek, .korean: [.own]
-        case .khmer: [.khmerism]
+        case .khmer: [.khmerism, .khmer]
         }
     }
 
@@ -266,6 +268,7 @@ nonisolated enum KeyboardLanguage: String, CaseIterable, Sendable {
         case .azerty: "AZERTY"
         case .dvorak: "Dvorak"
         case .khmerism: "Khmerism"
+        case .khmer: "Khmer"
         case .own:
             switch self {
             case .german, .czech, .hungarian: "QWERTZ – \(displayName)"
@@ -906,6 +909,8 @@ nonisolated enum KeyboardLetterLayout: String, CaseIterable, Sendable {
     case dvorak
     /// The five-row Khmer layout, with its own shift, number and symbol pages.
     case khmerism
+    /// The standard Khmer arrangement used by the iPhone keyboard.
+    case khmer
 }
 
 /// Settings › Keyboard › Languages as the keys use it: the languages the space bar switches

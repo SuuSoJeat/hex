@@ -250,6 +250,40 @@ final class FullKeyboardEngineTests: XCTestCase {
         XCTAssertEqual(target.text, "១ ហ")
     }
 
+    func testStandardKhmerShiftAndSmartModeUseTheSameTypingRules() {
+        for smartMode in [false, true] {
+            smartField(language: .khmer)
+            engine.letterLayout = .khmer
+            engine.khmerismSmartMode = smartMode
+            tap(.shift)
+            tap(.character("្")) // ញ
+            now += 0.5
+            tap(.shift)
+            tap(.character("ម")) // ំ
+            XCTAssertEqual(target.text, smartMode ? "ខ្ញុំ" : "ញំ")
+            XCTAssertEqual(engine.shift.state, .off)
+        }
+    }
+
+    func testStandardKhmerKeepsKeysInPlaceAfterCoengAndAdaptsItsDiacriticWithSmartMode() throws {
+        engine.language = .khmer
+        engine.letterLayout = .khmer
+        let vowel = try XCTUnwrap(engine.layout.key(.character("ោ")))
+        let sign = try XCTUnwrap(engine.layout.key(.character("៊")))
+        tap(.character("ស"))
+        tap(.character("្"))
+        XCTAssertTrue(engine.isAfterKhmerCoeng)
+        XCTAssertEqual(engine.displayLabel(for: vowel), "ោ")
+        tap(.character("ថ"))
+        XCTAssertEqual(target.text, "ស្ថ")
+
+        engine.khmerismSmartMode = true
+        tap(.character("ក"))
+        XCTAssertEqual(engine.displayLabel(for: sign), "៏")
+        tap(sign.kind)
+        XCTAssertEqual(target.text, "ស្ថក៏")
+    }
+
     func testKhmerismSmartModeExpandsIInJoinedText() {
         engine.language = .khmer
         engine.khmerismSmartMode = true
