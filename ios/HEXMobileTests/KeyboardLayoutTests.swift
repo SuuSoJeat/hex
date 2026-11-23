@@ -3598,7 +3598,7 @@ final class FullKeyboardSettingsTests: XCTestCase {
         XCTAssertEqual(defaults.object(forKey: "experiments.hideWordSuggestions") as? Bool, true)
     }
 
-    func testKhmerismExperimentsDefaultOffAndPersistIndependently() throws {
+    func testKhmerismSettingsDefaultOffAndPersistIndependently() throws {
         let suite = "FullKeyboardSettingsTests-\(UUID().uuidString)"
         let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
         defer { defaults.removePersistentDomain(forName: suite) }
@@ -3624,6 +3624,7 @@ final class FullKeyboardSettingsTests: XCTestCase {
 
         XCTAssertNil(settings.swipeTypingModel(for: .khmer), "the Latin swipe setting does not enable Khmerism")
         settings.khmerismSwipeTyping = true
+        XCTAssertEqual(defaults.object(forKey: "experiments.khmerismSwipeTyping") as? Bool, true)
         settings.swipeTyping = false
         XCTAssertFalse(settings.khmerismSmartMode)
         XCTAssertEqual(FullKeyboardSettings(defaults: defaults).swipeTypingModel(for: .khmer)?.language, "km")

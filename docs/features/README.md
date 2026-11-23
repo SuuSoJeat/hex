@@ -2962,8 +2962,8 @@ iOS prototype (`HEXMobile`) -> Record/transcribe/copy and keyboard handoff
 │   immediately. After a correction with punctuation, Backspace reveals that option.
 │   Checks:
 │   `KhmerAutocompleteTests`, `FullKeyboardEngineTests`.
-│   Settings › Experiments › Khmerism (off by default, App Group, `FullKeyboardSettingsTests`)
-│   ├── Smart Mode (`experiments.khmerismSmartMode`)
+│   Settings › Keyboard › Khmerism, with Full chosen (off by default, App Group)
+│   ├── Smart Mode
 │   │   ├── Tap ញ then ំ → ខ្ញុំ, including next to another word. Subscript ញ and
 │   │   │   text already in the field keep their literal spelling.
 │   │   ├── After a newly typed consonant, the ៉ key offers the matching sign for
@@ -2973,16 +2973,17 @@ iOS prototype (`HEXMobile`) -> Record/transcribe/copy and keyboard handoff
 │   │       and replaces a conflicting shifter. A late vowel moves before trailing
 │   │       signs when the syllable has no vowel yet. Rewrites that delete text
 │   │       require the field to confirm the syllable. Checks: `FullKeyboardEngineTests`.
-│   ├── No colors (`experiments.khmerismNoColors`) → every cap uses the keyboard theme
-│   ├── No superscripts (`experiments.khmerismNoSuperscripts`) → hide corner labels,
-│   │   center the main glyph, and keep hold-to-type and its pop-up
-│   └── Swipe typing (`experiments.khmerismSwipeTyping`) → trace one word using the positions
+│   └── Swipe typing → trace one word using the positions
 │       of its main and corner glyphs, including coeng and vowel signs. Lift to insert
 │       without an automatic space. Near-tied words on the same path wait for a strip pick
 │       when suggestions are visible. Backspace and replacement respect the last swipe's
 │       boundary. VoiceOver and a caret immediately after coeng keep regular key input.
 │       Checks: `SwipeDecoderTests`, `FullKeyboardEngineTests`, `FullKeyboardSettingsTests`.
 │       These cover synthetic paths and proxy fixtures. Real Khmer swipe accuracy is unmeasured.
+│   Settings › Experiments › Khmerism (off by default, App Group, `FullKeyboardSettingsTests`)
+│   ├── No colors → every cap uses the keyboard theme
+│   └── No superscripts → hide corner labels, center the main glyph, and keep hold-to-type
+│       and its pop-up
 ├── Korean keyboard (두벌식) (off by default, `experiments.koreanKeyboard`): Settings ›
 │   Experiments adds 한국어 to Settings › Keyboard › Languages, typed on the standard two-set
 │   rows (ㅂㅈㄷㄱㅅㅛㅕㅑㅐㅔ / ㅁㄴㅇㄹㅎㅗㅓㅏㅣ / ㅋㅌㅊㅍㅠㅜㅡ, shift's ㅃㅉㄸㄲㅆ and ㅒㅖ, no

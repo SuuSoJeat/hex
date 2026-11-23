@@ -4,7 +4,7 @@ import UIKit
 /// Settings › Keyboard › Swipe typing: slide from a letter through the letters of a word and lift,
 /// and the word goes in, as with Apple's QuickPath and Gboard's glide typing. English and
 /// Spanish layouts. French (France), Polish, and German use Swipe typing in more languages.
-/// Khmerism has its own experiment.
+/// Khmerism has its own swipe typing setting.
 ///
 /// A touch on a letter key becomes a swipe once it travels more than a key's pitch from
 /// where it went down: the key no longer types, a light trail follows the finger, and the

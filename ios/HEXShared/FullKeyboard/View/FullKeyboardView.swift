@@ -635,7 +635,7 @@ final class FullKeyboardView: UIView {
     /// Fixtures and tests turn Swipe typing on or off; otherwise its switch in Settings › Keyboard.
     var swipeOverride: Bool? { didSet { syncSwipeTyping() } }
 
-    /// Each supported layout uses its own bundled model. Khmerism has a separate experiment.
+    /// Each supported layout uses its own bundled model. Khmerism has its own swipe setting.
     /// Off under VoiceOver, which has its own way to type.
     private func syncSwipeTyping() {
         engine.khmerSwipeOffersChoices = !hidesWordSuggestions

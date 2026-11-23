@@ -355,14 +355,6 @@ struct ExperimentsSettingsPage: View {
 
         SettingsCard {
             SettingsToggleRow(
-                title: String(localized: "Smart Mode"),
-                detail: String(localized: "Use shortcuts like ញ + ំ → ខ្ញុំ, double-tap vowels, and arrange marks as you type."),
-                isOn: keyboardBinding(\.khmerismSmartMode)
-            )
-
-            SettingsDivider()
-
-            SettingsToggleRow(
                 title: String(localized: "No colors"),
                 detail: String(localized: "Use the keyboard theme for all Khmerism keys"),
                 isOn: keyboardBinding(\.khmerismNoColors)
@@ -374,14 +366,6 @@ struct ExperimentsSettingsPage: View {
                 title: String(localized: "No superscripts"),
                 detail: String(localized: "Hide the corner labels. Holding a key still types its alternate."),
                 isOn: keyboardBinding(\.khmerismNoSuperscripts)
-            )
-
-            SettingsDivider()
-
-            SettingsToggleRow(
-                title: String(localized: "Swipe typing"),
-                detail: String(localized: "Trace a Khmer word across its main or corner glyphs, then lift to type it."),
-                isOn: keyboardBinding(\.khmerismSwipeTyping)
             )
         }
     }
