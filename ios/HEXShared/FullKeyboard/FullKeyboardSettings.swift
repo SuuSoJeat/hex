@@ -82,6 +82,7 @@ struct FullKeyboardSettings {
         static let koreanKeyboard = KoreanKeyboardExperiment.key
         static let khmerismNoColors = "experiments.khmerismNoColors"
         static let khmerismNoSuperscripts = "experiments.khmerismNoSuperscripts"
+        static let khmerismSmartMode = "experiments.khmerismSmartMode"
         static let khmerismSwipeTyping = "experiments.khmerismSwipeTyping"
         static let keyPopups = "settings.keyboardKeyPopups"
         static let haptics = "settings.keyboardHaptics"
@@ -179,6 +180,12 @@ struct FullKeyboardSettings {
     var khmerismNoSuperscripts: Bool {
         get { defaults?.object(forKey: Key.khmerismNoSuperscripts) as? Bool ?? false }
         nonmutating set { defaults?.set(newValue, forKey: Key.khmerismNoSuperscripts) }
+    }
+
+    /// Settings › Experiments › Khmerism › Smart Mode. Off by default.
+    var khmerismSmartMode: Bool {
+        get { defaults?.bool(forKey: Key.khmerismSmartMode) ?? false }
+        nonmutating set { defaults?.set(newValue, forKey: Key.khmerismSmartMode) }
     }
 
     /// Settings › Experiments › Khmerism › Swipe typing. Off by default.

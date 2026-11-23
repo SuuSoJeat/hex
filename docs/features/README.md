@@ -2941,8 +2941,8 @@ iOS prototype (`HEXMobile`) -> Record/transcribe/copy and keyboard handoff
 │   the regular language swipe. The emoji key opens Hex's picker.
 │   123 and #+= fit four English rows and keep two Khmer punctuation keys beside Space.
 │   On #+=, hold ។ or ៖ for ៙ or ៚. Space, Return or កខគ returns to letters.
-│   The optional Number Row follows the shared setting. Khmer marks insert
-│   as entered, and the host handles backspace. With the caret just after coeng (្),
+│   The optional Number Row follows the shared setting. With Smart Mode off, Khmer
+│   marks insert as entered. The host handles backspace. With the caret just after coeng (្),
 │   the letter page brings common subscript consonants onto the main keys and hides
 │   the corner labels. Holds still work, and Shift still selects the full shifted
 │   layer. The usual labels return when the caret moves past or away from coeng. The five-row
@@ -2963,6 +2963,16 @@ iOS prototype (`HEXMobile`) -> Record/transcribe/copy and keyboard handoff
 │   Checks:
 │   `KhmerAutocompleteTests`, `FullKeyboardEngineTests`.
 │   Settings › Experiments › Khmerism (off by default, App Group, `FullKeyboardSettingsTests`)
+│   ├── Smart Mode (`experiments.khmerismSmartMode`)
+│   │   ├── Tap ញ then ំ → ខ្ញុំ, including next to another word. Subscript ញ and
+│   │   │   text already in the field keep their literal spelling.
+│   │   ├── After a newly typed consonant, the ៉ key offers the matching sign for
+│   │   │   ក៏, ដ៏, ន៍, ស៊, ហ៊, អ៊, or ប៉. Shift and hold give access to fixed signs.
+│   │   ├── Double-tap ា, េ, or ោ within 350 ms → ាំ, េះ, or ោះ.
+│   │   └── In the syllable just typed, a register shifter moves next to the base
+│   │       and replaces a conflicting shifter. A late vowel moves before trailing
+│   │       signs when the syllable has no vowel yet. Rewrites that delete text
+│   │       require the field to confirm the syllable. Checks: `FullKeyboardEngineTests`.
 │   ├── No colors (`experiments.khmerismNoColors`) → every cap uses the keyboard theme
 │   ├── No superscripts (`experiments.khmerismNoSuperscripts`) → hide corner labels,
 │   │   center the main glyph, and keep hold-to-type and its pop-up
