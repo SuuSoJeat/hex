@@ -17,7 +17,8 @@ Both join the vocabulary before pairs are counted, so their pairs are counted to
 Khmer takes word counts from the bundled SIL/Keyman list, additional Khmer-script
 Buddhist terms from km-buddhist.txt alongside that list, and pair counts from
 km-corpus-pairs.tsv.gz beside this script. For familiar conversational contexts
-Hex's km-next-words.tsv supplies the preferred follow-ups.
+Hex's km-next-words.tsv supplies the preferred follow-ups. The larger prefix
+dictionary is built from the original corpus with count-khmer-word-pairs.py.
 
 Polish has no Google Books counts. Its words and word pairs come from the National Corpus of
 Polish's n-grams (NKJP, its 300M-word balanced subcorpus), kept only where PoliMorf lists the
@@ -299,7 +300,7 @@ def main(lang, work, out_path):
     write_model(lang, vocab, total, pairs, out_path)
 
 
-def write_model(lang, vocab, total, pairs, out_path, min_pair=MIN_PAIR, context_totals=None):
+def write_model(lang, vocab, total, pairs, out_path, min_pair=MIN_PAIR, context_totals=None, max_pairs=None):
     scalars = sorted({c for w in vocab for c in w})
     code = {c: i + 1 for i, c in enumerate(scalars)}
     def base(c):
@@ -311,6 +312,8 @@ def write_model(lang, vocab, total, pairs, out_path, min_pair=MIN_PAIR, context_
     blob = b"".join(enc[w] for w in words)
     fixed = 28 + 8 * len(scalars) + 4 * (len(words) + 1) + len(words) + 3 + 4 * (len(words) + 1) + len(blob)
     budget = (MAX_BYTES - fixed) // 5
+    if max_pairs is not None:
+        budget = min(budget, max_pairs)
 
     # Keep the pairs that tell the most over the single-word model (backoff 0.4):
     # count x log(P(b | a) / (0.4 P(b))), positive only, best first, as many as fit.
@@ -495,9 +498,7 @@ def main_polish(work, out_path, source):
     print(f"{valid_path}: {len(valid)} words outside the model")
 
 
-def khmer_pair_counts(vocab):
-    # SIL's word counts and the corpus counts come from different texts. Normalize
-    # each corpus row against its own observations before pruning its followers.
+def read_khmer_corpus_rows(vocab):
     rows = {}
     corpus_path = os.path.join(os.path.dirname(__file__), "km-corpus-pairs.tsv.gz")
     with gzip.open(corpus_path, "rt", encoding="utf-8") as source:
@@ -512,7 +513,12 @@ def khmer_pair_counts(vocab):
             if word in row or count <= 0:
                 raise ValueError(f"{corpus_path}:{line_number}: invalid pair {previous} {word}")
             row[word] = count
+    return rows
 
+
+def khmer_pair_counts(vocab, rows, max_followers):
+    # Normalize pair counts against their own corpus: SIL counts individual words
+    # in different texts.
     # A small reserve for unseen words avoids assigning near-certainty to a
     # continuation on the strength of a handful of examples.
     totals = {previous: 16 + sum(row.values()) for previous, row in rows.items()}
@@ -542,32 +548,30 @@ def khmer_pair_counts(vocab):
 
     pairs = {}
     for previous, row in rows.items():
-        for word, count in sorted(row.items(), key=lambda item: (-item[1], item[0]))[:64]:
+        for word, count in sorted(row.items(), key=lambda item: (-item[1], item[0]))[:max_followers]:
             pairs[f"{previous} {word}".encode("utf-8")] = count
     return pairs, totals
 
 
-def build_khmer(wordlist, out_path):
-    # The bundled SIL/Keyman model supplies word counts. The Swift layouts
-    # supply the physical positions of base and alternate glyphs.
-    vocab = {}
-    coeng = "\u17d2"
-
+def valid_khmer_word(word):
     def begins_word(character):
         return 0x1780 <= ord(character) <= 0x17B3
 
-    def valid_word(word):
-        if not word or not begins_word(word[0]) or word.endswith(coeng):
-            return False
-        if any(not (0x1780 <= ord(c) <= 0x17D2 or c == "\u17dd") for c in word):
-            return False
-        return all(a != coeng or begins_word(b) for a, b in zip(word, word[1:]))
+    coeng = "\u17d2"
+    if not word or not begins_word(word[0]) or word.endswith(coeng):
+        return False
+    if any(not (0x1780 <= ord(c) <= 0x17D2 or c == "\u17dd") for c in word):
+        return False
+    return all(a != coeng or begins_word(b) for a, b in zip(word, word[1:]))
 
+
+def khmer_word_counts(wordlist):
+    vocab = {}
     with open(wordlist, encoding="utf-8") as source:
         for line in source:
             word, frequency = line.rstrip("\r\n").split("\t")
             count = int(frequency)
-            if count > 0 and valid_word(word):
+            if count > 0 and valid_khmer_word(word):
                 vocab[word] = vocab.get(word, 0) + count
 
     # Preserve the measured costs of SIL words when adding uncounted terms.
@@ -578,10 +582,16 @@ def build_khmer(wordlist, out_path):
             word = line.strip()
             if not word or word.startswith("#"):
                 continue
-            if not valid_word(word):
+            if not valid_khmer_word(word):
                 raise ValueError(f"{extra_path}:{line_number}: invalid Khmer word {word!r}")
             vocab.setdefault(word, 1)
-    pairs, context_totals = khmer_pair_counts(vocab)
+    return vocab, total
+
+
+def build_khmer(wordlist, out_path):
+    vocab, total = khmer_word_counts(wordlist)
+    rows = read_khmer_corpus_rows(vocab)
+    pairs, context_totals = khmer_pair_counts(vocab, rows, max_followers=64)
     write_model("km", vocab, total, pairs, out_path, min_pair=0, context_totals=context_totals)
 
 

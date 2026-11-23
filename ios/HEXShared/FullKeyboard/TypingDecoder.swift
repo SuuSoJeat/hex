@@ -16,6 +16,8 @@ nonisolated final class TypingDecoderModel: @unchecked Sendable {
     let characters: [Character]
     let baseCodes: [UInt8]
     let apostropheCode: UInt8?
+    /// Direct lookup from Khmer UTF-16 units to the codes used in the sorted word list.
+    private let khmerCodes: [UInt8]
     private let base: UnsafeRawPointer
     private let offsetsAt: Int
     private let unigramAt: Int
@@ -67,6 +69,17 @@ nonisolated final class TypingDecoderModel: @unchecked Sendable {
         self.characters = characters
         self.baseCodes = baseCodes
         self.apostropheCode = codes["'"]
+        if self.language == "km" {
+            var table = [UInt8](repeating: 0, count: 128)
+            for (key, code) in codes {
+                if let scalar = key.unicodeScalars.first, (0x1780..<0x1800).contains(scalar.value) {
+                    table[Int(scalar.value) - 0x1780] = code
+                }
+            }
+            khmerCodes = table
+        } else {
+            khmerCodes = []
+        }
         self.wordCount = words
         self.bigramCount = bigrams
         self.offsetsAt = offsetsAt
@@ -150,6 +163,23 @@ nonisolated final class TypingDecoderModel: @unchecked Sendable {
         return index(ofCodes: bytes)
     }
 
+    /// The contiguous range that still matches after adding one Khmer keyboard input.
+    func khmerMatches(in range: Range<Int>, depth: Int, unit: UInt16) -> Range<Int> {
+        let offset = Int(unit) - 0x1780
+        guard khmerCodes.indices.contains(offset), khmerCodes[offset] != 0 else { return 0..<0 }
+        let (lo, hi) = narrow(range.lowerBound, range.upperBound, depth: depth, byte: Int(khmerCodes[offset]))
+        return lo..<hi
+    }
+
+    func khmerMatches(_ prefix: ArraySlice<UInt16>) -> Range<Int> {
+        var range = 0..<wordCount
+        for (depth, unit) in prefix.enumerated() {
+            range = khmerMatches(in: range, depth: depth, unit: unit)
+            if range.isEmpty { break }
+        }
+        return range
+    }
+
     /// Whether the model has `second` following `first` as a pair.
     func hasPair(_ first: String, _ second: String) -> Bool {
         guard let a = index(of: first), let b = index(of: second) else { return false }
@@ -167,16 +197,27 @@ nonisolated final class TypingDecoderModel: @unchecked Sendable {
 
     /// The three most probable allowed continuations of a completed word. Scan just its
     /// mapped bigram row and keep three entries, even for a word with thousands of followers.
-    func nextWords(after previous: String, allowing: (String) -> Bool) -> [String] {
+    func nextWords(after previous: String, khmerPrefix: String = "", allowing: (String) -> Bool) -> [String] {
         guard let a = index(of: previous) else { return [] }
         let start = Int(base.loadUnaligned(fromByteOffset: pairRowsAt + 4 * a, as: UInt32.self))
         let end = Int(base.loadUnaligned(fromByteOffset: pairRowsAt + 4 * (a + 1), as: UInt32.self))
         guard start <= end, end <= bigramCount else { return [] }
+        let prefix = Array(khmerPrefix.utf16)
+        let matches = prefix.isEmpty ? 0..<wordCount : khmerMatches(prefix[...])
+        guard !matches.isEmpty else { return [] }
+        // Follower IDs are in dictionary order. Jump to the first possible
+        // match before inspecting weights or decoding candidate strings.
+        var lower = start, upper = end
+        while lower < upper && !prefix.isEmpty {
+            let mid = (lower + upper) / 2
+            if follower(mid) < matches.lowerBound { lower = mid + 1 } else { upper = mid }
+        }
         var best: [(rank: Int, text: String)] = []
-        for i in start..<end {
+        for i in lower..<end {
             let cost = Int(base.load(fromByteOffset: pairCostsAt + i, as: UInt8.self))
             let b = Int(base.loadUnaligned(fromByteOffset: pairWordsAt + 4 * i, as: UInt32.self))
-            guard b < wordCount else { continue }
+            if b >= matches.upperBound { break }
+            if !prefix.isEmpty && length(b) == prefix.count { continue }
             // Prefer the commoner word when two pair probabilities quantize to the same byte.
             let rank = cost * 256 + Int(base.load(fromByteOffset: unigramAt + b, as: UInt8.self))
             if best.count == 3, rank >= best[2].rank { continue }

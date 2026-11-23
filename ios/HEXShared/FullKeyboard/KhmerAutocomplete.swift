@@ -67,6 +67,7 @@ struct KhmerAutocomplete: Sendable {
 
     private let entries: [Entry]
     private let longestWord: Int
+    let expandedWords: TypingDecoderModel?
 
     static let bundled: KhmerAutocomplete? = {
         var url = Bundle.main.url(forResource: "km-autocomplete", withExtension: "tsv")
@@ -77,11 +78,14 @@ struct KhmerAutocomplete: Sendable {
         guard let url, let wordlist = try? String(contentsOf: url, encoding: .utf8) else { return nil }
         let supplementURL = url.deletingLastPathComponent().appendingPathComponent("km-buddhist.txt")
         let supplement = (try? String(contentsOf: supplementURL, encoding: .utf8)) ?? ""
-        let model = KhmerAutocomplete(wordlist: wordlist, supplementalWords: supplement)
+        let expandedURL = url.deletingLastPathComponent().appendingPathComponent("km-expanded.hextm")
+        let model = KhmerAutocomplete(wordlist: wordlist, supplementalWords: supplement,
+                                     expandedWords: TypingDecoderModel(url: expandedURL))
         return model.entries.isEmpty ? nil : model
     }()
 
-    init(wordlist: String, supplementalWords: String = "") {
+    init(wordlist: String, supplementalWords: String = "", expandedWords: TypingDecoderModel? = nil) {
+        self.expandedWords = expandedWords?.language == "km" ? expandedWords : nil
         var entries = wordlist.split(whereSeparator: \.isNewline).compactMap { line -> Entry? in
             let fields = line.split(separator: "\t")
             guard fields.count == 2, let frequency = Int(fields[1]), frequency > 0 else { return nil }
@@ -121,13 +125,15 @@ struct KhmerAutocomplete: Sendable {
         let start = before.utf16.index(before.endIndex, offsetBy: -prefixLength)
         var preceding = before[..<start]
         while preceding.last == " " || preceding.last == "\u{200B}" { preceding = preceding.dropLast() }
-        guard preceding.endIndex != start, let word = wordSuffix(in: preceding, personalWords: personalWords) else { return nil }
+        guard preceding.endIndex != start, let word = wordSuffix(
+            in: preceding, personalWords: personalWords, includeExpanded: prefixLength != 1
+        ) else { return nil }
         return (word, String(before[start...]))
     }
 
     /// The longest known final word that starts at a boundary reached by whole words.
     /// If the run is incomplete or extends beyond the lookback, leave word deletion alone.
-    func wordSuffix(in before: Substring, personalWords: [String] = []) -> String? {
+    func wordSuffix(in before: Substring, personalWords: [String] = [], includeExpanded: Bool = true) -> String? {
         let tail = before.utf16.reversed().prefix(Self.contextLength + 1)
         let run = Array(tail.prefix(while: Self.isWordUnit).reversed())
         guard let first = run.first, Self.beginsWord(first),
@@ -137,8 +143,11 @@ struct KhmerAutocomplete: Sendable {
         wordStarts[0] = true
         for start in run.indices where wordStarts[start] {
             let candidate = run[start...]
-            if contains(candidate, personal: personal) { return String(decoding: candidate, as: UTF16.self) }
-            markWordEnds(from: start, in: run, personal: personal, into: &wordStarts)
+            if contains(candidate, personal: personal) || (includeExpanded && isExpandedWord(candidate)) {
+                return String(decoding: candidate, as: UTF16.self)
+            }
+            markWordEnds(from: start, in: run, personal: personal, expanded: includeExpanded ? expandedWords : nil,
+                         into: &wordStarts)
         }
         return nil
     }
@@ -177,18 +186,33 @@ struct KhmerAutocomplete: Sendable {
                 return Candidate(word: word, suffix: String(decoding: units.dropFirst(prefix.count), as: UTF16.self))
             }
             if preferred.count >= limit { return Array(preferred.prefix(limit)) }
+            var matches = preferred
+            var knownPrefix = false
             if prefix.count <= longestWord {
                 let first = lowerBound(of: prefix)
                 if first < entries.count, entries[first].units.starts(with: prefix) {
-                    // A complete word may also start a longer one. Stay at this boundary;
-                    // a shorter suffix could just be the finished word's last syllable.
-                    return preferred + completions(for: prefix, from: first, limit: limit - preferred.count) {
+                    knownPrefix = true
+                    matches += completions(for: prefix, from: first, limit: limit - preferred.count) {
                         !personalMatches.contains($0.units) && mayOffer($0.word)
                     }
                 }
             }
-            if !personalMatches.isEmpty || personal.words.contains(Array(prefix)) { return preferred }
-            markWordEnds(from: start, in: run, personal: personal, into: &wordStarts)
+            if matches.count < limit, prefix.count >= 2, let expandedWords {
+                let range = expandedWords.khmerMatches(prefix)
+                // Extra dictionary entries have no measured word frequencies. Fill any
+                // spare slots in spelling order, decoding only candidates in this range.
+                for index in range where expandedWords.length(index) > prefix.count {
+                    let word = expandedWords.word(index)
+                    guard !matches.contains(where: { $0.word == word }), mayOffer(word) else { continue }
+                    let suffix = String(decoding: word.utf16.dropFirst(prefix.count), as: UTF16.self)
+                    matches.append(Candidate(word: word, suffix: suffix))
+                    if matches.count == limit { break }
+                }
+            }
+            // A complete word may also start a longer one. Stay at this boundary;
+            // if an added compound supplies no chips, still try the older joined reading.
+            if knownPrefix || !matches.isEmpty || !personalMatches.isEmpty || personal.words.contains(Array(prefix)) { return matches }
+            markWordEnds(from: start, in: run, personal: personal, expanded: expandedWords, into: &wordStarts)
         }
         return []
     }
@@ -226,6 +250,12 @@ struct KhmerAutocomplete: Sendable {
             hasPrefix(suffix) || personal.terms.contains { $0.starts(with: suffix) }
         }) else { return nil }
 
+        // An uncounted dictionary spelling may still have a useful tap-only
+        // alternative. Space must keep an entirely recognized reading literal.
+        func allowsAutomaticRepair() -> Bool {
+            expandedWords == nil || wordSuffix(in: beforeInput[...], personalWords: personalWords) == nil
+        }
+
         // The journal supplies spellings the user has chosen repeatedly. Only a unique
         // repair at an established boundary can replace text automatically.
         if !learnedSpellings.isEmpty {
@@ -234,7 +264,7 @@ struct KhmerAutocomplete: Sendable {
                 let typed = String(decoding: suffix, as: UTF16.self)
                 guard let replacement = learnedSpellings[typed], !replacement.utf16.elementsEqual(suffix),
                       canCorrect(typed), mayOffer(replacement) else { return nil }
-                return Correction(typed: typed, replacement: replacement)
+                return Correction(typed: typed, replacement: replacement, automaticallyApplies: allowsAutomaticRepair())
             }
             if !learned.isEmpty { return learned.count == 1 ? learned[0] : nil }
         }
@@ -244,7 +274,9 @@ struct KhmerAutocomplete: Sendable {
         let repeatedMarks = eligible.compactMap(duplicateMarkCorrection)
         // Equivalent readings remove the same scalar. Keep the shortest confirmed replacement.
         if let shortest = repeatedMarks.last, repeatedMarks.allSatisfy({ $0.offset == shortest.offset }) {
-            return canCorrect(shortest.fix.typed) && mayOffer(shortest.fix.replacement) ? shortest.fix : nil
+            guard canCorrect(shortest.fix.typed), mayOffer(shortest.fix.replacement) else { return nil }
+            return Correction(typed: shortest.fix.typed, replacement: shortest.fix.replacement,
+                              automaticallyApplies: allowsAutomaticRepair())
         }
 
         let complete = eligible.filter(Self.hasCompleteClusters)
@@ -262,7 +294,7 @@ struct KhmerAutocomplete: Sendable {
             let replacement = confident ? edit.entry.word : (edit.spatial?.word ?? edit.entry.word)
             guard mayOffer(replacement) else { return nil }
             return Correction(
-                typed: typed, replacement: replacement, automaticallyApplies: confident,
+                typed: typed, replacement: replacement, automaticallyApplies: confident && allowsAutomaticRepair(),
                 rankedByTapPosition: replacement != edit.entry.word,
                 dictionaryAlternative: replacement != edit.entry.word && mayOffer(edit.entry.word) ? edit.entry.word : nil
             )
@@ -341,12 +373,30 @@ struct KhmerAutocomplete: Sendable {
         return best.map { ($0.entry, $0.insertsCoeng, unique, spatial?.entry) }
     }
 
-    private func markWordEnds(from start: Int, in run: [UInt16], personal: PersonalLexicon, into wordStarts: inout [Bool]) {
+    private func markWordEnds(from start: Int, in run: [UInt16], personal: PersonalLexicon,
+                              expanded: TypingDecoderModel? = nil, into wordStarts: inout [Bool]) {
+        if let expanded {
+            var range = 0..<expanded.wordCount
+            for index in start..<run.count {
+                range = expanded.khmerMatches(in: range, depth: index - start, unit: run[index])
+                guard !range.isEmpty else { break }
+                let end = index + 1
+                if end < wordStarts.count, expanded.length(range.lowerBound) == end - start,
+                   end == run.count || Self.isBoundary(end, in: run) {
+                    wordStarts[end] = true
+                }
+            }
+        }
         let lastEnd = min(start + max(longestWord, personal.longestWord), wordStarts.count - 1)
         guard start < lastEnd else { return }
         for end in (start + 1)...lastEnd where end == run.count || Self.isBoundary(end, in: run) {
             if contains(run[start..<end], personal: personal) { wordStarts[end] = true }
         }
+    }
+
+    private func isExpandedWord(_ spelling: ArraySlice<UInt16>) -> Bool {
+        guard let expandedWords, let first = expandedWords.khmerMatches(spelling).first else { return false }
+        return expandedWords.length(first) == spelling.count
     }
 
     private func contains(_ spelling: ArraySlice<UInt16>) -> Bool {

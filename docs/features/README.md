@@ -2946,7 +2946,8 @@ iOS prototype (`HEXMobile`) -> Record/transcribe/copy and keyboard handoff
 │   "köszönöm", while a word of its own such as "meg" keeps its spelling), English as its
 │   bilingual partner through the Latin-script rule, and no typing (spatial) model
 ├── Khmer (ភាសាខ្មែរ) → Layout → Khmer (iPhone-style, default) or Khmerism
-│   ├── Start a sentence → three suggested words; type a first letter → offline completions
+│   ├── Start a sentence → three suggested words; type a first letter → familiar completions.
+│   │   From the second Khmer code point, a larger local dictionary can finish the word.
 │   ├── Choose សូម → អរគុណ → ច្រើន to write សូមអរគុណច្រើន without inserting spaces.
 │   │   The offline word-pair model also ranks completions after a space or zero-width space.
 │   ├── Khmer-script Pali and Sanskrit terms complete from a prefix and stay as typed

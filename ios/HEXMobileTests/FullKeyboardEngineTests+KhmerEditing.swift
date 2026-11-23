@@ -80,12 +80,94 @@ extension FullKeyboardEngineTests {
         }
     }
 
+    func testExpandedKhmerCompletesAfterTwoScalarsOnBothLayouts() async throws {
+        for letters in [KeyboardLetterLayout.khmer, .khmerism] {
+            smartField(language: .khmer)
+            engine.letterLayout = letters
+            target.documentIdentifier = UUID()
+            await engine.khmerAutocompleteLoad?.value
+            engine.acceptSuggestion(try XCTUnwrap(engine.suggestions.first { $0.displayText == "ខ្ញុំ" }))
+
+            tap(.character("ប"))
+            XCTAssertEqual(engine.suggestions.map(\.displayText), ["បាន", "បាទ", "ប្រាប់"])
+            tap(.character("ា"))
+            let completion = try XCTUnwrap(engine.suggestions.first { $0.displayText == "បានឃើញ" })
+            XCTAssertEqual(completion.kind, .khmerCompletion)
+            XCTAssertEqual(completion.replacement, "នឃើញ")
+            XCTAssertFalse(completion.willAutoReplace)
+            engine.acceptSuggestion(completion)
+            XCTAssertEqual(target.text, "ខ្ញុំបានឃើញ")
+        }
+    }
+
+    func testExpandedKhmerPreservesExistingSpellingRepairs() async throws {
+        for (spelling, repaired, automatic) in [("ពិិនិត្យ", "ពិនិត្យ", true), ("ចំនុច", "ចំណុច", false)] {
+            smartField(language: .khmer)
+            target.documentIdentifier = UUID()
+            await engine.khmerAutocompleteLoad?.value
+            target.insertText(spelling)
+            engine.textDidChange()
+            let repair = try XCTUnwrap(engine.suggestions.first { $0.displayText == repaired })
+            XCTAssertEqual(repair.kind, .khmerCorrection(autoReplace: automatic))
+            tap(.space)
+            XCTAssertEqual(target.text, automatic ? repaired : spelling + " ")
+        }
+    }
+
+    /// Run this test alone in a fresh test-host process to measure cold initialization.
+    /// The timings cover the strip's suggestion lookup on fixed synthetic text.
+    func testKhmerSuggestionLookupMeasurements() async throws {
+        func footprintMiB() throws -> Double {
+            var info = task_vm_info_data_t()
+            var count = mach_msg_type_number_t(MemoryLayout.size(ofValue: info) / MemoryLayout<natural_t>.size)
+            let capacity = Int(count)
+            let result = withUnsafeMutablePointer(to: &info) {
+                $0.withMemoryRebound(to: integer_t.self, capacity: capacity) {
+                    task_info(mach_task_self_, task_flavor_t(TASK_VM_INFO), $0, &count)
+                }
+            }
+            return try XCTUnwrap(result == KERN_SUCCESS ? Double(info.phys_footprint) / 1_048_576 : nil)
+        }
+
+        target.documentIdentifier = UUID()
+        let before = try footprintMiB()
+        target.insertText("ខ្ញុំ បា")
+        let start = CACurrentMediaTime()
+        engine.language = .khmer
+        await engine.khmerAutocompleteLoad?.value
+        XCTAssertFalse(engine.khmerSuggestionChoices(live: true).isEmpty)
+        let load = (CACurrentMediaTime() - start) * 1_000
+        let loaded = try footprintMiB()
+        while target.hasText { target.deleteBackward() }
+
+        var times: [Double] = []
+        for sample in ["ខ្ញុំ ", "ខ្ញុំ ប", "ខ្ញុំ បា", "សូម ព្រ", "សាលារ", "កម្ពុ"] {
+            target.insertText(sample)
+            for _ in 0..<40 {
+                let start = CACurrentMediaTime()
+                _ = engine.khmerSuggestionChoices(live: true)
+                times.append((CACurrentMediaTime() - start) * 1_000)
+            }
+            while target.hasText { target.deleteBackward() }
+        }
+        times.sort()
+        print(String(
+            format: "Khmer suggestions (test host) load %.2f ms, footprint %.2f → %.2f MiB (%+.2f), after queries %.2f MiB; lookup p50 %.3f ms, p95 %.3f ms (%d queries)",
+            load, before, loaded, loaded - before, try footprintMiB(),
+            times[times.count / 2], times[times.count * 95 / 100], times.count
+        ))
+    }
+
     func testKhmerCommonWordsFillSparsePredictionRows() async {
         smartField(language: .khmer)
         await engine.khmerAutocompleteLoad?.value
         target.insertText("នមោ ")
         engine.textDidChange()
-        XCTAssertEqual(engine.suggestions.map(\.displayText), ["តស្ស", "បាន", "មាន"])
+        XCTAssertEqual(engine.suggestions.first?.displayText, "តស្ស")
+
+        target.insertText("ភគវតោ ")
+        engine.textDidChange()
+        XCTAssertEqual(engine.suggestions.map(\.displayText), ["អរហតោ", "បាន", "មាន"])
     }
 
     func testKhmerFirstKeyAndWholeWordCompletionsOnBothLayouts() async throws {
