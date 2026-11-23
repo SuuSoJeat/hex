@@ -9,6 +9,8 @@ nonisolated struct KeyboardSuggestion: Equatable, Sendable {
         case secondary
         /// A Khmer word whose remaining characters can be appended at the caret.
         case khmerCompletion
+        /// A Khmer sentence starter or following word, inserted without a separator.
+        case khmerPrediction
         /// The Khmer spelling as typed, and a replacement that may apply on a word boundary.
         case khmerKeepLiteral
         case khmerCorrection(autoReplace: Bool)

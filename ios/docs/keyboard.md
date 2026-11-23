@@ -621,8 +621,10 @@ name it (`letters`).
 ## Khmer keyboard layouts
 
 Choose **ភាសាខ្មែរ** in **Settings › Keyboard › Languages**. Its **Layout** menu
-offers **Khmer** (the iPhone-style default) and **Khmerism**. Both support offline
-completions and spelling suggestions for joined Khmer text. On Khmerism, hold
+offers **Khmer** (the iPhone-style default) and **Khmerism**. Both show sentence
+starters, offer completions from the first letter, and suggest a next word after
+you choose one. Tapping suggestions joins Khmer words without adding spaces.
+Both layouts also offer spelling suggestions. On Khmerism, hold
 for a corner character or type coeng (្) to bring subscript consonants onto the keys.
 
 Both layouts use the keyboard’s **Autocorrect** switch for smart typing and

@@ -137,8 +137,15 @@ extension FullKeyboardEngine {
         guard let swipedWord else { return nil }
         if layout.language == .khmer,
            (swipedWord.document == nil || swipedWord.document != target.documentIdentifier) { return nil }
-        let items = swipedWord.alternatives.prefix(3).map { KeyboardSuggestion(displayText: $0, replacement: $0, kind: .swiped) }
-        return items.count >= 2 ? [items[1], items[0]] + items.dropFirst(2) : items
+        var items = swipedWord.alternatives.prefix(3).map { KeyboardSuggestion(displayText: $0, replacement: $0, kind: .swiped) }
+        if items.count >= 2 { items.swapAt(0, 1) }
+        if layout.language == .khmer, items.count < 3, khmerPickedWord != nil {
+            let following = khmerSuggestionChoices().filter { prediction in
+                prediction.kind == .khmerPrediction && !items.contains { $0.displayText == prediction.displayText }
+            }
+            items += following.prefix(3 - items.count)
+        }
+        return items
     }
 
     /// `words` that may be offered after the word before (`AutocorrectEngine.mayOffer`), once each.
@@ -304,6 +311,7 @@ extension FullKeyboardEngine {
             TypingLogField("src", .string("swipe")),
         ])
         let rendered = smartened(inserted)
+        if isKhmer { rememberKhmerPickedWord(word, before: (before ?? "") + rendered) }
         rememberTypingContext(before: before, inserted: rendered)
         target.insertText(rendered)
         finishedWord = nil
@@ -353,6 +361,7 @@ extension FullKeyboardEngine {
         ])
         // The reading's place, read before the deletes: a lagging host still reports the old word.
         let rendered = smartened(text)
+        if isKhmer { rememberKhmerPickedWord(text, before: prefix + rendered) }
         rememberTypingContext(before: prefix, inserted: rendered)
         if !isKhmer {
             for _ in 0..<swiped.word.count { target.deleteBackward() }
