@@ -24,29 +24,21 @@ nonisolated extension KeyboardLayout {
         )
     }
 
-    /// The comma and period share a joined space bar only when both fit.
-    static func spaceBarTakingCommaAndPeriod(
-        _ space: CGRect, keyWidth: CGFloat, gap: CGFloat
-    ) -> (space: CGRect, comma: CGRect, period: CGRect)? {
-        guard let period = spaceBar(space, takingPunctuation: true, keyWidth: keyWidth, gap: gap),
-              let comma = spaceBar(period.space, takingPunctuation: false, keyWidth: keyWidth, gap: gap)
-        else { return nil }
-        return (comma.space, comma.key, period.key)
-    }
-
     /// The joined keyboard's one space bar: a comma out of its leading end and a period out of
     /// its trailing one, where it still holds a letter-wide space after both.
     static func addCommaPeriodKeys(
-        to drawn: inout [(kind: KeyKind, row: Int, frame: CGRect, label: String, shifted: String?)],
+        to drawn: inout [KeyboardKey],
         keyWidth: CGFloat,
         gap: CGFloat
     ) {
-        guard let i = drawn.firstIndex(where: { $0.kind == .space && $0.row == 3 }),
-              let keys = spaceBarTakingCommaAndPeriod(drawn[i].frame, keyWidth: keyWidth, gap: gap)
+        guard let i = drawn.firstIndex(where: { $0.kind == .space }),
+              let period = spaceBar(drawn[i].frame, takingPunctuation: true, keyWidth: keyWidth, gap: gap),
+              let comma = spaceBar(period.space, takingPunctuation: false, keyWidth: keyWidth, gap: gap)
         else { return }
-        drawn[i] = (.space, 3, keys.space, "space", nil)
-        drawn.append((.character(","), 3, keys.comma, ",", nil))
-        drawn.append((.character("."), 3, keys.period, ".", nil))
+        let row = drawn[i].row
+        drawn[i].frame = comma.space
+        drawn.append(KeyboardKey(kind: .character(","), row: row, frame: comma.key, label: ","))
+        drawn.append(KeyboardKey(kind: .character("."), row: row, frame: period.key, label: "."))
     }
 
     /// The split keyboard's two bars: a comma out of the left half's leading end and a period

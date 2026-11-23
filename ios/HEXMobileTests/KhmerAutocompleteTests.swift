@@ -152,20 +152,15 @@ final class KhmerAutocompleteTests: XCTestCase {
         }
     }
 
-    func testConfirmedExtraRaCorrectionWorksInUnspacedKhmer() throws {
+    func testSchoolPrefixInJoinedTextStaysLiteralAndCanCompleteAPersonalTerm() throws {
         let model = try XCTUnwrap(KhmerAutocomplete.bundled)
-        let correction = KhmerAutocomplete.Correction(typed: "សាលារ", replacement: "សាលា")
-        for prefix in ["", "ខ្ញុំទៅ", "Name ", "។"] {
-            XCTAssertEqual(model.correction(beforeInput: prefix + "សាលារ"), correction)
+        for preceding in ["", "ខ្ញុំទៅ"] {
+            let prefix = preceding + "សាលារ"
+            XCTAssertNil(model.correction(beforeInput: prefix))
+            XCTAssertNil(model.correction(beforeInput: prefix + "ៀន"))
+            XCTAssertTrue(model.suggestions(beforeInput: prefix, personalWords: ["សាលារៀន"])
+                .contains(.init(word: "សាលារៀន", suffix: "ៀន")))
         }
-        for spelling in ["សាលារៀន", "ខ្ញុំទៅសាលារៀន", "សាលារក", "ឝ្ឞ្សសាលារ", "@សាលារ"] {
-            XCTAssertNil(model.correction(beforeInput: spelling))
-        }
-
-        let knownWord = KhmerAutocomplete(wordlist: "សាលា\t100\nសាលារ\t10")
-        XCTAssertNil(knownWord.correction(beforeInput: "សាលារ"))
-        let overlappingWord = KhmerAutocomplete(wordlist: "ខ្ញុំ\t100\nទៅ\t100\nទៅសាលារ\t10\nសាលា\t100")
-        XCTAssertNil(overlappingWord.correction(beforeInput: "ខ្ញុំទៅសាលារ"))
     }
 
     func testCorrectionsPreserveValidWordsAndJoinedReadings() throws {

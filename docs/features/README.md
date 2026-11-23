@@ -2945,90 +2945,14 @@ iOS prototype (`HEXMobile`) -> Record/transcribe/copy and keyboard handoff
 │   dictionary behind its autocorrect (a missing accent is the cheapest fix, "koszonom" →
 │   "köszönöm", while a word of its own such as "meg" keeps its spelling), English as its
 │   bilingual partner through the Latin-script rule, and no typing (spatial) model
-├── Khmer (ភាសាខ្មែរ, `km-KH`) → Layout → Khmer (default) or Khmerism.
-│   Khmer follows the iPhone's main, Shift, 123 and #+= key order with Hex's theme.
-│   Its top letter row includes Khmer digits and its 123 page starts with Arabic digits.
-│   ក returns to letters. Key positions stay fixed after coeng. The standard layout
-│   follows Hex's Globe and Hex placement, Comma and period keys, and Duo split setting.
-│   Khmerism's five rows use Hex's key height and corner radius. The background and press
-│   colors follow the keyboard theme, with teal marks, green independent vowels,
-│   and rose Khmer digits in light and dark. Arabic digits use the keyboard theme.
-│   Main and corner glyphs fit in separate padded areas, including wide vowels and marks.
-│   Tap for the main glyph
-│   or hold for the corner glyph, which replaces the main glyph in the key pop-up
-│   when pop-ups are enabled. Tap Shift for one character or double-tap to lock
-│   the shifted layer. Tap Shift again to unlock.
-│   123 and #+= fit four English rows and keep two Khmer punctuation keys beside Space.
-│   On #+=, hold ។ or ៖ for ៙ or ៚. Space, Return or កខគ returns to letters.
-│   With the caret just after coeng (្),
-│   the letter page brings common subscript consonants onto the main keys and hides
-│   the corner labels. Holds still work, and Shift still selects the full shifted
-│   layer. The usual labels return when the caret moves past or away from coeng. Khmerism
-│   stays joined on the Duo and uses strip positions for Hex and Globe to keep its footer.
-│   Checks: `KhmerKeyboardLanguageTests`,
-│   `KeyboardLayoutTests`, `FullKeyboardEngineTests`.
-│   Both layouts have the usual Search, URL, and email keys. Space uses the regular
-│   language swipe and keeps the active dictation or translation label when applicable.
-│   The emoji key
-│   opens Hex's picker and Number Row follows the shared setting. With Smart Mode off, marks
-│   insert as entered and the host handles backspace. The suggestion strip offers up to three
-│   offline completions from a bundled SIL/Keyman dictionary. It draws each Khmer suggestion as one word so coeng
-│   and its following consonant shape together. Tap one to append the missing
-│   characters. With Autocorrect on, the same dictionary suggests nearby spellings
-│   for one-edit typos. Space accepts a confident correction and leaves the words
-│   joined. When iOS cannot identify the field, a correction that needs to delete text
-│   leaves the original spelling intact. Space then types a literal space.
-│   A quick double Space after a word
-│   types ។ and a space. iOS Text Replacement uses the shared shortcut behavior.
-│   Closing punctuation applies the
-│   correction and types the punctuation. Other dictionary guesses are tap-to-accept.
-│   After a correction accepted with Space, the strip offers the original spelling
-│   immediately. After a correction with punctuation, Backspace reveals that option in
-│   the same field when iOS identifies it. Held and swiped word deletion use
-│   dictionary boundaries for joined Khmer and stop at a Khmer–Latin boundary. When
-│   the word boundary is uncertain or the edit cannot start safely, holding deletes
-│   one unit through the host. A Backspace swipe needs an identified field and stops if the
-│   field, route, or caret changes. A delayed delete is restored when the host
-│   confirms what changed at the same caret.
-│   Checks:
-│   `KhmerAutocompleteTests`, `FullKeyboardEngineTests`.
-│   Settings › Keyboard › Spatial autocorrect (on by default while Autocorrect is on)
-│   uses near-edge taps to rank single-character spelling guesses in either layout.
-│   Tap a suggestion to apply it to the current word. Space and closing punctuation
-│   use regular Khmer autocorrect, which handles learned repairs. Swipes use their
-│   own gesture readings.
-│   Checks: `KhmerAutocompleteTests`, `FullKeyboardEngineTests`.
-│   Settings › Experiments › Khmer appears when Khmer is configured with Full chosen. Both
-│   options apply to both layouts and default off. Saved choices are kept in the App Group.
-│   ├── Smart Mode applies in fields that accept word corrections
-│   │   ├── Tap ញ then ំ → ខ្ញុំ, including next to another word. Subscript ញ and
-│   │   │   text already in the field keep their literal spelling.
-│   │   ├── After a newly typed consonant, the ៉ key in Khmerism or the ៊ key in Khmer
-│   │   │   offers the matching sign for ក៏, ដ៏, ន៍, ស៊, ហ៊, អ៊, or ប៉.
-│   │   │   Shift and hold give access to fixed signs.
-│   │   ├── Double-tap ា, េ, or ោ within 350 ms → ាំ, េះ, or ោះ.
-│   │   └── In the syllable just typed, a register shifter moves next to the base
-│   │       and replaces a conflicting shifter. A late vowel moves before trailing
-│   │       signs when the syllable has no vowel yet. Rewrites that delete text
-│   │       require an identified field and a confirmed syllable. Checks: `FullKeyboardEngineTests`.
-│   └── Khmer swipe typing → trace one word using the positions of its characters on the selected
-│       layout, including shifted glyphs, coeng and vowel signs. Lift to insert
-│       without an automatic space. Near-tied words on the same path wait for a strip pick
-│       when suggestions are visible and iOS identifies the field. Otherwise the best reading
-│       goes in at lift. If a notice, chip, or shortcode covers a pending choice, Hex
-│       inserts the best reading only while its field and input route still match.
-│       The main Swipe typing switch also disables Khmer
-│       swipe. Personal words and iOS Text Replacement use Hex's shared swipe suggestions.
-│       Backspace and replacement respect the last swipe's
-│       boundary. VoiceOver and a caret immediately after coeng keep regular key input.
-│       Checks: `SwipeDecoderTests`, `FullKeyboardEngineTests`, `FullKeyboardSettingsTests`.
-│       These cover synthetic paths and proxy fixtures. Real Khmer swipe accuracy is unmeasured.
-│   Settings › Experiments › Khmerism is visible when the Khmerism layout is selected
-│   (both switches off by default, App Group,
-│   `FullKeyboardSettingsTests`)
-│   ├── No colors → every cap uses the keyboard theme
-│   └── No superscripts → hide corner labels, center the main glyph, and keep hold-to-type
-│       and its pop-up
+├── Khmer (ភាសាខ្មែរ) → Layout → Khmer (iPhone-style, default) or Khmerism
+│   ├── Type joined words → offline completions, spelling suggestions and word deletion
+│   ├── Khmerism → hold for corner characters; coeng brings subscript consonants onto the keys
+│   ├── Autocorrect → smart typing; Swipe typing → trace a word (both on by default)
+│   ├── Swipe in emoji search → only the query changes; Backspace on an uncommitted
+│   │   swipe choice dismisses it and preserves the preceding text
+│   └── Checks: KeyboardLayoutTests, KhmerAutocompleteTests and FullKeyboardEngineTests use
+│       key maps, simulated fields and synthetic paths. Physical swipe accuracy is unmeasured.
 ├── Korean keyboard (두벌식) (off by default, `experiments.koreanKeyboard`): Settings ›
 │   Experiments adds 한국어 to Settings › Keyboard › Languages, typed on the standard two-set
 │   rows (ㅂㅈㄷㄱㅅㅛㅕㅑㅐㅔ / ㅁㄴㅇㄹㅎㅗㅓㅏㅣ / ㅋㅌㅊㅍㅠㅜㅡ, shift's ㅃㅉㄸㄲㅆ and ㅒㅖ, no
@@ -3238,6 +3162,7 @@ Sources: [meeting.rs](../../src/meeting.rs),
 [meeting/watcher.rs](../../src/meeting/watcher.rs),
 [control/developer_control.rs](../../src/control/developer_control.rs),
 `SCENES` in [rune_ui.rs](../../src/rune_ui.rs), [iOS guide](../../ios/README.md),
+[Khmer keyboard layouts and editing](../../ios/docs/khmer-keyboards.md),
 [Android typing and checks](../../android/benchmark/typing/README.md).
 The iOS custom vocabulary experiment stays off by default and keeps its list in
 the App Group. Apple Speech also receives it as a best-effort recognition hint,

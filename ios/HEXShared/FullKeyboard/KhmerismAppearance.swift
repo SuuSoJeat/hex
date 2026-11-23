@@ -41,8 +41,12 @@ enum KhmerismAppearance {
         }
     }
 
+    static func containsKhmer(_ text: String) -> Bool {
+        text.utf16.contains { (0x1780...0x17FF).contains($0) }
+    }
+
     static func font(for label: String, size: CGFloat) -> UIFont {
-        if label.unicodeScalars.contains(where: { (0x1780...0x17FF).contains($0.value) }),
+        if containsKhmer(label),
            let font = UIFont(name: "KhmerMN", size: size) {
             return font
         }

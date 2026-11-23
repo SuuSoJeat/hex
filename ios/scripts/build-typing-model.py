@@ -30,7 +30,7 @@ differs.
     python3 -m venv /tmp/venv && /tmp/venv/bin/pip install spylls   # Spanish only
     /tmp/venv/bin/python scripts/build-typing-model.py es <workdir> HEXKeyboard/TypingModel/es.hextm
     python3 scripts/build-typing-model.py pl <workdir> pl.hextm [nkjp+parlamint|nkjp|parlamint]
-    python3 scripts/build-typing-model.py km KhmerLexicon/km-autocomplete.tsv HEXKeyboard/TypingModel/km.hextm
+    python3 scripts/build-typing-model.py km HEXKeyboard/TypingModel/km-autocomplete.tsv HEXKeyboard/TypingModel/km.hextm
 
 Needs about 7 GB free in <workdir> while it runs (English downloads ~240 GB of ngrams,
 Spanish ~50 GB, each file deleted once counted) and a fast connection; every stage is

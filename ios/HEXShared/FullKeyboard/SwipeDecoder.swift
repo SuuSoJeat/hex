@@ -195,7 +195,7 @@ nonisolated struct SwipeDecoder: Sendable {
         mutating func add(_ words: [String], cost: (String) -> Double, model: TypingDecoderModel, contractions: Bool = false) {
             var seen = Set(codes)
             for word in words {
-                guard word.count >= 2, let encoded = model.encode(word.lowercased()), seen.insert(encoded).inserted else { continue }
+                guard let encoded = model.encode(word.lowercased()), encoded.count >= 2, seen.insert(encoded).inserted else { continue }
                 codes.append(encoded)
                 texts.append(word)
                 costs.append(cost(word))
@@ -717,6 +717,6 @@ extension KeyboardLayout {
     /// The distance between neighbouring letter keys' centres across: a split half's own pitch.
     var swipePitch: CGFloat {
         if isSplit { return SplitGeometry.pitch }
-        return (letters == .khmer ? characterWidth : letterWidth) + metrics.gap
+        return (language == .khmer ? characterWidth : letterWidth) + metrics.gap
     }
 }

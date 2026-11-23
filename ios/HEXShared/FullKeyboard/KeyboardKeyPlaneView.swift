@@ -181,9 +181,31 @@ final class KeyboardKeyPlaneView: UIView {
                 let font = isKhmer ? KhmerismAppearance.font(for: spaceLabel, size: size) : .systemFont(ofSize: size)
                 drawText(spaceLabel, in: labelFrame, font: font, color: palette.textMuted)
             case .returnKey:
-                drawReturnKey(
-                    in: context, frame: frame, labelFrame: labelFrame, pressed: pressed.contains(.returnKey),
-                    glyphAlpha: glyphAlpha, hideGlyphs: hideGlyphs, pointSize: isLandscape ? 18 : 19,
+                let isPressed = pressed.contains(.returnKey) && returnIsEnabled
+                let isAction = returnStyle.isAction && !hideGlyphs
+                let activeAction = isAction && returnIsEnabled
+                let fill: UIColor = if activeAction {
+                    isPressed ? palette.actionPressedFill : palette.actionFill
+                } else if isAction {
+                    palette.actionDisabledFill
+                } else {
+                    isPressed ? palette.functionHeldFill : palette.keyFill
+                }
+                let ink: UIColor = if !returnIsEnabled {
+                    palette.returnDisabledInk
+                } else if activeAction {
+                    .white
+                } else {
+                    palette.textBase
+                }
+                context.fillKeycap(frame, fill: fill, shadow: palette.keyShadow, radius: radius)
+                guard showGlyphs() else { continue }
+                drawSymbol(
+                    returnStyle.symbol,
+                    in: labelFrame,
+                    color: ink,
+                    pointSize: isLandscape ? 18 : 19,
+                    weight: activeAction ? .medium : .regular,
                     yOffset: isLandscape ? -0.5 : -0.33
                 )
             case .shift:
@@ -191,7 +213,16 @@ final class KeyboardKeyPlaneView: UIView {
                 let isPressed = pressed.contains(.shift) && !shift.pressShowsOff
                 context.fillKeycap(frame, fill: isPressed ? palette.functionHeldFill : palette.keyFill, shadow: palette.keyShadow, radius: radius)
                 guard showGlyphs() else { continue }
-                drawSymbol(shiftSymbol, in: labelFrame, color: palette.textBase, pointSize: isLandscape ? 18 : 19, yOffset: isLandscape ? -0.16 : 0.67)
+                let symbol = if shift.pressShowsOff {
+                    "shift"
+                } else {
+                    switch shift.state {
+                    case .off: shift.isHeld ? "shift.fill" : "shift"
+                    case .on: "shift.fill"
+                    case .locked: "capslock.fill"
+                    }
+                }
+                drawSymbol(symbol, in: labelFrame, color: palette.textBase, pointSize: isLandscape ? 18 : 19, yOffset: isLandscape ? -0.16 : 0.67)
             case .delete:
                 let lit = pressed.contains(.delete)
                 context.fillKeycap(frame, fill: lit ? palette.functionHeldFill : palette.keyFill, shadow: palette.keyShadow, radius: radius)
@@ -233,46 +264,6 @@ final class KeyboardKeyPlaneView: UIView {
                 guard showGlyphs() else { continue }
                 drawSymbol("keyboard.chevron.compact.down", in: labelFrame, color: palette.textBase, pointSize: 19, yOffset: 0)
             }
-        }
-    }
-
-    private func drawReturnKey(
-        in context: CGContext, frame: CGRect, labelFrame: CGRect, pressed: Bool,
-        glyphAlpha: CGFloat, hideGlyphs: Bool, pointSize: CGFloat, yOffset: CGFloat
-    ) {
-        let isPressed = pressed && returnIsEnabled
-        let isAction = returnStyle.isAction && !hideGlyphs
-        let activeAction = isAction && returnIsEnabled
-        let fill: UIColor = if activeAction {
-            isPressed ? palette.actionPressedFill : palette.actionFill
-        } else if isAction {
-            palette.actionDisabledFill
-        } else {
-            isPressed ? palette.functionHeldFill : palette.keyFill
-        }
-        let ink: UIColor = if !returnIsEnabled {
-            palette.returnDisabledInk
-        } else if activeAction {
-            .white
-        } else {
-            palette.textBase
-        }
-        context.fillKeycap(frame, fill: fill, shadow: palette.keyShadow, radius: engine.layout.metrics.cornerRadius)
-        context.setAlpha(glyphAlpha)
-        guard glyphAlpha > 0 else { return }
-        drawSymbol(
-            returnStyle.symbol, in: labelFrame, color: ink, pointSize: pointSize,
-            weight: activeAction ? .medium : .regular, yOffset: yOffset
-        )
-    }
-
-    private var shiftSymbol: String {
-        let shift = engine.shift
-        if shift.pressShowsOff { return "shift" }
-        return switch shift.state {
-        case .off: shift.isHeld ? "shift.fill" : "shift"
-        case .on: "shift.fill"
-        case .locked: "capslock.fill"
         }
     }
 

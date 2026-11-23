@@ -109,7 +109,7 @@ extension FullKeyboardEngine {
         guard layerState.layer == .letters, field.takesWords, activeAccentMenu == nil else { return false }
         // Leave the next key to finish an explicitly tapped coeng.
         return layout.language != .khmer || (!isAfterKhmerCoeng && target.isSecureTextEntry != true
-            && TypingJournal.allows(field: field, target: target))
+            && !target.hasRestrictedTextContentType)
     }
 
     /// The letter keys a swipe is read against, where they're drawn.
@@ -213,6 +213,25 @@ extension FullKeyboardEngine {
     /// brackets, an apostrophe, a hyphen and a slash. Anything else tapped right after a swipe
     /// (a straight quote and opening brackets included) starts the next word.
     static let swipeJoiners: Set<Character> = [",", ".", "!", "?", ";", ":", ")", "]", "}", "'", "’", "-", "/"]
+
+    struct KhmerSwipeChoices {
+        var words: [String]
+        var before: String?
+        var after: String?
+        var document: UUID
+        var route: Int
+    }
+
+    func dismissKhmerSwipeChoices() {
+        pendingKhmerSwipeChoices = nil
+    }
+
+    func cancelPendingKhmerSwipeOnBackspace() -> Bool {
+        guard khmerSwipeChoicesAreCurrent else { return false }
+        dismissKhmerSwipeChoices()
+        refreshSuggestions()
+        return true
+    }
 
     var khmerSwipeChoicesAreCurrent: Bool {
         guard let choices = pendingKhmerSwipeChoices else { return false }
