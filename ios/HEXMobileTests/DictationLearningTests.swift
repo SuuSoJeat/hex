@@ -470,6 +470,41 @@ final class TypingJournalLearningTests: XCTestCase {
         XCTAssertEqual(learning.rejected, ["kit"])
     }
 
+    /// TestFlight (build 142): Learn how I type listed "Sunda → Saturday" beside real fixes, a
+    /// word erased for another. A word erased and retyped teaches only when it was a slip of the
+    /// new one: a change of mind isn't recorded, and one a journal already holds isn't counted,
+    /// listed or learned.
+    func testAWordErasedForAnotherWordTeachesNothing() {
+        let slips = [("Ciry", "City"), ("Diaxuss", "Discuss"), ("Im", "I'm"), ("i", "I"), ("teh", "the"),
+                     ("thw", "the"), ("hexx", "hex"), ("bonjor", "bonjour"), ("ity", "city")]
+        for (typed, final) in slips {
+            XCTAssertTrue(TypingLearning.isSlip(typed: typed, final: final), "\(typed) → \(final)")
+        }
+        let changes = [("Sunda", "Saturday"), ("is", "this"), ("reqe", "request"), ("agent", "subagent"),
+                       ("bat", "cat"), ("take", "talk"), ("a", "do")]
+        for (typed, final) in changes {
+            XCTAssertFalse(TypingLearning.isSlip(typed: typed, final: final), "\(typed) → \(final)")
+        }
+        XCTAssertTrue(TypingLearning.isSlip(typed: "tu", final: "zu", language: "de"), "t beside z on German's keys")
+        XCTAssertFalse(TypingLearning.isSlip(typed: "tu", final: "zu"), "not on English's")
+
+        let journal = TypingJournal(directory: directory, settings: settings)
+        for (erased, word) in [("Sunda", "Saturday"), ("Ciry", "City")] {
+            journal.willErase(word: erased)
+            journal.didFinish(word: word)
+        }
+        XCTAssertEqual(journal.current.corrections.map { "\($0.typed) → \($0.final)" }, ["Ciry → City"])
+
+        func correction(_ kind: TypingJournalCorrection.Kind, _ typed: String, _ final: String) -> TypingJournalCorrection {
+            TypingJournalCorrection(kind: kind, typed: typed, final: final, at: 0)
+        }
+        let older = [correction(.retyped, "Sunda", "Saturday"), correction(.retyped, "Sunda", "Saturday"),
+                     correction(.retyped, "Ciry", "City"), correction(.retyped, "Ciry", "City")]
+        XCTAssertEqual(TypingLearning.derive(from: older).typos, ["ciry": "City"], "never applied")
+        XCTAssertEqual(older.filter(\.teaches).count, 2, "never counted or listed")
+        XCTAssertTrue(correction(.autocorrected, "Sunda", "Saturday").teaches, "only what you erased and retyped")
+    }
+
     func testTheKeysUseTheJournalsLearning() {
         let target = FixtureTextTarget()
         target.autocapitalizationType = UITextAutocapitalizationType.none
@@ -667,6 +702,74 @@ final class LiveDictationTests: XCTestCase {
         return nil
     }
 
+    /// AJ dictates into Slack with Type as I speak and taps Send without stopping. The app
+    /// emptying the field while it ends with the words is a send: the sent words are never typed
+    /// or taken back again, and a fresh typing types the next words from the first into the
+    /// empty field, three sends in a row, so ✓ inserts only the last dictation's text.
+    func testAFieldTheAppEmptiedWithTheWordsInItWasSent() throws {
+        let field = FixtureTextTarget(text: "")
+        var typing = try XCTUnwrap(LiveFieldTyping(target: field))
+        for message in ["See you at ten", "Bring the slides", "And the notes"] {
+            typing.show(message)
+            XCTAssertEqual(field.text, message)
+            XCTAssertFalse(typing.wasSent)
+            while field.hasText { field.deleteBackward() }
+            XCTAssertTrue(typing.wasSent, "the app emptied the field: a send")
+            typing.show(message + " please")
+            XCTAssertEqual(field.text, "", "the sent dictation types nothing more")
+            typing = try XCTUnwrap(LiveFieldTyping(target: field), "the fresh dictation")
+            XCTAssertEqual(typing.base, "")
+        }
+        typing.show("Thanks")
+        XCTAssertEqual(field.text, "Thanks", "typed from its first word")
+        XCTAssertTrue(typing.takeBack())
+        XCTAssertEqual(field.text, "", "✓'s text goes into the empty field, the sent words nowhere")
+    }
+
+    /// An app that changes the words without emptying the field (an edit, a mention) didn't
+    /// send them: typing stops for that dictation, as before.
+    func testAnEditThatLeavesTextIsNotASend() throws {
+        let field = FixtureTextTarget(text: "")
+        let typing = try XCTUnwrap(LiveFieldTyping(target: field))
+        typing.show("Ask the team")
+        for _ in 0 ..< 4 { field.deleteBackward() }
+        field.insertText("@team")
+        XCTAssertFalse(typing.wasSent)
+        typing.show("Ask the team about it")
+        XCTAssertTrue(typing.stopped)
+        XCTAssertEqual(field.text, "Ask the @team", "hands off")
+        XCTAssertFalse(typing.wasSent, "stopped: a later send of the edited text isn't this dictation's")
+    }
+
+    /// After a send the keyboard forgets Undo for the text that left the field, and Undo after
+    /// the next dictation takes back only that one.
+    @MainActor
+    func testUndoAfterASendReachesOnlyTheNewDictation() throws {
+        let field = FixtureTextTarget(text: "")
+        let view = FullKeyboardView(model: KeyboardViewModel(), target: field)
+        view.frame = CGRect(x: 0, y: 0, width: 402, height: 262)
+        view.layoutIfNeeded()
+        func undo() -> UIButton? { visibleButton(in: view, titled: "Undo dictation") }
+        field.insertText("Earlier words.")
+        view.didInsertDictation("Earlier words.", before: "", after: "")
+        XCTAssertNotNil(undo())
+        while field.hasText { field.deleteBackward() }
+        view.hideUndo()
+        XCTAssertNil(undo(), "nothing to undo: the text left with the send")
+        field.insertText("Next words.")
+        view.didInsertDictation("Next words.", before: "", after: "")
+        try XCTUnwrap(undo()).sendActions(for: .touchUpInside)
+        XCTAssertEqual(field.text, "")
+    }
+
+    private func visibleButton(in view: UIView, titled title: String) -> UIButton? {
+        for sub in view.subviews where !sub.isHidden && sub.alpha > 0 {
+            if let button = sub as? UIButton, button.configuration?.title == title { return button }
+            if let found = visibleButton(in: sub, titled: title) { return found }
+        }
+        return nil
+    }
+
     func testTheSwitchesDefaultToShowingButNotTyping() throws {
         let suite = "anomaly.hex.tests.live-dictation"
         let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
@@ -746,5 +849,45 @@ final class LiveDictationTests: XCTestCase {
         XCTAssertFalse(LiveFieldTyping.mayType(secure: nil, content: .oneTimeCode, selected: nil))
         XCTAssertFalse(LiveFieldTyping.mayType(secure: nil, content: nil, selected: "late"))
         XCTAssertTrue(LiveFieldTyping.mayType(secure: false, content: .emailAddress, selected: ""))
+    }
+
+    /// Settings › Dictation › Live words, Into field: where it can't type this dictation (Translate
+    /// what I say on, or a field `LiveFieldTyping` never types in), the words show over the keys
+    /// instead, as build 147's two switches did, and nothing stored changes. In bar, Off and the
+    /// two switches 1.0.4 could turn on together keep what they did.
+    func testIntoFieldShowsTheWordsOverTheKeysWhereItCantType() throws {
+        let suite = "LiveWordsFallbackTests"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+        defaults.removePersistentDomain(forName: suite)
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let settings = LiveDictationSettings(defaults: defaults)
+        func words(preview: Bool, typing: Bool, translating: Bool = false, field: Bool = true) -> [Bool] {
+            settings.showsPreview = preview
+            settings.typesIntoField = typing
+            let words = settings.liveWords(translating: translating, fieldTakesTyping: field)
+            return [words.showsPreview, words.typesIntoField]
+        }
+        XCTAssertEqual(words(preview: false, typing: true), [false, true], "Into field types, the keys stay")
+        XCTAssertEqual(words(preview: false, typing: true, translating: true), [true, false], "translating: over the keys")
+        XCTAssertEqual(words(preview: false, typing: true, field: false), [true, false], "a field it never types in: over the keys")
+        XCTAssertEqual([settings.showsPreview, settings.typesIntoField], [false, true], "what is stored stays Into field")
+        XCTAssertEqual(words(preview: true, typing: false, translating: true), [true, false], "In bar")
+        XCTAssertEqual(words(preview: false, typing: false, translating: true, field: false), [false, false], "Off")
+        XCTAssertEqual(words(preview: true, typing: true), [true, true], "both of 1.0.4's switches")
+        XCTAssertEqual(words(preview: true, typing: true, translating: true), [true, false])
+
+        XCTAssertTrue(LiveFieldTyping.types(in: FixtureTextTarget(text: "Running late")))
+        let password = FixtureTextTarget(text: "")
+        password.isSecureTextEntry = true
+        XCTAssertFalse(LiveFieldTyping.types(in: password))
+        let code = FixtureTextTarget(text: "")
+        code.textContentType = .oneTimeCode
+        XCTAssertFalse(LiveFieldTyping.types(in: code))
+        let selection = FixtureTextTarget(text: "Running late")
+        selection.selectedText = "late"
+        XCTAssertFalse(LiveFieldTyping.types(in: selection))
+        let silent = LaggingField(text: "Hello")
+        silent.lag = .nothing
+        XCTAssertFalse(LiveFieldTyping.types(in: silent), "a host that reports no text")
     }
 }

@@ -86,7 +86,7 @@ final class KeyboardViewController: UIInputViewController {
     /// The dictation bar's key haptic; the full keyboard has its own generator.
     private lazy var barHaptics = UIImpactFeedbackGenerator(style: FullKeyboardView.keyTickStyle(hapticStrength))
     /// Settings › Keyboard › Strength as of the last bridge sync.
-    private var hapticStrength = KeyHapticStrength.medium {
+    private var hapticStrength = KeyHapticStrength.light {
         didSet {
             if hapticStrength != oldValue { barHaptics = UIImpactFeedbackGenerator(style: FullKeyboardView.keyTickStyle(hapticStrength)) }
         }
@@ -173,6 +173,8 @@ final class KeyboardViewController: UIInputViewController {
         // about 80 ms late (Record typing logs), so q, a, p, l, shift and delete lagged and
         // could land after the next key. Apple's own keyboard has no such delay.
         view.window?.gestureRecognizers?.forEach { $0.delaysTouchesBegan = false }
+        fullKeyboard?.keyboardDidAppear()
+        fullKeyboard?.offerModelNotice()
         // Onboarding's practice tells Hex's keyboard on screen from another one, or iOS's
         // dictation, by these.
         bridge.recordKeyboardShown(at: Date().timeIntervalSince1970)
@@ -205,7 +207,7 @@ final class KeyboardViewController: UIInputViewController {
         // keyboard does, and iOS gives up on a keyboard slow to draw.
         let autoStart = DispatchWorkItem { [weak self] in
             self?.autoStartDictationIfPending()
-            // Experiments › Speech model in keyboard: last, and it loads off the main thread.
+            // Settings › Dictation › Speech model in keyboard: last, and it loads off the main thread.
             if let self, self.isShown, self.hasFullAccess, !self.memoryWarned { KeyboardParakeet.shared.warmUp() }
         }
         launchWork = [lexicon, optional, autoStart]
@@ -350,6 +352,7 @@ final class KeyboardViewController: UIInputViewController {
         updateKeyboardTraits()
         followTypingLogField()
         fullKeyboard?.textDidChange()
+        liveTyping.checkSent()
         observeDictationEdits(fromKeys: false)
         noteHostTextChange()
         handOffNumericPadIfNeeded()
@@ -494,8 +497,8 @@ final class KeyboardViewController: UIInputViewController {
 
     // MARK: - Learn how I type
 
-    /// Dictations are followed only while Learn how I type is on, in plain text fields
-    /// that allow autocorrect.
+    /// Dictations are followed only while Learn how I type is on, in text and web search
+    /// fields that allow autocorrect.
     private var learnsFromDictation: Bool {
         guard TypingJournalSettings().isEnabled,
               case .keys(let kind, _) = KeyboardFieldRouting.route(for: textDocumentProxy.keyboardType)
@@ -516,6 +519,21 @@ final class KeyboardViewController: UIInputViewController {
         let context = editContext
         if logDictationEdits.isTracking { logDictationEdits.observe(context, fromKeys: fromKeys) }
         if dictationEdits.isTracking { dictationEdits.observe(context, fromKeys: fromKeys) }
+    }
+
+    /// Type as I speak's words went out with the app's Send: a dictation kept as typed (the host
+    /// emptying the field, as `DictationEditTracker` reads a send), out of Undo's reach, and
+    /// the capture goes on as a fresh dictation.
+    private func liveWordsSent(_ sent: KeyboardLiveTyping.Sent?) {
+        guard let sent else { return localDictation.releaseSend(sent: false) }
+        if learnsFromDictation {
+            let before = sent.before ?? ""
+            dictationEdits.willInsert(heard: sent.heard, inserted: sent.typed, context: .init(before: before, after: "", hasText: !before.isEmpty))
+            dictationEdits.observe(.init(before: before + sent.typed, after: "", hasText: true), fromKeys: true)
+            dictationEdits.observe(.init(before: "", after: "", hasText: false), fromKeys: false)
+        }
+        fullKeyboard?.hideUndo()
+        localDictation.releaseSend(sent: true)
     }
 
     /// A return key labelled Send ends the dictation's edit window: what is there is sent.
@@ -669,10 +687,13 @@ final class KeyboardViewController: UIInputViewController {
         localDictation.liveText = viewModel.liveText
         liveTyping.attach(viewModel.liveText)
         liveTyping.mayType = { [weak self] in self?.fullKeyboard?.engine.hasPendingSelectionDictation != true }
+        viewModel.liveText.fieldTakesTyping = { [weak self] in self?.liveTyping.takesTyping ?? true }
         liveTyping.didEdit = { [weak self] in
             self?.fullKeyboard?.engine.forgetTextAroundKeys()
             self?.fullKeyboard?.engine.textDidChange()
         }
+        liveTyping.willSend = { [weak self] in self?.localDictation.holdForSend() }
+        liveTyping.didSettleSend = { [weak self] sent in self?.liveWordsSent(sent) }
         viewModel.onPasteDictation = { [weak self] in self?.pasteOfferedDictation() }
         viewModel.onDictateTap = { [weak self] in self?.startWarmDictation() }
         viewModel.onHexKeyPress = { [weak self] at in self?.hexKeyPressed(at: at) }
@@ -1399,7 +1420,7 @@ final class KeyboardViewController: UIInputViewController {
         }
         // As the full keyboard's emoji key: fields that take any text.
         let takesEmoji: Bool = {
-            guard case .keys(.text, _) = KeyboardFieldRouting.route(for: textDocumentProxy.keyboardType) else { return false }
+            guard case .keys(let kind, _) = KeyboardFieldRouting.route(for: textDocumentProxy.keyboardType), kind.takesWords else { return false }
             return textDocumentProxy.keyboardType != .asciiCapable
         }()
         let showsEmoji = FullKeyboardSettings().emoji && takesEmoji

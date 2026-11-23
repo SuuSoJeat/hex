@@ -127,6 +127,7 @@ extension KeyboardLayout {
         }
         switch field {
         case .text: break
+        case .webSearch: footer.append(character(.init(text: ".")))
         case .url: footer.append(contentsOf: [character(.init(text: ".")), character(.init(text: "/"))])
         case .email: footer.append(contentsOf: [character(.init(text: "@")), character(.init(text: "."))])
         }
