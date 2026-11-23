@@ -116,18 +116,11 @@ struct KeyboardSettingsPage: View {
     private var swipeLanguages: String {
         _ = revision
         let settings = FullKeyboardSettings()
-        let includesGerman = settings.spatialAutocorrect && settings.germanSpatialAutocorrect
-        guard settings.swipesIn(.khmer), configuredKhmerLayout() != nil else {
-            guard settings.swipeMoreLanguages else { return String(localized: "English and Spanish only") }
-            if includesGerman { return String(localized: "English, Spanish, French, Polish and German") }
-            return String(localized: "English, Spanish, French and Polish")
-        }
-        var languages: [KeyboardLanguage] = [.english, .spanish]
+        var languages: [KeyboardLanguage] = [.english, .spanish, .khmer]
         if settings.swipeMoreLanguages {
             languages += [.french, .polish]
-            if includesGerman { languages.append(.german) }
+            if settings.spatialAutocorrect && settings.germanSpatialAutocorrect { languages.append(.german) }
         }
-        languages.append(.khmer)
         return ListFormatter.localizedString(byJoining: languages.map {
             Locale.current.localizedString(forLanguageCode: $0.rawValue) ?? $0.displayName
         })
@@ -224,6 +217,7 @@ struct KeyboardSettingsPage: View {
 
             // Typing: autocorrect, swipe, vocabulary.
             if fullKeyboard {
+                let includesKhmer = configuredKhmerLayout() != nil
                 SettingsSectionHeader(title: "Typing")
 
                 SettingsCard {
@@ -236,7 +230,9 @@ struct KeyboardSettingsPage: View {
 
                     SettingsToggleRow(
                         title: String(localized: "Autocorrect"),
-                        detail: String(localized: "Fixes typos when you press space"),
+                        detail: includesKhmer
+                            ? String(localized: "Fixes typos on space and applies Khmer typing shortcuts")
+                            : String(localized: "Fixes typos when you press space"),
                         isOn: binding(\.autocorrect)
                     )
 
@@ -245,7 +241,7 @@ struct KeyboardSettingsPage: View {
 
                         SettingsToggleRow(
                             title: String(localized: "Spatial autocorrect"),
-                            detail: configuredKhmerLayout() != nil
+                            detail: includesKhmer
                                 ? String(localized: "English, Spanish, French and Polish. In Khmer, ranks spelling suggestions by where you tap.")
                                 : String(localized: "English, Spanish, French and Polish only"),
                             isOn: binding(\.spatialAutocorrect)

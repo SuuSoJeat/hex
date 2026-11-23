@@ -301,10 +301,10 @@ final class SwipeTyping {
 }
 
 extension KeyboardLanguage {
-    /// Swipe typing's default layouts, English and Spanish. Another language swipes too with a
+    /// Swipe typing's default layouts, English, Spanish, and Khmer. Another language swipes too with a
     /// typing model when Settings › Experiments › Swipe typing in more languages is on
     /// (`FullKeyboardSettings.swipesIn`); elsewhere a drag stays a slide to another key.
-    var supportsSwipeTyping: Bool { self == .english || self == .spanish }
+    var supportsSwipeTyping: Bool { self == .english || self == .spanish || self == .khmer }
 }
 
 /// The light trail behind a swiping finger: the last `tail` seconds of its path, which

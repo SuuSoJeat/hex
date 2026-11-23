@@ -175,7 +175,7 @@ extension FullKeyboardEngine {
     }
 
     private var allowsKhmerSmartTyping: Bool {
-        khmerismSmartMode && allowsKhmerSuggestions
+        autocorrect.isEnabled && allowsKhmerSuggestions
     }
 
     private var currentKhmerSmartRun: KhmerSmartRun? {

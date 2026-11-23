@@ -82,9 +82,6 @@ struct FullKeyboardSettings {
         static let koreanKeyboard = KoreanKeyboardExperiment.key
         static let khmerismNoColors = "experiments.khmerismNoColors"
         static let khmerismNoSuperscripts = "experiments.khmerismNoSuperscripts"
-        // Keep the choices saved by earlier Khmer builds.
-        static let khmerismSmartMode = "experiments.khmerismSmartMode"
-        static let khmerismSwipeTyping = "experiments.khmerismSwipeTyping"
         static let keyPopups = "settings.keyboardKeyPopups"
         static let haptics = "settings.keyboardHaptics"
         static let hapticStrength = "settings.keyboardHapticStrength"
@@ -184,25 +181,9 @@ struct FullKeyboardSettings {
         nonmutating set { defaults?.set(newValue, forKey: Key.khmerismNoSuperscripts) }
     }
 
-    /// Settings › Experiments › Khmer › Smart Mode. Off by default, shared by both layouts.
-    var khmerismSmartMode: Bool {
-        get { defaults?.object(forKey: Key.khmerismSmartMode) as? Bool ?? false }
-        nonmutating set { defaults?.set(newValue, forKey: Key.khmerismSmartMode) }
-    }
-
-    /// Settings › Experiments › Khmer › Khmer swipe typing. Off by default, shared by both layouts.
-    var khmerismSwipeTyping: Bool {
-        get { defaults?.object(forKey: Key.khmerismSwipeTyping) as? Bool ?? false }
-        nonmutating set { defaults?.set(newValue, forKey: Key.khmerismSwipeTyping) }
-    }
-
     func swipeTypingModel(for language: KeyboardLanguage, override: Bool? = nil) -> TypingDecoderModel? {
-        guard override ?? swipeTyping else { return nil }
-        if language == .khmer {
-            return (override ?? swipesIn(language)) ? TypingDecoderModel.bundled(language.rawValue) : nil
-        }
-        guard swipesIn(language) else { return nil }
-        return typingModel(for: language)
+        guard override ?? swipeTyping, swipesIn(language) else { return nil }
+        return language == .khmer ? TypingDecoderModel.bundled(language.rawValue) : typingModel(for: language)
     }
 
     /// The typing model the keyboard may read `language`'s taps with: its bundled model, with
@@ -217,12 +198,10 @@ struct FullKeyboardSettings {
         return TypingDecoderModel.bundled(language.rawValue)
     }
 
-    /// Swipes read English, Spanish, and Khmer when its own switch is on. The
-    /// Swipe typing in more languages experiment adds French (France), Polish, and German
-    /// while its model is chosen. Elsewhere a drag stays a slide to another key.
+    /// English, Spanish, and Khmer support swiping. The more-languages experiment adds
+    /// French (France), Polish, and German when its model is enabled.
     func swipesIn(_ language: KeyboardLanguage) -> Bool {
-        if language == .khmer { return khmerismSwipeTyping }
-        return swipeMoreLanguages ? typingModel(for: language) != nil : language.supportsSwipeTyping
+        language.supportsSwipeTyping || (swipeMoreLanguages && typingModel(for: language) != nil)
     }
 
     /// Suggestions and autocorrect may offer swear words (`OffensiveWords`); slurs never.
@@ -318,7 +297,7 @@ struct FullKeyboardSettings {
     }
 
     /// Settings › Keyboard › Swipe typing: slide through a word's letters to type it, on the
-    /// English and Spanish layouts (`SwipeTyping`), Khmer when its experiment is enabled,
+    /// English, Spanish, and Khmer layouts (`SwipeTyping`),
     /// and with Swipe typing in more languages on
     /// also every layout with a typing model (`swipesIn(_:)`). On by default. Stored as
     /// `experiments.swipeTyping`, from when it was an experiment (off by default): unset or
@@ -329,7 +308,7 @@ struct FullKeyboardSettings {
     }
 
     /// Settings › Experiments › Swipe typing in more languages adds languages whose models
-    /// are ready (see `swipesIn(_:)`). Off by default. Khmer has its own switch.
+    /// are ready (see `swipesIn(_:)`). Off by default.
     var swipeMoreLanguages: Bool {
         get { defaults?.object(forKey: Key.swipeMoreLanguages) as? Bool ?? false }
         nonmutating set { defaults?.set(newValue, forKey: Key.swipeMoreLanguages) }

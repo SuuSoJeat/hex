@@ -61,9 +61,7 @@ list starts at the top. The pages, one file each in `HEXMobile/Settings/`
   keyboard when unfolded (only on a foldable iPhone, `FullKeyboardView.isFoldable`);
   **Typing**: Adaptive touch (its status and Reset touch learning below the switch),
   Two-thumb selection, Delete swiped words letter by letter, Hide word suggestions, Emoji
-  shortcodes and Learn each language separately. With Full chosen and Khmer configured,
-  **Khmer** offers Smart Mode and Khmer swipe typing, both off by default. The
-  main Swipe typing switch also controls Khmer swipe. With the Khmerism layout selected,
+  shortcodes and Learn each language separately. With the Khmerism layout selected,
   **Khmerism** offers No colors and No superscripts. See [Khmer keyboard layouts](keyboard.md#khmer-keyboard-layouts)
   for what each switch changes.
 

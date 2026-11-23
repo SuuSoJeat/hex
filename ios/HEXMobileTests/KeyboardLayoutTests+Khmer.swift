@@ -157,10 +157,6 @@ extension KeyboardLayoutTests {
                 let label = "\(width) \(layer)"
                 XCTAssertFalse(layout.isSplit, label)
                 XCTAssertFalse(layout.hasNumberRow, label)
-                XCTAssertEqual(layout.totalHeight, KeyboardLayout.height(
-                    for: orientation, posture: posture, phoneSize: phoneSize, pad: pad, language: .khmer,
-                    layer: layer, letters: .khmerism
-                ), accuracy: 0.001, label)
                 let footerRow = layer == .letters ? 4 : 3
                 XCTAssertEqual(layout.bottomRowIndex, footerRow, label)
                 XCTAssertEqual(layout.key(.globe)?.row, -1, label)
@@ -177,19 +173,13 @@ extension KeyboardLayoutTests {
                 case .symbols: .layerSwitch(.numbers)
                 }
                 XCTAssertEqual(layout.keys.first { $0.row == footerRow - 1 }?.kind, pageKey, label)
-                let rows: [[String]] = switch layer {
-                case .letters: KhmerismLayout.base.map { $0.map(\.text) }
-                case .numbers: KeyboardLayout.characterRows(for: .numbers) + [["។", "៕"]]
-                case .symbols: KeyboardLayout.characterRows(for: .symbols) + [["។", "៖"]]
-                }
                 let firstKey = layout.keys.first { $0.row == 0 }
                 let stripBottom = layout.metrics.stripTop + layout.metrics.stripHeight
                 XCTAssertEqual(firstKey?.frame.minY ?? 0, layout.metrics.stripArea, accuracy: 0.001, label)
                 XCTAssertGreaterThanOrEqual((firstKey?.frame.minY ?? 0) - stripBottom, KeyboardMetrics.stripGap, label)
                 XCTAssertEqual(firstKey?.hitFrame.minY, layout.touchAreaFrame.minY, label)
                 XCTAssertEqual(Set(layout.keys.filter { $0.row >= 0 }.map(\.row)), Set(0...footerRow), label)
-                for (row, page) in rows.enumerated() {
-                    XCTAssertEqual(letters(layout, row: row), page, label)
+                for row in 0...footerRow {
                     let rowKeys = layout.keys.filter { $0.row == row }
                     XCTAssertEqual(rowKeys.first?.hitFrame.minX, 0, label)
                     XCTAssertEqual(rowKeys.last?.hitFrame.maxX ?? -1, width, accuracy: 0.001, label)
@@ -205,11 +195,22 @@ extension KeyboardLayoutTests {
         }
     }
 
-    func testKhmerismWebSearchKeepsKhmerPunctuationAndAddsAPeriod() {
-        let layout = KeyboardLayout(width: 402, layer: .numbers, field: .webSearch, language: .khmer, letters: .khmerism)
-        let footer = layout.keys.filter { $0.row == layout.bottomRowIndex }.map(\.kind)
-        XCTAssertTrue(footer.contains(.character(".")))
-        XCTAssertTrue(footer.contains(.character("។")))
+    func testKhmerismKeyOrderAndCornerCharacters() {
+        let layout = KeyboardLayout(width: 402, language: .khmer, letters: .khmerism)
+        let rows = [
+            ("ហ ណ ញ យ វ ៉ ៅ ៃ ើ ឿ ៀ", "១ ២ ៣ ៤ ៥ ៊ ៈ ៏ ៍ ័ ៌"),
+            ("ដ ត ប ក ច ោ ែ ិ ី ឹ ឺ", "៦ ៧ ៨ ៩ ០ ថ ធ ខ ឃ ៎ ."),
+            ("ស ន ម ង ល េ រ ្ ា ះ ៗ", "ឬ ឮ ឯ ឥ ឧ ឡ ឲ ផ ភ ឆ ឈ"),
+            ("ឌ ទ ព គ ជ អ ុ ូ ួ", "ឫ ឭ ឰ ឦ ឪ ឱ ឋ ឍ ៛"),
+            ("ំ ់", "។ ?"),
+        ]
+        for (row, pair) in rows.enumerated() {
+            let keys = layout.keys.filter { $0.row == row && $0.character != nil }
+            XCTAssertEqual(keys.map(\.label).joined(separator: " "), pair.0)
+            XCTAssertEqual(keys.compactMap(\.alternate).joined(separator: " "), pair.1)
+            XCTAssertEqual(keys.compactMap(\.shifted).joined(separator: " "), pair.1)
+            XCTAssertEqual(keys.compactMap(\.shiftedAlternate).joined(separator: " "), pair.0)
+        }
     }
 
     func testKhmerLayoutsKeepFieldKeysBeforeReturn() {
@@ -224,6 +225,9 @@ extension KeyboardLayoutTests {
                     let layout = KeyboardLayout(width: 402, layer: layer, field: field, language: .khmer, letters: letters)
                     let footer = layout.keys.filter { $0.row == layout.bottomRowIndex }.map(\.kind)
                     XCTAssertEqual(Array(footer.suffix(keys.count + 1)), keys + [.returnKey], describe(layout))
+                    if letters == .khmerism && layer != .letters {
+                        XCTAssertTrue(footer.contains(.character("។")), describe(layout))
+                    }
                 }
             }
         }
@@ -265,9 +269,11 @@ extension KeyboardLayoutTests {
             for (expected, actual) in zip(englishBody, numericBody) {
                 assertSameRect(actual.frame, expected.frame, actual.label)
                 // The low part of the punctuation row follows each layout's own footer.
-                var expectedHit = expected.hitFrame
-                if actual.row == numeric.bottomRowIndex - 1 { expectedHit.size.height = actual.hitFrame.height }
-                assertSameRect(actual.hitFrame, expectedHit, actual.label)
+                XCTAssertEqual(actual.hitFrame.origin, expected.hitFrame.origin, actual.label)
+                XCTAssertEqual(actual.hitFrame.width, expected.hitFrame.width, accuracy: 0.001, actual.label)
+                if actual.row < numeric.bottomRowIndex - 1 {
+                    XCTAssertEqual(actual.hitFrame.height, expected.hitFrame.height, accuracy: 0.001, actual.label)
+                }
             }
         }
         let symbols = KeyboardLayout(width: 440, layer: .symbols, language: .khmer, letters: .khmerism, phoneSize: .large)

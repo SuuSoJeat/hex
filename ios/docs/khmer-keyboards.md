@@ -90,7 +90,7 @@ options each default off. Hiding corner labels preserves hold-to-type.
   pop-ups and field-specific punctuation. The iPhone-style layout also follows
   the user's Hex/Globe placement, optional comma and period keys, and unfolded
   split preference.
-- Insert Khmer in typing order. With Smart Mode off, two presses on a vowel
+- Insert Khmer in typing order. With Autocorrect off, two presses on a vowel
   insert the vowel twice. Shape an entire suggestion together so that a
   highlighted prefix can end in coeng without separating the subscript.
 - Offer up to three offline completions, including with Autocorrect off.
@@ -115,13 +115,12 @@ The prototype uses the SIL/Keyman Khmer word-frequency list for completions,
 spelling candidates and swipe vocabulary. It retains the MIT notice for the
 list. [SIL lexical model](https://github.com/keymanapp/lexical-models/tree/e3918e6963c616db501ee7bb6b37d6051f3d59b1/release/sil/sil.km.ggc)
 
-## Optional typing aids
+## Smart typing and swipe typing
 
-**Smart Mode** and **Khmer swipe typing** are independent, off-by-default
-choices under **Settings › Experiments › Khmer** when Full is selected and
-Khmer is configured. Both work on either layout.
+Both layouts use the existing **Autocorrect** and **Swipe typing** switches in
+**Settings › Keyboard**. Both default on and can be turned off independently.
 
-- **Smart Mode** acts on the syllable just entered in an eligible text field.
+- With **Autocorrect** on, smart typing acts on the syllable just entered in an eligible text field.
   Tapping **ញ + ◌ំ** produces **ខ្ញុំ**. Subscript ញ and text already in the
   field retain their spelling. The sign key (◌៉ on Khmerism, ◌៊ on Khmer) offers
   the sign for **ក៏ ដ៏ ន៍ ស៊ ហ៊ អ៊ ប៉** after its respective consonant. Two
@@ -129,7 +128,7 @@ Khmer is configured. Both work on either layout.
   **◌ោះ** respectively. An explicit register shifter goes after the base,
   replacing any prior shifter. A first vowel goes before trailing final signs.
   Address, credential and correction-disabled fields retain literal input.
-- **Swipe typing** also requires Hex's main Swipe typing switch. Trace one
+- With **Swipe typing** on, trace one
   word in encoded order, including coeng and vowel signs, on the selected
   layout. Main and shifted characters can share a physical position. When
   two readings are close, an identified field with a visible suggestion strip
@@ -144,9 +143,9 @@ Khmer is configured. Both work on either layout.
 | Try this in the Full keyboard | Expected result |
 | --- | --- |
 | Enter **ស + ◌្** on each layout. On Khmer, tap **ថ**. On Khmerism, tap the position that usually types **◌ោ**. | Both give **ស្ថ**. The Khmerism key then shows **◌ោ** again. |
-| With Smart Mode off, tap **ញ + ◌ំ**. Repeat with it on in a fresh text field. | Literal **ញំ** first, then **ខ្ញុំ**. |
+| Tap **ញ + ◌ំ** in an ordinary text field with the default settings. Repeat with Autocorrect off. | **ខ្ញុំ** first, then literal **ញំ**. |
 | With Autocorrect off, type **កម្** and choose **កម្ពុជា**. | The keyboard appends **ពុជា** once, preserving the coeng in the prefix. |
-| In an identified field with Autocorrect on, type **សាលារ**, then press Space twice. | The first press gives **សាលា**. The second adds one space. |
+| With Autocorrect on, type **សាលារ**. Continue with **ៀន**, or press Space at the prefix. | Continuing gives **សាលារៀន**. Space keeps the final **រ** and inserts a space. |
 | Swipe Backspace left one word at the end of **ខ្ញុំទៅសាលា។** followed by a space. Slide back before lifting. | The field first reads **ខ្ញុំទៅ**, then recovers the exact original text, including punctuation and space. |
 | With swipe enabled, trace **បាន** then **ខ្ញុំ**. With whole-word swipe deletion enabled, press Backspace. | **បានខ្ញុំ** becomes **បាន**. A preceding word survives. |
 

@@ -339,8 +339,7 @@ alone. A word it may not offer, typed in full, is never corrected (as on Android
 
 On by default (stored as
 `experiments.swipeTyping` from when it was an experiment off by default: unset or true
-is on, false off, so testers who turned it off keep it off), for English and Spanish.
-Khmer uses its own off-by-default experiment and also needs the main switch on.
+is on, false off, so testers who turned it off keep it off), for English, Spanish and Khmer.
 Settings › Experiments › Swipe typing in more languages
 (`experiments.swipeMoreLanguages`, off by default) also enables the other languages with a
 typing model: French (France), Polish, and German while Spatial autocorrect and German
@@ -626,9 +625,9 @@ offers **Khmer** (the iPhone-style default) and **Khmerism**. Both support offli
 completions and spelling suggestions for joined Khmer text. On Khmerism, hold
 for a corner character or type coeng (្) to bring subscript consonants onto the keys.
 
-With Khmer configured, **Settings › Experiments › Khmer** offers **Smart Mode**
-and **Khmer swipe typing**, both off by default. Khmerism also has options to
-hide corner labels and key colors. See the [Khmer keyboard specification](khmer-keyboards.md)
+Both layouts use the keyboard’s **Autocorrect** switch for smart typing and
+the **Swipe typing** switch for tracing words. Both settings default on.
+**Settings › Experiments › Khmerism** can hide corner labels and key colors. See the [Khmer keyboard specification](khmer-keyboards.md)
 for both key maps, editing rules and worked examples.
 
 ## Keyboard layouts (each language's letters)

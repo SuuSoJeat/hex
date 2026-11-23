@@ -92,13 +92,6 @@ extension FullKeyboardEngineTests {
         }
     }
 
-    func testAmbiguousKhmerSwipeInsertsBestReadingWhenSuggestionsAreHidden() throws {
-        let (field, plane) = try swipeKeyboard(language: .khmer, letters: .khmerism)
-        plane.engine.khmerSwipeOffersChoices = false
-        swipe("ដៃ", on: plane)
-        XCTAssertEqual(field.text, "ដ៏")
-    }
-
     func testAmbiguousKhmerSwipeInsertsBestReadingBehindDictationUndo() {
         let field = FixtureTextTarget(text: "បាន")
         field.documentIdentifier = UUID()

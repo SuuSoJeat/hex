@@ -88,13 +88,6 @@ final class FullKeyboardEngine {
     var khmerAutocomplete: KhmerAutocomplete?
     var khmerAutocompleteLoad: Task<Void, Never>?
     var isAfterKhmerCoeng = false
-    var khmerismSmartMode = false {
-        didSet {
-            guard khmerismSmartMode != oldValue else { return }
-            khmerSmartRun = nil
-            onChange?()
-        }
-    }
     var khmerSmartRun: KhmerSmartRun?
     var khmerSpatialSuggestions = false {
         didSet {

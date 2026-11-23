@@ -472,7 +472,9 @@ final class KeyboardLayoutTests: XCTestCase {
                 let inEmojiMargin = emojiSlot?.contains(point) == true && emoji?.hitFrame.contains(point) == false
                 XCTAssertEqual(hits.count, inEmojiMargin ? 0 : 1, "\(describe(layout)) at \(point): \(hits.map(\.label))")
             }
-            XCTAssertNil(layout.hitTest(CGPoint(x: layout.stripFrame.midX, y: layout.stripFrame.midY)), "strip is not a key")
+            // Khmerism can put Globe on the left. The rest of the strip still passes touches through.
+            let x: CGFloat = layout.letters == .khmerism ? layout.stripFrame.midX : 20
+            XCTAssertNil(layout.hitTest(CGPoint(x: x, y: layout.stripFrame.midY)), "strip is not a key")
         }
     }
 
@@ -3386,15 +3388,8 @@ final class FullKeyboardSettingsTests: XCTestCase {
 
         XCTAssertFalse(settings.khmerismNoColors)
         XCTAssertFalse(settings.khmerismNoSuperscripts)
-        XCTAssertFalse(settings.khmerismSmartMode)
-        XCTAssertFalse(settings.khmerismSwipeTyping)
-        XCTAssertNil(settings.swipeTypingModel(for: .khmer))
-        XCTAssertNil(defaults.object(forKey: "experiments.khmerismSmartMode"), "Reading the default writes nothing")
-        XCTAssertNil(defaults.object(forKey: "experiments.khmerismSwipeTyping"), "Reading the default writes nothing")
         XCTAssertFalse(FullKeyboardSettings(defaults: nil).khmerismNoColors)
         XCTAssertFalse(FullKeyboardSettings(defaults: nil).khmerismNoSuperscripts)
-        XCTAssertFalse(FullKeyboardSettings(defaults: nil).khmerismSmartMode)
-        XCTAssertNil(FullKeyboardSettings(defaults: nil).swipeTypingModel(for: .khmer))
 
         settings.khmerismNoColors = true
         XCTAssertTrue(FullKeyboardSettings(defaults: defaults).khmerismNoColors)
@@ -3405,26 +3400,13 @@ final class FullKeyboardSettingsTests: XCTestCase {
         XCTAssertTrue(FullKeyboardSettings(defaults: defaults).khmerismNoSuperscripts)
         XCTAssertFalse(FullKeyboardSettings(defaults: defaults).khmerismNoColors)
 
-        settings.khmerismSmartMode = true
-        settings.khmerismSwipeTyping = true
-        XCTAssertEqual(defaults.object(forKey: "experiments.khmerismSmartMode") as? Bool, true)
-        XCTAssertEqual(defaults.object(forKey: "experiments.khmerismSwipeTyping") as? Bool, true)
-        XCTAssertTrue(FullKeyboardSettings(defaults: defaults).khmerismSmartMode)
-        XCTAssertEqual(FullKeyboardSettings(defaults: defaults).swipeTypingModel(for: .khmer)?.language, "km")
-        settings.swipeTyping = false
-        XCTAssertNil(settings.swipeTypingModel(for: .khmer), "The main switch disables Khmer swipe typing")
-        XCTAssertNil(settings.swipeTypingModel(for: .english))
-        settings.swipeTyping = true
         XCTAssertEqual(settings.swipeTypingModel(for: .khmer)?.language, "km")
         XCTAssertNil(settings.typingModel(for: .khmer), "The swipe model stays out of spatial autocorrect")
-
-        settings.khmerismSwipeTyping = false
-        XCTAssertEqual(defaults.object(forKey: "experiments.khmerismSwipeTyping") as? Bool, false)
-        XCTAssertNil(FullKeyboardSettings(defaults: defaults).swipeTypingModel(for: .khmer))
-        XCTAssertNotNil(settings.swipeTypingModel(for: .english))
-        settings.khmerismSmartMode = false
-        XCTAssertEqual(defaults.object(forKey: "experiments.khmerismSmartMode") as? Bool, false)
-        XCTAssertFalse(FullKeyboardSettings(defaults: defaults).khmerismSmartMode)
+        settings.swipeTyping = false
+        XCTAssertNil(settings.swipeTypingModel(for: .khmer), "The main switch disables Khmer swipe typing")
+        settings.swipeTyping = true
+        settings.swipeMoreLanguages = true
+        XCTAssertEqual(settings.swipeTypingModel(for: .khmer)?.language, "km")
     }
 
     /// The experiment is off until its switch is turned on, and it keeps its App Group key.

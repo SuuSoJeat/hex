@@ -287,7 +287,6 @@ final class FullKeyboardView: UIView {
         engine.trackpadSelectionState.enabled = FullKeyboardSettings().twoThumbSelection
         engine.deletesSwipedWordsLetterByLetter = FullKeyboardSettings().deletesSwipedWordsLetterByLetter
         engine.quickAccentsEnabled = FullKeyboardSettings().quickAccents
-        engine.khmerismSmartMode = FullKeyboardSettings().khmerismSmartMode
         syncEmojiShortcodes()
         hidesWordSuggestions = FullKeyboardSettings().hideWordSuggestions
         syncHexPlacement()
@@ -604,7 +603,6 @@ final class FullKeyboardView: UIView {
             applyAppearance()
         }
         let settings = FullKeyboardSettings()
-        engine.khmerismSmartMode = settings.khmerismSmartMode
         plane.showsKhmerismColors = !settings.khmerismNoColors
         plane.showsKhmerismSuperscripts = !settings.khmerismNoSuperscripts
         hapticStrength = FullKeyboardSettings().hapticStrength
@@ -617,6 +615,7 @@ final class FullKeyboardView: UIView {
         let wantsAutocorrect = FullKeyboardSettings().autocorrect
         if engine.autocorrect.isEnabled != wantsAutocorrect {
             engine.autocorrect.isEnabled = wantsAutocorrect
+            engine.clearKhmerSmartRun()
             engine.refreshSuggestions()
         }
         let vocabulary = CustomVocabularySettings().terms
@@ -639,7 +638,7 @@ final class FullKeyboardView: UIView {
     /// Fixtures and tests turn Swipe typing on or off; otherwise its switch in Settings › Keyboard.
     var swipeOverride: Bool? { didSet { syncSwipeTyping() } }
 
-    /// Each supported layout uses its own bundled model. Khmerism has its own swipe setting.
+    /// Each supported layout uses its own bundled model and the shared Swipe typing setting.
     /// Off under VoiceOver, which has its own way to type.
     private func syncSwipeTyping() {
         let language: KeyboardLanguage = engine.layout.language == .khmer ? .khmer : engine.language

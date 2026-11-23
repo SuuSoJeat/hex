@@ -27,17 +27,17 @@ extension FullKeyboardEngineTests {
     }
 
     func testStandardKhmerShiftAndSmartModeUseTheSameTypingRules() {
-        for smartMode in [false, true] {
+        for autocorrect in [false, true] {
             smartField(language: .khmer)
             target.documentIdentifier = UUID()
             engine.letterLayout = .khmer
-            engine.khmerismSmartMode = smartMode
+            engine.autocorrect.isEnabled = autocorrect
             tap(.shift)
             tap(.character("្")) // ញ
             now += 0.5
             tap(.shift)
             tap(.character("ម")) // ំ
-            XCTAssertEqual(target.text, smartMode ? "ខ្ញុំ" : "ញំ")
+            XCTAssertEqual(target.text, autocorrect ? "ខ្ញុំ" : "ញំ")
             XCTAssertEqual(engine.shift.state, .off)
         }
     }
@@ -54,7 +54,6 @@ extension FullKeyboardEngineTests {
         tap(.character("ថ"))
         XCTAssertEqual(target.text, "ស្ថ")
 
-        engine.khmerismSmartMode = true
         tap(.character("ក"))
         XCTAssertEqual(engine.displayLabel(for: sign), "៏")
         tap(sign.kind)
@@ -63,7 +62,6 @@ extension FullKeyboardEngineTests {
 
     func testKhmerismSmartModeExpandsIInJoinedText() {
         useKhmerism()
-        engine.khmerismSmartMode = true
 
         tap(.character("ប"))
         tap(.character("ា"))
@@ -86,7 +84,6 @@ extension FullKeyboardEngineTests {
             target.textContentType = contentType
             target.autocorrectionType = autocorrection
             engine.configureForField()
-            engine.khmerismSmartMode = true
             tap(.shift)
             tap(.character("្")) // ញ
             tap(.shift)
@@ -95,8 +92,9 @@ extension FullKeyboardEngineTests {
         }
     }
 
-    func testKhmerismSmartModeDefaultsToLiteralTyping() {
+    func testKhmerismKeepsLiteralKeysWithAutocorrectOff() {
         useKhmerism()
+        engine.autocorrect.isEnabled = false
 
         tap(.character("ញ"))
         tap(.character("ំ"))
@@ -110,7 +108,6 @@ extension FullKeyboardEngineTests {
 
     func testKhmerismSmartModePreservesSubscriptNyo() {
         useKhmerism()
-        engine.khmerismSmartMode = true
 
         tap(.character("ក"))
         tap(.character("្"))
@@ -122,7 +119,6 @@ extension FullKeyboardEngineTests {
 
     func testKhmerismSmartModeDoesNotRewriteNyoAfterCaretMovement() {
         useKhmerism()
-        engine.khmerismSmartMode = true
 
         tap(.character("ញ"))
         target.adjustTextPosition(byCharacterOffset: -1)
@@ -137,7 +133,6 @@ extension FullKeyboardEngineTests {
     func testKhmerismSmartModeDoesNotRewriteExistingNyo() {
         target.insertText("ញ")
         useKhmerism()
-        engine.khmerismSmartMode = true
 
         tap(.character("ំ"))
 
@@ -149,7 +144,6 @@ extension FullKeyboardEngineTests {
         target.adjustTextPosition(byCharacterOffset: -target.text.count)
         engine = FullKeyboardEngine(target: target)
         useKhmerism()
-        engine.khmerismSmartMode = true
 
         tap(.character("ញ"))
         tap(.character("ំ"))
@@ -162,7 +156,6 @@ extension FullKeyboardEngineTests {
         for (consonant, sign) in pairs {
             smartField(language: .khmer)
             engine.letterLayout = .khmerism
-            engine.khmerismSmartMode = true
             let diacritic = KeyKind.character("៉")
             let key = try XCTUnwrap(engine.layout.key(diacritic))
 
@@ -179,7 +172,6 @@ extension FullKeyboardEngineTests {
 
     func testKhmerismSmartModeUsesLastExplicitDiacritic() {
         useKhmerism()
-        engine.khmerismSmartMode = true
         let diacritic = KeyKind.character("៉")
 
         tap(.character("ប"))
@@ -205,7 +197,6 @@ extension FullKeyboardEngineTests {
         for (vowel, combined) in pairs {
             smartField(language: .khmer)
             engine.letterLayout = .khmerism
-            engine.khmerismSmartMode = true
             tap(.character("ក"))
             tap(.character(vowel))
             now += 0.1
@@ -217,7 +208,6 @@ extension FullKeyboardEngineTests {
 
     func testKhmerismSmartModeLeavesSlowRepeatedVowelsLiteral() {
         useKhmerism()
-        engine.khmerismSmartMode = true
 
         tap(.character("ក"))
         tap(.character("ា"))
@@ -232,7 +222,6 @@ extension FullKeyboardEngineTests {
             target = field
             engine = FullKeyboardEngine(target: field)
             useKhmerism()
-            engine.khmerismSmartMode = true
             tap(.character("ម"))
             tap(.character("ក"))
             tap(.character("ា"))
@@ -248,7 +237,6 @@ extension FullKeyboardEngineTests {
 
     func testKhmerismSmartModeOrdersAnExplicitShifterBeforeTheSubscript() {
         useKhmerism()
-        engine.khmerismSmartMode = true
         tap(.character("ស"))
         tap(.character("្"))
         tap(.character("រ"))
@@ -260,7 +248,6 @@ extension FullKeyboardEngineTests {
 
     func testKhmerismSmartModeOrdersALateVowelBeforeTheFinalSign() {
         useKhmerism()
-        engine.khmerismSmartMode = true
         tap(.character("ក"))
         tap(.character("ំ"))
         tap(.character("ា"))
