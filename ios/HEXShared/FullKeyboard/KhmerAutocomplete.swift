@@ -13,12 +13,21 @@ struct KhmerAutocomplete: Sendable {
         let replacement: String
         let automaticallyApplies: Bool
         let rankedByTapPosition: Bool
+        let dictionaryAlternative: String?
 
-        init(typed: String, replacement: String, automaticallyApplies: Bool = true, rankedByTapPosition: Bool = false) {
+        init(typed: String, replacement: String, automaticallyApplies: Bool = true,
+             rankedByTapPosition: Bool = false, dictionaryAlternative: String? = nil) {
             self.typed = typed
             self.replacement = replacement
             self.automaticallyApplies = automaticallyApplies
             self.rankedByTapPosition = rankedByTapPosition
+            self.dictionaryAlternative = dictionaryAlternative
+        }
+
+        func selecting(_ word: String) -> Self? {
+            if word == replacement { return self }
+            guard word == dictionaryAlternative else { return nil }
+            return Self(typed: typed, replacement: word, automaticallyApplies: false)
         }
     }
 
@@ -46,7 +55,7 @@ struct KhmerAutocomplete: Sendable {
         }
     }
 
-    private static let minimumPrefixLength = 2
+    private static let minimumDuplicateMarkLength = 3
     private static let minimumSpellingLength = 4
     // Require the tap to be meaningfully closer to the alternative before changing the strip.
     private static let minimumSubstitutionGain = 0.65
@@ -119,17 +128,16 @@ struct KhmerAutocomplete: Sendable {
         let personal = PersonalLexicon(personalWords)
         let tail = beforeInput.utf16.reversed().prefix(Self.contextLength + 1).prefix(while: Self.isWordUnit)
         let run = Array(tail.prefix(Self.contextLength).reversed())
-        let lastStart = run.count - Self.minimumPrefixLength
-        guard lastStart >= 0 else { return [] }
+        guard !run.isEmpty else { return [] }
 
         // A connected Khmer run can contain multiple words. Look for the longest active
         // prefix preceded by known words, and allow splits only between Khmer clusters.
-        var wordStarts = Array(repeating: false, count: lastStart + 1)
+        var wordStarts = Array(repeating: false, count: run.count)
         wordStarts[0] = Self.beginsWord(run[0])
         if tail.count > Self.contextLength {
             // The lookback may start mid-word. Recover at a plausible cluster boundary near
             // the cut, then still require known words between there and the live prefix.
-            let lastRecoveryStart = min(max(longestWord, personal.longestWord), lastStart)
+            let lastRecoveryStart = min(max(longestWord, personal.longestWord), run.count - 1)
             if lastRecoveryStart > 0 {
                 for start in 1...lastRecoveryStart where Self.isBoundary(start, in: run) {
                     wordStarts[start] = true
@@ -137,7 +145,7 @@ struct KhmerAutocomplete: Sendable {
             }
         }
 
-        for start in 0...lastStart where wordStarts[start] {
+        for start in run.indices where wordStarts[start] {
             let prefix = run[start...]
             let personalMatches = personal.terms.filter { $0.count > prefix.count && $0.starts(with: prefix) }
             let preferred = personalMatches.compactMap { units -> Candidate? in
@@ -149,9 +157,8 @@ struct KhmerAutocomplete: Sendable {
             if prefix.count <= longestWord {
                 let first = lowerBound(of: prefix)
                 if first < entries.count, entries[first].units.starts(with: prefix) {
-                    // A finished word needs no completion. A shorter suffix could just be
-                    // its final syllable. A saved vocabulary term can still extend it.
-                    if entries[first].units.count == prefix.count || personal.words.contains(Array(prefix)) { return preferred }
+                    // A complete word may also start a longer one. Stay at this boundary;
+                    // a shorter suffix could just be the finished word's last syllable.
                     return preferred + completions(for: prefix, from: first, limit: limit - preferred.count) {
                         !personalMatches.contains($0.units) && mayOffer($0.word)
                     }
@@ -209,7 +216,7 @@ struct KhmerAutocomplete: Sendable {
             if !learned.isEmpty { return learned.count == 1 ? learned[0] : nil }
         }
         let eligible = suffixes.filter { spelling in
-            spelling.count >= Self.minimumPrefixLength + 1 && spelling.count <= longestWord + 1
+            spelling.count >= Self.minimumDuplicateMarkLength && spelling.count <= longestWord + 1
         }
         let repeatedMarks = eligible.compactMap(duplicateMarkCorrection)
         // Equivalent readings remove the same scalar. Keep the shortest confirmed replacement.
@@ -233,7 +240,8 @@ struct KhmerAutocomplete: Sendable {
             guard mayOffer(replacement) else { return nil }
             return Correction(
                 typed: typed, replacement: replacement, automaticallyApplies: confident,
-                rankedByTapPosition: replacement != edit.entry.word
+                rankedByTapPosition: replacement != edit.entry.word,
+                dictionaryAlternative: replacement != edit.entry.word && mayOffer(edit.entry.word) ? edit.entry.word : nil
             )
         }
         return nil
@@ -338,8 +346,19 @@ struct KhmerAutocomplete: Sendable {
     private func completions(
         for prefix: ArraySlice<UInt16>, from first: Int, limit: Int, mayOffer: (Entry) -> Bool
     ) -> [Candidate] {
-        let matches = entries[first...].prefix { $0.units.starts(with: prefix) }
-        return matches.filter(mayOffer).sorted(by: ranksAhead).prefix(limit).map { entry in
+        // A single letter can match thousands of words. Keep only the top few, and
+        // check the offer policy only when a word could actually enter the strip.
+        var best: [Entry] = []
+        for entry in entries[first...] {
+            guard entry.units.starts(with: prefix) else { break }
+            guard entry.units.count > prefix.count else { continue }
+            if best.count == limit, let last = best.last, !ranksAhead(entry, last) { continue }
+            guard mayOffer(entry) else { continue }
+            if best.count == limit { best.removeLast() }
+            let index = best.firstIndex { ranksAhead(entry, $0) } ?? best.endIndex
+            best.insert(entry, at: index)
+        }
+        return best.map { entry in
             Candidate(word: entry.word, suffix: String(decoding: entry.units.dropFirst(prefix.count), as: UTF16.self))
         }
     }
@@ -367,7 +386,7 @@ struct KhmerAutocomplete: Sendable {
 
     // All supported Khmer characters are in the BMP. Compare code units so a coeng or
     // combining vowel can be the last part of a valid prefix before its cluster is complete.
-    private static func isWordUnit(_ unit: UInt16) -> Bool {
+    static func isWordUnit(_ unit: UInt16) -> Bool {
         (0x1780...0x17D3).contains(unit) || unit == 0x17DD || unit == 0x200C || unit == 0x200D
     }
 
