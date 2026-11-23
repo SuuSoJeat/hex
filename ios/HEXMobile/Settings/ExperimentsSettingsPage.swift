@@ -57,6 +57,7 @@ struct ExperimentsSettingsPage: View {
             languagesSection
             layoutSection
             typingSection
+            khmerismSection
         }
         .animation(HexMotion.settleAnimation(reduceMotion: reduceMotion), value: adaptiveTouchOn)
         .animation(HexMotion.settleAnimation(reduceMotion: reduceMotion), value: keyboardThemesOn)
@@ -344,6 +345,27 @@ struct ExperimentsSettingsPage: View {
                     { TypingJournalSettings().learnsPerLanguage },
                     { TypingJournalSettings().learnsPerLanguage = $0 }
                 )
+            )
+        }
+    }
+
+    @ViewBuilder
+    private var khmerismSection: some View {
+        SettingsSectionHeader(title: "Khmerism")
+
+        SettingsCard {
+            SettingsToggleRow(
+                title: String(localized: "No colors"),
+                detail: String(localized: "Use the keyboard theme for all Khmerism keys"),
+                isOn: keyboardBinding(\.khmerismNoColors)
+            )
+
+            SettingsDivider()
+
+            SettingsToggleRow(
+                title: String(localized: "No superscripts"),
+                detail: String(localized: "Hide the corner labels. Holding a key still types its alternate."),
+                isOn: keyboardBinding(\.khmerismNoSuperscripts)
             )
         }
     }

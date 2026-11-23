@@ -348,9 +348,9 @@ struct KeyboardLanguagesPage: View {
         }
     }
 
-    /// The languages whose keys the keyboard shows, with more than one layout to pick: each
-    /// chosen one (Automatic's while none is), but only the first of English and Spanish, or
-    /// English and German, together, whose keys both type on (`KeyboardLanguageList.layout`).
+    /// Shows languages with a layout choice, using Automatic's language when
+    /// none is chosen. English and Spanish or English and German can share the first
+    /// language's keys (`KeyboardLanguageList.layout`).
     private var arranged: [KeyboardLanguage] {
         let typing = chosen.isEmpty ? [automatic] : chosen
         var seen = Set<KeyboardLanguage>()

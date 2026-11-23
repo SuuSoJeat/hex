@@ -85,6 +85,7 @@ extension FullKeyboardEngine {
         var expected: String
         /// The text after the cursor then: an insert at the cursor leaves it, a move changes it.
         var after: String?
+        var document: UUID?
         /// When Hex stops taking a host that still reports `reported` for merely behind.
         var until: TimeInterval
     }
@@ -96,10 +97,15 @@ extension FullKeyboardEngine {
     private var hostIsBehind: Bool {
         guard let expected = expectedTypingContext, clock() <= expected.until,
               target.hasText, (target.selectedText ?? "").isEmpty,
+              target.documentIdentifier == expected.document,
               target.documentContextAfterInput == expected.after else { return false }
         guard let reported = textBefore else { return true }
         if reported == expected.expected { return false }
         if reported == expected.reported { return true }
+        if layout.language == .khmer {
+            return reported.utf16.count >= (expected.reported?.utf16.count ?? 0)
+                && expected.expected.utf16.starts(with: reported.utf16)
+        }
         return reported.count >= (expected.reported?.count ?? 0) && expected.expected.hasPrefix(reported)
     }
 
@@ -114,10 +120,12 @@ extension FullKeyboardEngine {
     /// goes in: the text a host that has caught up reports next, for `typingContext` while
     /// it hasn't. Both are as `textBefore` reads them: quotes straight.
     func rememberTypingContext(before: String?, inserted: String) {
+        clearKhmerSmartRun()
         expectedTypingContext = ExpectedTypingContext(
             reported: textBefore,
             expected: (before ?? "") + SmartPunctuation.plain(inserted),
             after: target.documentContextAfterInput,
+            document: target.documentIdentifier,
             until: clock() + Self.typingContextLifetime
         )
     }
@@ -125,7 +133,9 @@ extension FullKeyboardEngine {
     /// A delete, a cursor move, a pick or a field change: what Hex typed is no longer what the
     /// host should report.
     func forgetTypingContext() {
+        clearKhmerSmartRun()
         expectedTypingContext = nil
+        dismissKhmerSwipeChoices()
     }
 
     /// Whether the host's update is Hex's own edit (an echo, or a host still behind it) rather

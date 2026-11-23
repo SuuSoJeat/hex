@@ -19,6 +19,7 @@ extension FullKeyboardEngine {
         /// to report them: an update that matches is the echo of Hex's own edit (`hostEchoed`).
         var before: String?
         var after: String?
+        var document: UUID? = nil
         /// Its other readings, cased as the word is, best first.
         var alternatives: [String]
     }
@@ -108,7 +109,10 @@ extension FullKeyboardEngine {
     /// Whether a letter touch may become a swipe now: on the letters page of a text or web
     /// search field (not an address or a URL), with no accent menu open.
     var allowsSwipes: Bool {
-        layerState.layer == .letters && field.takesWords && activeAccentMenu == nil
+        guard layerState.layer == .letters, field.takesWords, activeAccentMenu == nil else { return false }
+        // Leave the next key to finish an explicitly tapped coeng.
+        return layout.language != .khmer || (!isAfterKhmerCoeng && target.isSecureTextEntry != true
+            && TypingJournal.allows(field: field, target: target))
     }
 
     /// The letter keys a swipe is read against, where they're drawn.
@@ -119,6 +123,7 @@ extension FullKeyboardEngine {
     /// The word before a swipe's, lowercased, when only spaces (or the one the swipe will
     /// add) come between them.
     var swipePreviousWord: String? {
+        if layout.language == .khmer { return nil }
         let before = textBefore ?? ""
         return AutocorrectEngine.previousWord(SwipeTyping.needsSpace(before: before) ? before + " " : before, token: "")
     }
@@ -128,6 +133,9 @@ extension FullKeyboardEngine {
     var swipeSuggestions: [KeyboardSuggestion]? {
         if isSwiping {
             return swipePreview.map { [KeyboardSuggestion(displayText: $0, replacement: $0, kind: .primary(autoReplace: true))] } ?? []
+        }
+        if let choices = pendingKhmerSwipeChoices, khmerSwipeChoicesAreCurrent {
+            return choices.words.map { KeyboardSuggestion(displayText: $0, replacement: $0, kind: .swiped) }
         }
         guard let swipedWord else { return nil }
         let items = swipedWord.alternatives.prefix(3).map { KeyboardSuggestion(displayText: $0, replacement: $0, kind: .swiped) }
@@ -164,6 +172,7 @@ extension FullKeyboardEngine {
     /// With Auto-capitalization off, no capital you didn't ask for ("i'm", "monday"), but
     /// your own spellings keep theirs.
     func swipeCased(_ word: String, capital: Bool) -> String {
+        if layout.language == .khmer { return word }
         if shift.state == .locked { return word.uppercased() }
         guard let first = word.first else { return word }
         if capital { return first.uppercased() + word.dropFirst() }
@@ -179,6 +188,7 @@ extension FullKeyboardEngine {
     /// replacement ("home" as "at my house"), the swiped word's first, as Apple's keyboard
     /// offers one after a swipe (black box, iOS 27.2); space never puts it in.
     func swipeAlternatives(_ readings: [String], capital: Bool) -> [String] {
+        if layout.language == .khmer { return Array(readings.dropFirst().prefix(3)) }
         func replacement(_ reading: String) -> String? {
             guard target.autocorrectionType != .no else { return nil }
             let typed = capital ? reading.prefix(1).uppercased() + reading.dropFirst() : reading

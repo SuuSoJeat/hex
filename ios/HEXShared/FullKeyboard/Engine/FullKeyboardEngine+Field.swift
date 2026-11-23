@@ -5,6 +5,7 @@ import UIKit
 @MainActor
 extension FullKeyboardEngine {
     func didEdit() {
+        dismissKhmerSwipeChoices()
         suggestionSpaceBefore = nil
         swipeRetries.edited()
         // A key's own edit means a pending Dictate no longer has the field it picked.

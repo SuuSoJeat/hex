@@ -119,6 +119,30 @@ final class EmojiShortcodeTests: XCTestCase {
         XCTAssertEqual(target.text, "🍕 :piz")
     }
 
+    func testClosingColonCompletesAShortcodeOnKhmerism() throws {
+        let target = FixtureTextTarget(text: ":pizza")
+        let engine = FullKeyboardEngine(target: target)
+        engine.language = .khmer
+        let library = try library()
+        engine.emojiShortcode = { before in
+            guard let completion = EmojiShortcode.completion(before: before, library: library) else { return nil }
+            return EmojiShortcode.Replacement(
+                token: completion.token.text,
+                emoji: library.entries[completion.entry].emoji
+            )
+        }
+
+        let numbers = try XCTUnwrap(engine.layout.key(.layerSwitch(.numbers)))
+        let numbersPoint = CGPoint(x: numbers.frame.midX, y: numbers.frame.midY)
+        engine.touchBegan(id: 1, at: numbersPoint)
+        engine.touchEnded(id: 1, at: numbersPoint)
+        let colon = try XCTUnwrap(engine.layout.key(.character(":")))
+        let colonPoint = CGPoint(x: colon.frame.midX, y: colon.frame.midY)
+        engine.touchBegan(id: 2, at: colonPoint)
+        engine.touchEnded(id: 2, at: colonPoint)
+        XCTAssertEqual(target.text, "🍕")
+    }
+
     func testTheSettingIsOffByDefaultAndKeepsTheAppGroupKey() throws {
         let suite = "EmojiShortcodeTests-\(UUID().uuidString)"
         let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))

@@ -106,9 +106,17 @@ nonisolated final class TypingDecoderModel: @unchecked Sendable {
         return body(UnsafeRawBufferPointer(start: base.advanced(by: blobAt + s), count: start(i + 1) - s))
     }
 
-    /// The word's letter codes, or nil when it has a letter the model doesn't.
+    /// The word's codes, or nil when it has a character the model doesn't.
     func encode(_ word: String) -> [UInt8]? {
         var out: [UInt8] = []
+        if language == "km" {
+            // Each Khmer scalar has its own key, even inside a Swift Character.
+            for scalar in word.unicodeScalars {
+                guard let code = codes[Character(scalar)] else { return nil }
+                out.append(code)
+            }
+            return out
+        }
         for c in word {
             guard let code = codes[c] else { return nil }
             out.append(code)
@@ -404,6 +412,8 @@ nonisolated struct TypingDecoder {
     struct Keys: Equatable, Sendable {
         /// Each letter key's centre, shifted by your tap offsets when there are any.
         var centres: [Character: CGPoint]
+        /// Alternate glyphs that share their main glyph's physical key during a swipe.
+        var swipeAliases: [Character: Character] = [:]
         var pitch: CGSize
         /// The bottom letter row's centre, below which a tap may have been meant for space.
         var bottomRowY: CGFloat
@@ -418,11 +428,30 @@ nonisolated struct TypingDecoder {
             self.space = space
         }
 
+        static func swipeLetter(on key: KeyboardKey, language: KeyboardLanguage) -> Character? {
+            guard !key.isNumberRow, let text = key.character, text.count == 1, let letter = text.first else { return nil }
+            if language == .khmer {
+                return khmerSwipeGlyph(text) != nil || !khmerSwipeAlternates(on: key).isEmpty ? letter : nil
+            }
+            return letter.isLetter ? letter : nil
+        }
+
+        private static func khmerSwipeGlyph(_ text: String) -> Character? {
+            guard text.unicodeScalars.count == 1, let scalar = text.unicodeScalars.first,
+                  (0x1780...0x17D2).contains(scalar.value) || scalar.value == 0x17DD else { return nil }
+            return Character(scalar)
+        }
+
+        private static func khmerSwipeAlternates(on key: KeyboardKey) -> [Character] {
+            [key.shifted, key.alternate, key.shiftedAlternate].compactMap { $0.flatMap(khmerSwipeGlyph) }
+        }
+
         /// The letter keys of `layout` (nil off the letters page). `offsets` (in points, by
         /// letter) moves a centre to where you tend to tap it.
         init?(layout: KeyboardLayout, offsets: [Character: CGVector] = [:]) {
             guard layout.layer == .letters else { return nil }
             var centres: [Character: CGPoint] = [:]
+            var alternates: [(glyph: Character, key: Character)] = []
             var bottom: CGFloat = 0
             var space: CGRect?
             for key in layout.keys where key.kind == .space {
@@ -431,23 +460,30 @@ nonisolated struct TypingDecoder {
                 space = space.map { $0.union(bar) } ?? bar
             }
             for key in layout.keys {
-                guard let c = key.character, c.count == 1, let letter = c.first, letter.isLetter else { continue }
+                guard let letter = Self.swipeLetter(on: key, language: layout.language) else { continue }
                 let shift = offsets[letter] ?? .zero
                 // A split layout's halves are pushed together, so a letter on both halves (G, V)
                 // has one centre, where the unsplit keyboard has it.
                 centres[letter] = CGPoint(x: layout.unsplitX(key.frame.midX) + shift.dx, y: key.frame.midY + shift.dy)
                 bottom = max(bottom, key.frame.midY)
+                if layout.language == .khmer {
+                    for glyph in Self.khmerSwipeAlternates(on: key) { alternates.append((glyph, letter)) }
+                }
             }
             let m = layout.metrics
             self.init(
                 centres: centres,
                 pitch: CGSize(
-                    width: layout.isSplit ? SplitGeometry.pitch : layout.letterWidth + m.gap,
+                    width: layout.swipePitch,
                     height: m.keyHeight + m.rowGap
                 ),
                 bottomRowY: bottom,
                 space: space
             )
+            // The main face is the canonical path for a glyph also offered on another key.
+            for (glyph, key) in alternates where centres[glyph] == nil && swipeAliases[glyph] == nil {
+                swipeAliases[glyph] = key
+            }
         }
     }
 

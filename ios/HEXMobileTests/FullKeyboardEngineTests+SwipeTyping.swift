@@ -3,6 +3,87 @@ import XCTest
 @testable import HEX
 
 extension FullKeyboardEngineTests {
+    func testKhmerSwipesJoinAndUndoStopsAtTheLastWordsBoundary() throws {
+        let field = KhmerScalarDeletingTarget(text: "")
+        field.lagsAfterDeleting = true
+        let (_, plane) = try swipeKeyboard(language: .khmer, target: field)
+        swipe("បាន", on: plane)
+        swipe("ខ្ញុំ", on: plane)
+        XCTAssertEqual(field.text, "បានខ្ញុំ")
+        plane.engine.deleteBackward()
+        XCTAssertEqual(field.text, "បាន")
+        tap(.space, on: plane)
+        XCTAssertEqual(field.text, "បាន ")
+    }
+
+    func testRegularKhmerSwipesJoinAndUndoAfterSwitchingLayouts() throws {
+        let field = KhmerScalarDeletingTarget(text: "")
+        field.lagsAfterDeleting = true
+        let (_, plane) = try swipeKeyboard(language: .khmer, target: field)
+        swipe("បាន", on: plane)
+        plane.engine.letterLayout = .khmer
+        swipe("ខ្ញុំ", on: plane)
+        XCTAssertEqual(field.text, "បានខ្ញុំ")
+        plane.engine.deleteBackward()
+        XCTAssertEqual(field.text, "បាន")
+    }
+
+    func testAmbiguousKhmerSwipeWaitsForPickAndCanReplaceIt() throws {
+        let field = KhmerScalarDeletingTarget(text: "បាន")
+        let (_, plane) = try swipeKeyboard(language: .khmer, target: field)
+        swipe("ដៃ", on: plane)
+        XCTAssertEqual(field.text, "បាន")
+        let first = try XCTUnwrap(plane.engine.suggestions.first { $0.replacement == "ដៃ" })
+        plane.engine.acceptSuggestion(first)
+        XCTAssertEqual(field.text, "បានដៃ")
+        let alternate = try XCTUnwrap(plane.engine.suggestions.first { $0.replacement == "ដ៏" })
+        plane.engine.acceptSuggestion(alternate)
+        XCTAssertEqual(field.text, "បានដ៏")
+        tap(.space, on: plane)
+        XCTAssertEqual(field.text, "បានដ៏ ")
+    }
+
+    func testAmbiguousKhmerSwipeDoesNotInsertAfterHostTextChanges() throws {
+        let (field, plane) = try swipeKeyboard("បាន", language: .khmer)
+        swipe("ដៃ", on: plane)
+        let reading = try XCTUnwrap(plane.engine.suggestions.first { $0.replacement == "ដៃ" })
+        field.insertText("ទៅ")
+        plane.engine.textDidChange()
+        plane.engine.acceptSuggestion(reading)
+        XCTAssertEqual(field.text, "បានទៅ")
+    }
+
+    func testAmbiguousKhmerSwipeInsertsBestReadingWhenSuggestionsAreHidden() throws {
+        let (field, plane) = try swipeKeyboard(language: .khmer)
+        plane.engine.khmerSwipeOffersChoices = false
+        swipe("ដៃ", on: plane)
+        XCTAssertEqual(field.text, "ដ៏")
+    }
+
+    func testSwitchingAwayFromKhmerClearsSwipeAlternatives() throws {
+        let (field, plane) = try swipeKeyboard("បាន", language: .khmer)
+        swipe("ដៃ", on: plane)
+        let pick = try XCTUnwrap(plane.engine.suggestions.first { $0.replacement == "ដៃ" })
+        plane.engine.acceptSuggestion(pick)
+        let alternate = try XCTUnwrap(plane.engine.suggestions.first { $0.replacement == "ដ៏" })
+
+        plane.engine.language = .english
+        XCTAssertNil(plane.engine.swipedWord)
+        plane.engine.acceptSuggestion(alternate)
+        XCTAssertEqual(field.text, "បានដៃ")
+    }
+
+    func testKhmerSwipeLeavesTapsAndCornerHoldsAvailable() throws {
+        let (field, plane) = try swipeKeyboard(language: .khmer)
+        tap(.character("ប"), on: plane)
+        let key = try XCTUnwrap(plane.engine.layout.key(.character("ិ")))
+        let centre = CGPoint(x: key.frame.midX, y: key.frame.midY)
+        plane.began(id: 52, sample: sample(centre))
+        XCTAssertTrue(plane.engine.handleCharacterHold(forTouch: 52))
+        plane.ended(id: 52, sample: sample(centre))
+        XCTAssertEqual(field.text, "បខ")
+    }
+
     /// Hex's vocabulary list reaches Swipe typing: a word no dictionary or model has
     /// ("kubectl") is swiped once it's in the list.
     func testSwipeTypesYourVocabularyWords() throws {

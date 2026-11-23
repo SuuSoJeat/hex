@@ -617,6 +617,62 @@ swipe typing, next-key growth and the neighbouring-key cost read the keys as dra
 Adaptive touch learns each arrangement as its own key plane; typing logs' `layout` lines
 name it (`letters`).
 
+## Khmer keyboard layouts
+
+Choose **ភាសាខ្មែរ** under **Settings › Keyboard › Languages**. Its **Layout** menu
+offers **Khmerism** by default and **Khmer** for the iPhone's Khmer key arrangement.
+
+**Khmer** follows the iPhone's main, Shift, 123 and #+= key order using Hex's
+keyboard theme. The first row includes Khmer digits. The 123 page has Arabic
+digits and Khmer symbols, and **ក** returns to letters. Coeng keeps the letter
+positions fixed.
+
+On **Khmerism**, tap a key for its main character and
+hold it for its corner character, shown in the pop-up when enabled. Tap Shift
+for one character or double-tap to lock the shifted layer. Tap Shift again to
+unlock. Space, Return and **កខគ** go from 123 or #+= back to the letters and
+clear Shift. Those pages use English rows with two Khmer punctuation keys beside Space.
+Arabic digits use the keyboard theme. Web search fields add a period before Return. On #+=,
+hold **។** or **៖** to type **៙** or **៚**. The five letter rows use Hex's key
+height and corner radius, with teal marks, green
+independent vowels and rose Khmer digits. The background and press colors follow
+the keyboard theme. Main and corner labels fit within each key using the visible
+bounds of the shaped character. The space between them keeps wide vowels and
+combining marks clear on narrow keys.
+When the caret follows coeng (**្**), common subscript consonants move onto the
+main keys and the corner labels hide. Hold a changed key to type its usual
+character. Shift still selects the full shifted layer. The usual labels return
+when the caret moves past or away from coeng.
+
+On either layout, the space bar shows **ខ្មែរ** and switches languages with the
+standard swipe. Emoji opens Hex's picker and Number Row follows the shared
+setting. The suggestion strip offers up to three offline completions. Tap one
+to append the missing characters. **Settings › Keyboard › Autocorrect** enables offline Khmer
+spelling suggestions. Space accepts a confident correction without inserting a
+space. Press Space again if you want a space after the corrected word. A quick
+double Space after a word types **។** and a space. iOS Text Replacement uses
+the shared shortcut behavior. Closing
+punctuation applies the correction and types the punctuation. Tap other dictionary
+guesses to use them. Tap the quoted spelling to keep it or tap the undo suggestion
+to restore it. After a correction with punctuation, Backspace reveals that option.
+
+Under **Settings › Keyboard › Khmer**, both options work in either layout and
+are off by default.
+
+- **Smart Mode** adds shortcuts such as **ញ** + **ំ** → **ខ្ញុំ**, adapts the
+  diacritic key (**៉** in Khmerism, **៊** in Khmer) after common consonants,
+  and orders marks within the syllable you just typed.
+- **Swipe typing** reads one word from the positions of its characters on your
+  layout, including shifted glyphs, coeng and vowel signs. Trace the keys in
+  typing order and lift to insert the word. Near-tied spellings wait for a tap in the suggestion
+  strip when suggestions are visible. Consecutive swipes join without spaces,
+  and Backspace takes back the last swiped word unless letter-by-letter deletion
+  is enabled.
+
+Under **Settings › Experiments › Khmerism**, **No colors** uses the keyboard theme
+for every key, and **No superscripts** hides the small corner labels while keeping
+hold-to-type. Both are off by default.
+
 ## Keyboard layouts (each language's letters)
 
 English,

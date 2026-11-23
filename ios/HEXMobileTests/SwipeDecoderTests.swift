@@ -8,7 +8,9 @@ import XCTest
 /// the keys type a swipe is in FullKeyboardEngineTests.
 @MainActor
 final class SwipeDecoderTests: XCTestCase {
-    private func decoder(_ language: KeyboardLanguage, swearing: Bool = false) throws -> (SwipeDecoder, TypingDecoder.Keys) {
+    private func decoder(
+        _ language: KeyboardLanguage, swearing: Bool = false, letters: KeyboardLetterLayout? = nil
+    ) throws -> (SwipeDecoder, TypingDecoder.Keys) {
         let model = try XCTUnwrap(TypingDecoderModel.bundled(language.rawValue), "the \(language) model is bundled")
         var decoder = SwipeDecoder(model: model)
         decoder.neverSuggest = TypingDecoder.NeverSuggest(
@@ -19,7 +21,7 @@ final class SwipeDecoderTests: XCTestCase {
                 AutocorrectEngine.englishContractions, cost: { SwipeDecoder.costOfContraction($0) }, model: model
             )
         }
-        let keys = try XCTUnwrap(TypingDecoder.Keys(layout: KeyboardLayout(width: 390, language: language)))
+        let keys = try XCTUnwrap(TypingDecoder.Keys(layout: KeyboardLayout(width: 390, language: language, letters: letters)))
         return (decoder, keys)
     }
 
@@ -60,6 +62,40 @@ final class SwipeDecoderTests: XCTestCase {
         for (language, word) in [(KeyboardLanguage.french, "bonjour"), (.german, "hallo"), (.polish, "dzień")] {
             let (decoder, keys) = try decoder(language)
             XCTAssertTrue(read(word, decoder, keys).prefix(2).contains(word), "\(language): \(word)")
+        }
+    }
+
+    func testKhmerSwipesKeepCoengAndCornerGlyphsInTypingOrder() throws {
+        let (decoder, keys) = try decoder(.khmer)
+        XCTAssertEqual(keys.swipeAliases["ខ"], "ិ")
+        XCTAssertNotNil(keys.centres["្"])
+        XCTAssertNotNil(keys.centres["ំ"])
+        let word = "ខ្ញុំ"
+        XCTAssertEqual(decoder.model.encode(word)?.count, 5)
+        XCTAssertEqual(read(word, decoder, keys).first, word)
+    }
+
+    func testKhmerNearTieAtTheSamePositionsOffersAChoice() throws {
+        let (decoder, keys) = try decoder(.khmer)
+        XCTAssertEqual(SwipePath.through("ដៃ", keys: keys), SwipePath.through("ដ៏", keys: keys))
+        let reading = decoder.read(SwipePath.through("ដៃ", keys: keys), keys: keys)
+        XCTAssertEqual(Set(reading.candidates.prefix(2).map(\.text)), ["ដៃ", "ដ៏"])
+        XCTAssertTrue(reading.requiresChoice)
+    }
+
+    func testRegularKhmerSwipesUseItsOwnBaseAndShiftedPositions() throws {
+        let (decoder, keys) = try decoder(.khmer, letters: .khmer)
+        let (khmerism, khmerismKeys) = try self.decoder(.khmer)
+        XCTAssertTrue(decoder.model === khmerism.model, "one bundled Khmer model")
+        XCTAssertNotEqual(SwipePath.through("ខ្ញុំ", keys: keys), SwipePath.through("ខ្ញុំ", keys: khmerismKeys))
+        XCTAssertLessThan(keys.pitch.width, khmerismKeys.pitch.width, "regular Khmer fits twelve columns")
+        XCTAssertEqual(keys.swipeAliases["ភ"], "ផ")
+        XCTAssertNil(keys.swipeAliases["ខ"], "regular Khmer has a base key for ខ")
+        for word in ["ខ្ញុំ", "ភាសា"] {
+            XCTAssertTrue(word.unicodeScalars.map(Character.init).allSatisfy {
+                keys.centres[keys.swipeAliases[$0] ?? $0] != nil
+            }, "\(word) has a position for every scalar")
+            XCTAssertEqual(read(word, decoder, keys).first, word)
         }
     }
 
@@ -148,9 +184,10 @@ enum SwipePath {
     /// letter's key, an apostrophe on none), a point every `step` points, moved by `offset`.
     static func through(_ word: String, keys: TypingDecoder.Keys, offset: CGVector = .zero, step: CGFloat = 6) -> [CGPoint] {
         var centres: [CGPoint] = []
-        for letter in word.lowercased() where letter != "'" {
+        let letters = keys.swipeAliases.isEmpty ? Array(word.lowercased()) : word.unicodeScalars.map(Character.init)
+        for letter in letters where letter != "'" {
             let base = String(letter).decomposedStringWithCanonicalMapping.unicodeScalars.first.map(Character.init)
-            guard let centre = keys.centres[letter] ?? base.flatMap({ keys.centres[$0] }) else { continue }
+            guard let centre = keys.centres[keys.swipeAliases[letter] ?? letter] ?? base.flatMap({ keys.centres[$0] }) else { continue }
             if centres.last != centre { centres.append(centre) }
         }
         guard let first = centres.first else { return [] }

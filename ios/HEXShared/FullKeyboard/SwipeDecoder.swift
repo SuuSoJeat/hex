@@ -156,6 +156,8 @@ nonisolated struct SwipeDecoder: Sendable {
         var candidates: [Candidate]
         /// Words that passed the key filters and were scored.
         var scored: Int
+        /// The best Khmer reading shares its path with another similarly likely spelling.
+        var requiresChoice = false
     }
 
     /// Words read beside the model's, each with its own cost (-ln P(word)): words the model
@@ -349,18 +351,28 @@ nonisolated struct SwipeDecoder: Sendable {
         quick.sort { $0.cost < $1.cost }
 
         let previousWord = previous.flatMap { model.index(of: $0.lowercased()) }
-        var scored: [(word: Int, cost: Double)] = []
+        var scored: [(candidate: Int, cost: Double)] = []
         for (c, _) in quick.prefix(max(limit, p.shortlist)) {
             let word = Int(words[c])
             if word >= 0, neverSuggest.follows(word, after: previousWord) { continue }
-            scored.append((word, spatial(c, aligned: true) + p.lmWeight * lmCost(word, after: previousWord)))
+            scored.append((c, spatial(c, aligned: true) + p.lmWeight * lmCost(word, after: previousWord)))
         }
         scored.sort { $0.cost < $1.cost }
         var candidates: [Candidate] = []
-        for (word, cost) in scored.prefix(limit) {
+        for (candidate, cost) in scored.prefix(limit) {
+            let word = Int(words[candidate])
             candidates.append(Candidate(text: word >= 0 ? model.word(word) : extraWords.texts[-1 - word], cost: cost))
         }
-        return Reading(candidates: candidates, scored: words.count)
+        var requiresChoice = false
+        if model.language == KeyboardLanguage.khmer.rawValue, let best = scored.first {
+            func path(_ c: Int) -> ArraySlice<UInt8> { sequence[Int(offsets[c])..<Int(offsets[c + 1])] }
+            // Identical geometry offers no evidence to distinguish these spellings.
+            // A one-nat gap allows a clear frequency favorite to commit immediately.
+            requiresChoice = scored.prefix(min(limit, 3)).dropFirst().contains {
+                $0.cost - best.cost <= 1 && path($0.candidate).elementsEqual(path(best.candidate))
+            }
+        }
+        return Reading(candidates: candidates, scored: words.count, requiresChoice: requiresChoice)
     }
 
     /// -ln P(word | previous) with stupid backoff (0.4) to the unigram, as Spatial autocorrect's;
@@ -410,7 +422,8 @@ nonisolated struct SwipeDecoder: Sendable {
                     keyOfCode[code] = Self.skip
                     continue
                 }
-                let own = index[model.characters[code]]
+                let character = model.characters[code]
+                let own = index[keys.swipeAliases[character] ?? character]
                 guard let key = own ?? index[model.characters[Int(model.baseCodes[code])]], key < 64 else { continue }
                 keyOfCode[code] = Int8(key)
                 codesOfKey[key].append(UInt8(code))
@@ -702,5 +715,8 @@ extension KeyboardLayout {
     }
 
     /// The distance between neighbouring letter keys' centres across: a split half's own pitch.
-    var swipePitch: CGFloat { isSplit ? SplitGeometry.pitch : letterWidth + metrics.gap }
+    var swipePitch: CGFloat {
+        if isSplit { return SplitGeometry.pitch }
+        return (letters == .khmer ? characterWidth : letterWidth) + metrics.gap
+    }
 }

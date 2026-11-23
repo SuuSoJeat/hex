@@ -3,6 +3,29 @@ import XCTest
 @testable import HEX
 
 extension FullKeyboardEngineTests {
+    func testKhmerSuggestionRendersCoengWithItsFollowingConsonant() throws {
+        let strip = KeyboardStripView(frame: CGRect(x: 0, y: 0, width: 390, height: 44))
+        let word = "កណ្ដុរ"
+        strip.update(suggestions: [suggestion(word, .khmerCompletion)], showsUndo: false, statusText: nil)
+        strip.layoutIfNeeded()
+        let slot = try XCTUnwrap(strip.subviews.first { $0.accessibilityLabel == word })
+        let format = UIGraphicsImageRendererFormat()
+        format.scale = 3
+        let renderer = UIGraphicsImageRenderer(size: slot.bounds.size, format: format)
+        let actual = renderer.pngData { _ in slot.draw(slot.bounds) }
+        let expected = renderer.pngData { _ in
+            let attributes: [NSAttributedString.Key: Any] = [
+                .font: UIFont.systemFont(ofSize: 17),
+                .foregroundColor: strip.palette.stripText,
+            ]
+            let text = word as NSString
+            let size = text.size(withAttributes: attributes)
+            text.draw(at: CGPoint(x: (slot.bounds.width - size.width) / 2,
+                                  y: (slot.bounds.height - size.height) / 2), withAttributes: attributes)
+        }
+        XCTAssertTrue(actual == expected, "The strip should shape the suggestion as a complete Khmer word")
+    }
+
     func testNextWordSuggestionsAppendOnlyOnAPickInTheSameWordGap() throws {
         engine.letterOdds = try XCTUnwrap(TypingDecoderModel.bundled("en"))
         type("thank ")
@@ -407,6 +430,7 @@ extension FullKeyboardEngineTests {
     /// while you type, so the suggestions never see the touch.
     func testTheKeysTakeTheStripsLowerHalfWhileTyping() {
         let view = FullKeyboardView(model: KeyboardViewModel(), target: target)
+        view.languageOverride = .english
         var clock: TimeInterval = 50
         view.engine.clock = { clock }
         view.frame = CGRect(x: 0, y: 0, width: 402, height: 262)

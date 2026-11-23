@@ -67,6 +67,7 @@ extension FullKeyboardEngine {
     /// Apple's own pairs).
     func displayLabel(for key: KeyboardKey) -> String {
         guard let character = key.character else { return key.label }
+        if layout.language == .khmer { return khmerLabel(for: key, base: character, shifted: isUppercase) }
         if typesFrenchApostrophe(character) { return SmartPunctuation.apostrophe }
         guard isUppercase, layerState.layer == .letters else { return character }
         if let shifted = key.shifted, layout.metrics.pad?.isDocked != true, shift.isUserShift { return shifted }
@@ -80,10 +81,38 @@ extension FullKeyboardEngine {
     /// A key's label as its keycap shows it (`keycapsUppercase`); pop-ups use `displayLabel`.
     func keycapLabel(for key: KeyboardKey) -> String {
         guard let character = key.character else { return key.label }
+        if layout.language == .khmer { return khmerLabel(for: key, base: character, shifted: keycapsUppercase) }
         if typesFrenchApostrophe(character) { return SmartPunctuation.apostrophe }
         guard keycapsUppercase else { return character }
         if let shifted = key.shifted, layout.metrics.pad?.isDocked != true, shift.isUserShift { return shifted }
         return layout.language == .korean ? HangulComposer.shifted(character) : character.uppercased()
+    }
+
+    private func khmerLabel(for key: KeyboardKey, base: String, shifted: Bool) -> String {
+        if shifted { return key.shifted ?? base }
+        if showsKhmerismCoengLayer { return KhmerismLayout.afterCoeng[base] ?? base }
+        if layout.layer == .letters, base == khmerAdaptiveSignKey, let sign = adaptiveKhmerSign { return sign }
+        return base
+    }
+
+    private var khmerAdaptiveSignKey: String { layout.letters == .khmerism ? "៉" : "៊" }
+
+    private var showsKhmerismCoengLayer: Bool {
+        layout.letters == .khmerism && isAfterKhmerCoeng && layout.layer == .letters
+    }
+
+    func khmerismAlternate(for key: KeyboardKey, onKeycap: Bool = false) -> String? {
+        let shifted = onKeycap ? keycapsUppercase : isUppercase
+        if shifted { return key.shiftedAlternate }
+        if showsKhmerismCoengLayer {
+            if onKeycap { return nil }
+            if let base = key.character, KhmerismLayout.afterCoeng[base] != nil { return base }
+        }
+        if layout.layer == .letters, key.character == khmerAdaptiveSignKey, let sign = adaptiveKhmerSign,
+           layout.letters == .khmer || sign == key.alternate {
+            return key.character
+        }
+        return key.alternate
     }
 
     /// The key a touch going down at `point` presses: the one under it, or a neighbouring

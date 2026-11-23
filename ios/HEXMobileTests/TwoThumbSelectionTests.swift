@@ -364,6 +364,7 @@ final class TwoThumbSelectionTests: XCTestCase {
     /// A selection takes the strip and puts it back exactly as hidden or visible as it was.
     func testASelectionRestoresTheStripsPriorVisibility() {
         let view = FullKeyboardView(model: KeyboardViewModel(), target: FixtureTextTarget())
+        view.languageOverride = .english
         view.frame = CGRect(x: 0, y: 0, width: 402, height: 262)
         view.layoutIfNeeded()
         let spaceKey = view.engine.layout.key(.space)!
