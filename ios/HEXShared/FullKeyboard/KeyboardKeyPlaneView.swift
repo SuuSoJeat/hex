@@ -636,7 +636,7 @@ final class KeyboardKeyPlaneView: UIView {
         swipe?.forget(id)
         let lingering = lingerKind(forEnding: id)
         if engine.touches[id]?.key.kind == .delete { stopDeleteRepeat() }
-        finishDeleteSwipe(for: id)
+        finishDeleteSwipe(for: id, at: sample.point.x)
         typingLog?.touch(.ended, id: id, sample: sample, key: engine.touches[id]?.key, under: engine.layout.hitTest(sample.point))
         engine.touchEnded(id: id, at: sample.point)
         if let lingering { linger(lingering) }
@@ -747,10 +747,10 @@ final class KeyboardKeyPlaneView: UIView {
         engine.cancelAllTouches()
     }
 
-    private func finishDeleteSwipe(for id: Int) {
+    private func finishDeleteSwipe(for id: Int, at x: CGFloat? = nil) {
         guard let swipe = deleteSwipe, swipe.touchID == id else { return }
-        swipe.finish()
         deleteSwipe = nil
+        swipe.finish(at: x)
     }
 
     private func armAccentTimer(for id: Int) {

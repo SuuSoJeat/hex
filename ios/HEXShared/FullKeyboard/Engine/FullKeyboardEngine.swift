@@ -784,7 +784,9 @@ final class FullKeyboardEngine {
             document: target.documentIdentifier
         )
         // A suggestion offered by the experiment must not become an automatic journal repair.
-        if !correction.rankedByTapPosition {
+        if correction.rankedByTapPosition {
+            learning?.didFinish(word: nil)
+        } else {
             learning?.record(
                 explicitlyPicked ? .picked : .autocorrected,
                 typed: correction.typed, final: correction.replacement, language: KeyboardLanguage.khmer.rawValue
@@ -1345,7 +1347,7 @@ final class FullKeyboardEngine {
         }
         guard let touch = touches.removeValue(forKey: id) else { return }
         touchOrder.removeAll { $0 == id }
-        if layout.language == .khmer, touch.key.kind == .shift {
+        if touch.key.kind == .shift {
             shift.shiftUp()
             logState("cancel")
         }

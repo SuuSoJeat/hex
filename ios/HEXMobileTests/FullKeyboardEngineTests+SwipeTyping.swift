@@ -448,6 +448,9 @@ extension FullKeyboardEngineTests {
         field.documentIdentifier = UUID()
         plane.engine.textDidChange()
         XCTAssertEqual(plane.engine.typingContext, "this")
+        field.documentIdentifier = UUID()
+        plane.engine.textDidChange()
+        XCTAssertEqual(plane.engine.typingContext, field.documentContextBeforeInput)
     }
 
     /// A host that stays behind longer than the keys believe one (`typingContextLifetime`)

@@ -664,9 +664,9 @@ readings.
 
 Hold Backspace or swipe it left to delete a whole word at a known Khmer word
 boundary. When the boundary is uncertain or a word cannot be safely removed, the
-hold uses regular Backspace and the swipe leaves the text in place. If iOS reports
-a delete late, Hex only restores it when the same identified field and input route
-still confirm the edit.
+hold uses regular Backspace. A swipe needs an identified field and stops if the
+field, caret or input route changes. Sliding back restores words at the same
+caret. A delayed delete is restored only when the host confirms the edit there.
 
 **Settings › Keyboard › Khmer** appears when Khmer is configured. Both options
 work in either layout and are on by default. Turning off the main **Swipe typing**

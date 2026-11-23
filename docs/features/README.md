@@ -2986,8 +2986,9 @@ iOS prototype (`HEXMobile`) -> Record/transcribe/copy and keyboard handoff
 │   the same field when iOS identifies it. Held and swiped word deletion use
 │   dictionary boundaries for joined Khmer and stop at a Khmer–Latin boundary. When
 │   the word boundary is uncertain or the edit cannot start safely, holding deletes
-│   one unit through the host and swiping leaves the text as it is. A delayed delete is restored
-│   only when the same identified field, input route, and caret confirm what changed.
+│   one unit through the host. A swipe needs an identified field and stops if the
+│   field, route, or caret changes. A delayed delete is restored when the host
+│   confirms what changed at the same caret.
 │   Checks:
 │   `KhmerAutocompleteTests`, `FullKeyboardEngineTests`.
 │   Settings › Keyboard › Spatial autocorrect (on by default while Autocorrect is on)

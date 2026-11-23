@@ -101,16 +101,24 @@ extension FullKeyboardEngine {
         guard let expected = expectedTypingContext, clock() <= expected.until,
               target.hasText, (target.selectedText ?? "").isEmpty,
               target.documentContextAfterInput == expected.after else { return false }
-        if layout.language == .khmer, let previous = expected.document,
-           let current = target.documentIdentifier, current != previous { return false }
-        guard let reported = textBefore else { return true }
-        if reported == expected.expected { return false }
-        if reported == expected.reported { return true }
-        if layout.language == .khmer {
-            return reported.utf16.count >= (expected.reported?.utf16.count ?? 0)
+        let document = target.documentIdentifier
+        if let previous = expected.document, let document, document != previous { return false }
+        let matches: Bool
+        if let reported = textBefore {
+            if reported == expected.expected { return false }
+            if reported == expected.reported {
+                matches = true
+            } else if layout.language == .khmer {
+                matches = reported.utf16.count >= (expected.reported?.utf16.count ?? 0)
                 && expected.expected.utf16.starts(with: reported.utf16)
+            } else {
+                matches = reported.count >= (expected.reported?.count ?? 0) && expected.expected.hasPrefix(reported)
+            }
+        } else {
+            matches = true
         }
-        return reported.count >= (expected.reported?.count ?? 0) && expected.expected.hasPrefix(reported)
+        if matches, expected.document == nil, let document { expectedTypingContext?.document = document }
+        return matches
     }
 
     /// The text before the cursor as word boundaries and casing read it: the host's, unless it
@@ -129,7 +137,7 @@ extension FullKeyboardEngine {
             reported: textBefore,
             expected: (before ?? "") + SmartPunctuation.plain(inserted),
             after: target.documentContextAfterInput,
-            document: layout.language == .khmer ? target.documentIdentifier : nil,
+            document: target.documentIdentifier,
             until: clock() + Self.typingContextLifetime
         )
     }
