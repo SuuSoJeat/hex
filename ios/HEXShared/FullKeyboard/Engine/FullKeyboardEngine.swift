@@ -178,9 +178,8 @@ final class FullKeyboardEngine {
     var joinsUnfoldedKeyboard = false {
         didSet { if joinsUnfoldedKeyboard != oldValue { rebuildLayout(cause: "join_unfolded") } }
     }
-    /// Settings › Experiments › Dvorak punctuation keys (off by default): English's Dvorak
-    /// letters gain comma and period on row 1 and a semicolon by the space bar, which type
-    /// `<`, `>` and `:` with shift.
+    /// Settings › Experiments › Dvorak punctuation keys (off by default). In joined text
+    /// fields, adds apostrophe, comma and period and puts Q and Z around the space bar.
     var dvorakPunctuation = false {
         didSet { if dvorakPunctuation != oldValue { rebuildLayout(cause: "dvorak_punctuation") } }
     }
