@@ -174,7 +174,8 @@ Dictation has its own switch (Settings › Dictation › Lowercase).
 On by default, shown under Autocorrect while it's on (it needs the full keyboard
 with Autocorrect on). Stored as `experiments.spatialAutocorrect` from when it was an
 experiment off by default: unset or true is on, false off, so testers who turned it
-off keep it off. A noisy-channel decoder
+off keep it off. Both [Khmer layouts](#khmer-keyboard-layouts) use this setting
+to rank spelling suggestions in the strip. A noisy-channel decoder
 (`TypingDecoder`) replaces `UITextChecker`'s one-edit guesses on space and in the
 strip for English, Spanish and French (France): each tap is scored against every letter with a 2D
 Gaussian around the key (shifted by Learn how I type's tap offsets when it has 20
@@ -655,10 +656,9 @@ guesses to use them. Tap the quoted spelling to keep it or tap the undo suggesti
 to restore it when iOS identifies the field. After a correction with punctuation,
 Backspace reveals that option.
 
-**Settings › Experiments › Typing › Khmer spatial suggestions** uses recent
-near-edge taps to rank single-character spelling guesses in either Khmer layout
-while Autocorrect is on. It is off by default and appears when Khmer is
-configured in the Full keyboard. Tap a suggestion to use it. Space and closing
+**Settings › Keyboard › Spatial autocorrect** uses recent near-edge taps to rank
+single-character spelling guesses in either Khmer layout. It's on by default
+while **Autocorrect** is on. Tap a suggestion to use it. Space and closing
 punctuation use regular Khmer autocorrect. Swipe typing uses its own gesture
 readings.
 

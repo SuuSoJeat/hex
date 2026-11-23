@@ -418,6 +418,34 @@ extension FullKeyboardEngineTests {
         XCTAssertNil(withoutSpatial.plane.swipe, "Spatial autocorrect is off")
     }
 
+    func testKhmerSuggestionsFollowSpatialAutocorrectWithoutDisablingSwipe() {
+        let settings = FullKeyboardSettings()
+        let wasOn = settings.spatialAutocorrect
+        let wasAutocorrect = settings.autocorrect
+        defer {
+            settings.spatialAutocorrect = wasOn
+            settings.autocorrect = wasAutocorrect
+        }
+        settings.spatialAutocorrect = true
+        settings.autocorrect = true
+        let view = FullKeyboardView(model: KeyboardViewModel(), target: target)
+        view.swipeOverride = true
+        view.languageOverride = .khmer
+        XCTAssertTrue(view.engine.khmerSpatialSuggestions)
+        XCTAssertEqual(view.plane.swipe?.model.language, "km")
+
+        settings.spatialAutocorrect = false
+        view.syncSettings()
+        XCTAssertFalse(view.engine.khmerSpatialSuggestions)
+        XCTAssertEqual(view.plane.swipe?.model.language, "km")
+
+        settings.spatialAutocorrect = true
+        settings.autocorrect = false
+        view.syncSettings()
+        XCTAssertFalse(view.engine.khmerSpatialSuggestions)
+        XCTAssertEqual(view.plane.swipe?.model.language, "km")
+    }
+
     /// The input mode's language (`UIInputViewController.primaryLanguage`), which Apple
     /// documents as superseding the Info.plist's `mul`: the keyboard reports the language
     /// resolved before the controller attaches, and each space-bar switch.

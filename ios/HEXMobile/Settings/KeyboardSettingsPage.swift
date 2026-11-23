@@ -251,7 +251,9 @@ struct KeyboardSettingsPage: View {
 
                         SettingsToggleRow(
                             title: String(localized: "Spatial autocorrect"),
-                            detail: String(localized: "English, Spanish, French and Polish only"),
+                            detail: usesKhmer
+                                ? String(localized: "Ranks Khmer spelling suggestions by where you tap")
+                                : String(localized: "English, Spanish, French and Polish only"),
                             isOn: binding(\.spatialAutocorrect)
                         )
                     }

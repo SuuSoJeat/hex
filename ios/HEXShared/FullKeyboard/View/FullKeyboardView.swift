@@ -288,7 +288,6 @@ final class FullKeyboardView: UIView {
         engine.deletesSwipedWordsLetterByLetter = FullKeyboardSettings().deletesSwipedWordsLetterByLetter
         engine.quickAccentsEnabled = FullKeyboardSettings().quickAccents
         engine.khmerismSmartMode = FullKeyboardSettings().khmerismSmartMode
-        engine.khmerSpatialSuggestions = FullKeyboardSettings().khmerSpatialSuggestions
         syncEmojiShortcodes()
         hidesWordSuggestions = FullKeyboardSettings().hideWordSuggestions
         syncHexPlacement()
@@ -606,7 +605,6 @@ final class FullKeyboardView: UIView {
         }
         let settings = FullKeyboardSettings()
         engine.khmerismSmartMode = settings.khmerismSmartMode
-        engine.khmerSpatialSuggestions = settings.khmerSpatialSuggestions
         plane.showsKhmerismColors = !settings.khmerismNoColors
         plane.showsKhmerismSuperscripts = !settings.khmerismNoSuperscripts
         hapticStrength = FullKeyboardSettings().hapticStrength
@@ -660,8 +658,10 @@ final class FullKeyboardView: UIView {
     /// centres to where Learn how I type saw you tap. The same word list lets the likely next
     /// letter claim a few points of its neighbour's touch target whether or not Spatial
     /// autocorrect is on (`FullKeyboardEngine.letterOdds`; only while autocorrecting).
+    /// In Khmer, the switch enables tap-ranked spelling suggestions.
     private func syncSpatialAutocorrect() {
         let settings = FullKeyboardSettings()
+        engine.khmerSpatialSuggestions = settings.autocorrect && settings.spatialAutocorrect
         let words = settings.typingModel(for: engine.language)
         if engine.letterOdds !== words {
             engine.letterOdds = words
