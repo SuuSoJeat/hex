@@ -13,7 +13,7 @@ extension FullKeyboardEngine {
     /// space keeps anyway), while the cursor is right after the latest autocorrection.
     func offeringRevert(_ suggestions: [KeyboardSuggestion]) -> [KeyboardSuggestion] {
         // A held space (`spacePending`) stands for the one delete takes first.
-        guard !spacePending, let correction = autocorrect.revertibleCorrection(before: textBefore) else {
+        guard !spacePending, let correction = autocorrect.revertibleCorrection(before: textBefore, document: target.documentIdentifier) else {
             return suggestions
         }
         let revert = KeyboardSuggestion(displayText: correction.original, replacement: correction.original, kind: .revert)
@@ -46,6 +46,8 @@ extension AutocorrectEngine {
         let changes: [Change]
         /// The text before the cursor right after `corrected`.
         let anchor: String
+        /// The field for corrections that use Khmer's checked proxy edits.
+        var document: UUID? = nil
 
         /// How much of the text before the cursor must read as `anchor`: hosts give a window of
         /// it, which may start elsewhere once the text is long.

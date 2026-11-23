@@ -233,7 +233,7 @@ final class FullKeyboardEngine {
     /// Called whenever something visible changed (page, shift, pressed keys, suggestions, accents).
     var onChange: (() -> Void)?
     /// Called after the keys typed or deleted anything.
-    var onEdit: (() -> Void)?
+    var onEdit: ((EditKind) -> Void)?
     /// Called when an accent cell ticks, for selection haptics.
     var onSelectionStep: (() -> Void)?
     /// Called just before the return key types its line break, so a send can be noticed.
@@ -639,11 +639,6 @@ final class FullKeyboardEngine {
             // The proxy must confirm the exact suffix before a replacement can delete it.
             if let live = textBefore, let before, live.utf16.elementsEqual(before.utf16) {
                 let change = khmerReplacementTail(from: run.syllable, to: replacement)
-                // At the left edge of a nonempty field, a proxy can report nil on delete,
-                // indistinguishable from a lagging read. Keep the literal keys there.
-                if change.removed.utf16.count == live.utf16.count, run.context.after?.isEmpty == false {
-                    return false
-                }
                 if removeKhmerSuffix(change.removed, from: live) != nil {
                     typingLog?.edit("delete", [
                         TypingLogField("deleted", .string(change.removed)),
@@ -688,7 +683,8 @@ final class FullKeyboardEngine {
         ])
         autocorrect.recordAppliedCorrection(
             original: correction.typed, corrected: correction.replacement, anchor: prefix + change.inserted,
-            changes: [.init(from: correction.typed, to: correction.replacement, language: .khmer)]
+            changes: [.init(from: correction.typed, to: correction.replacement, language: .khmer)],
+            document: target.documentIdentifier
         )
         learning?.record(
             explicitlyPicked ? .picked : .autocorrected,
@@ -710,39 +706,52 @@ final class FullKeyboardEngine {
         return (String(original.dropFirst(shared)), String(replacement.dropFirst(shared)))
     }
 
+    enum KhmerSuffixDeletion {
+        case rejected
+        case interrupted
+        case removed(prefix: String)
+    }
+
+    private func removeKhmerSuffix(_ suffix: String, from before: String) -> String? {
+        guard case .removed(let prefix) = deleteKhmerSuffix(suffix, from: before) else { return nil }
+        return prefix
+    }
+
     /// UIKit can delete one Khmer scalar where Swift sees a whole character. Stop at the
     /// exact word boundary, checking each step against the original text before the caret.
-    private func removeKhmerSuffix(_ suffix: String, from before: String) -> String? {
+    private func deleteKhmerSuffix(_ suffix: String, from before: String) -> KhmerSuffixDeletion {
         guard khmerDeleteRecovery == nil, let rawBefore = target.documentContextBeforeInput,
               SmartPunctuation.plain(rawBefore).utf16.elementsEqual(before.utf16),
               before.utf16.suffix(suffix.utf16.count).elementsEqual(suffix.utf16),
-              (target.selectedText ?? "").isEmpty else { return nil }
+              (target.selectedText ?? "").isEmpty else { return .rejected }
         let original = Array(rawBefore.utf16)
         let boundary = original.count - suffix.utf16.count
         let document = target.documentIdentifier
         let after = target.documentContextAfterInput
+        // With text to the right, a nil prefix after deleting to the start is ambiguous.
+        guard boundary != 0 || after?.isEmpty != false else { return .rejected }
         var end = original.count
         var previous = rawBefore
         while end > boundary {
             target.deleteBackward()
             var confirmed: (text: String, end: Int)?
             for _ in 0..<3 {
-                guard sameKhmerDeleteCaret(document: document, after: after) else { return nil }
+                guard sameKhmerDeleteCaret(document: document, after: after) else { return .interrupted }
                 confirmed = observedKhmerDelete(in: original, before: previous, end: end)
                 if confirmed != nil { break }
             }
             guard let confirmed else {
                 recoverKhmerDelete(in: original, before: previous, end: end, document: document, after: after)
-                return nil
+                return .interrupted
             }
             end = confirmed.end
             if end < boundary {
                 target.insertText(String(decoding: original.dropFirst(end), as: UTF16.self))
-                return nil
+                return .interrupted
             }
             previous = confirmed.text
         }
-        return SmartPunctuation.plain(previous)
+        return .removed(prefix: SmartPunctuation.plain(previous))
     }
 
     private func sameKhmerDeleteCaret(document: UUID?, after: String?) -> Bool {
@@ -1273,7 +1282,7 @@ final class FullKeyboardEngine {
         if takesSwipeBack, !deletesSwipedWordsLetterByLetter, let swiped, deleteSwipedWord(swiped) { return }
         let before = textBefore
         learning?.willErase(word: AutocorrectEngine.currentToken(in: before))
-        if autocorrect.revertibleCorrection(before: before.map { String($0.dropLast()) }) == nil {
+        if autocorrect.revertibleCorrection(before: before.map { String($0.dropLast()) }, document: target.documentIdentifier) == nil {
             adaptiveLearning?.willDelete(before: before)
         }
         if let log = typingLog {
@@ -1308,7 +1317,12 @@ final class FullKeyboardEngine {
                 deleteBackward(takesSwipeBack: false, source: "repeat_word")
                 return
             }
-            if deleteKhmerWord(suffix, before: before, source: "repeat_word") {
+            switch deleteKhmerWord(suffix, before: before, source: "repeat_word") {
+            case .rejected:
+                deleteBackward(takesSwipeBack: false, source: "repeat_word")
+            case .interrupted:
+                break
+            case .removed:
                 didEdit()
                 typingLog?.context("delete_word")
             }
@@ -1347,12 +1361,15 @@ final class FullKeyboardEngine {
                   let suffix = khmerAutocomplete?.wordSuffix(in: words, personalWords: autocorrect.ownWords) else { return nil }
             return suffix + trailing
         }
-        return DeleteWordSwipe.wordLength(before: before).map { String(before.suffix($0)) }
+        guard !words.isEmpty else { return trailing.isEmpty ? nil : String(trailing) }
+        let count = DeleteWordSwipe.wordLength(before: String(words), stopsAtKhmer: true) ?? 0
+        return String(words.suffix(count)) + trailing
     }
 
     /// A gesture can save the suffix for restoration only after the proxy confirms its removal.
-    func deleteKhmerWord(_ suffix: String, before: String, source: String) -> Bool {
-        guard removeKhmerSuffix(SmartPunctuation.plain(suffix), from: SmartPunctuation.plain(before)) != nil else { return false }
+    func deleteKhmerWord(_ suffix: String, before: String, source: String) -> KhmerSuffixDeletion {
+        let deletion = deleteKhmerSuffix(SmartPunctuation.plain(suffix), from: SmartPunctuation.plain(before))
+        guard case .removed = deletion else { return deletion }
         forgetTextAroundKeys()
         learning?.willErase(word: suffix)
         tokenTaps.removeAll()
@@ -1361,7 +1378,7 @@ final class FullKeyboardEngine {
             TypingLogField("deleted", .string(suffix)),
             TypingLogField("src", .string(source)),
         ])
-        return true
+        return deletion
     }
 
     // MARK: - Typing
@@ -1579,7 +1596,7 @@ final class FullKeyboardEngine {
     /// Learn how I type and Adaptive touch take it as an undone autocorrection.
     private func revertCorrection() {
         let before = textBefore
-        guard let correction = autocorrect.revertibleCorrection(before: before) else {
+        guard let correction = autocorrect.revertibleCorrection(before: before, document: target.documentIdentifier) else {
             return refreshSuggestions()
         }
         let isKhmer = correction.changes.contains { $0.language == .khmer }
@@ -1791,11 +1808,18 @@ final class FullKeyboardEngine {
     }
 
     private(set) var pendingKhmerSwipeChoices: KhmerSwipeChoices?
-    var khmerSwipeOffersChoices = true
+    var khmerSwipeOffersChoices = true {
+        didSet {
+            guard oldValue, !khmerSwipeOffersChoices, let choices = pendingKhmerSwipeChoices else { return }
+            let current = khmerSwipeChoicesAreCurrent
+            dismissKhmerSwipeChoices()
+            if current { commitSwipe(choices.words, edit: .resolvingObscuredSwipe) }
+        }
+    }
 
     var khmerSwipeChoicesAreCurrent: Bool {
         guard let choices = pendingKhmerSwipeChoices else { return false }
-        return khmerSwipeOffersChoices && layout.language == .khmer && allowsSwipes
+        return layout.language == .khmer && allowsSwipes
             && choices.before == typingContext && choices.after == target.documentContextAfterInput
             && choices.document == target.documentIdentifier && (target.selectedText ?? "").isEmpty
     }
@@ -1872,7 +1896,7 @@ final class FullKeyboardEngine {
         commitSwipe(readings)
     }
 
-    private func commitSwipe(_ readings: [String]) {
+    private func commitSwipe(_ readings: [String], edit: EditKind = .normal) {
         guard khmerDeleteRecovery == nil, let first = readings.first else { return }
         let before = typingContext
         let isKhmer = layout.language == .khmer
@@ -1903,7 +1927,7 @@ final class FullKeyboardEngine {
             alternatives: swipeAlternatives(readings, capital: capital)
         )
         logState("typed")
-        didEdit()
+        didEdit(edit)
         typingLog?.context("swipe")
     }
 
@@ -1982,10 +2006,15 @@ final class FullKeyboardEngine {
         let isKhmer = layout.language == .khmer
         if isKhmer {
             guard swiped.document == target.documentIdentifier, hostEchoed(swiped) else { return false }
-            guard removeKhmerSuffix(swiped.inserted, from: before) != nil else {
+            switch deleteKhmerSuffix(swiped.inserted, from: before) {
+            case .rejected:
+                return false
+            case .interrupted:
                 // The proxy may have partially applied the edit. Avoid an extra delete.
                 didEdit()
                 return true
+            case .removed:
+                break
             }
         }
         typingLog?.edit("delete", [

@@ -60,6 +60,96 @@ extension FullKeyboardEngineTests {
         XCTAssertEqual(field.text, "ដ៏")
     }
 
+    func testAmbiguousKhmerSwipeInsertsBestReadingBehindDictationUndo() {
+        let field = FixtureTextTarget(text: "បាន")
+        let view = FullKeyboardView(model: KeyboardViewModel(), target: field)
+        view.frame = CGRect(x: 0, y: 0, width: 390, height: 300)
+        view.languageOverride = .khmer
+        view.swipeOverride = true
+        view.layoutIfNeeded()
+        view.didInsertDictation("បាន")
+
+        swipe("ដៃ", on: view.plane)
+
+        XCTAssertEqual(field.text, "បានដ៏")
+        XCTAssertNil(view.engine.pendingKhmerSwipeChoices)
+    }
+
+    func testPendingKhmerSwipeInsertsBestReadingWhenANoticeTakesTheStrip() {
+        let field = FixtureTextTarget(text: "បាន")
+        let view = FullKeyboardView(model: KeyboardViewModel(), target: field)
+        view.frame = CGRect(x: 0, y: 0, width: 390, height: 300)
+        view.languageOverride = .khmer
+        view.swipeOverride = true
+        view.layoutIfNeeded()
+
+        swipe("ដៃ", on: view.plane)
+        XCTAssertNotNil(view.engine.pendingKhmerSwipeChoices)
+        view.showAllowPasteHint()
+        XCTAssertEqual(field.text, "បានដ៏")
+        XCTAssertNil(view.engine.pendingKhmerSwipeChoices)
+        XCTAssertTrue(view.showsAllowPasteHint)
+    }
+
+    func testPendingKhmerSwipePreservesTheFullAccessHintAndOpenHexAction() throws {
+        let field = FixtureTextTarget(text: "បាន")
+        let model = KeyboardViewModel()
+        model.hasFullAccess = false
+        var opened: URL?
+        model.onOpenURL = { opened = $0 }
+        let view = FullKeyboardView(model: model, target: field)
+        view.frame = CGRect(x: 0, y: 0, width: 390, height: 300)
+        view.languageOverride = .khmer
+        view.swipeOverride = true
+        view.layoutIfNeeded()
+
+        swipe("ដៃ", on: view.plane)
+        XCTAssertNotNil(view.engine.pendingKhmerSwipeChoices)
+        view.showFullAccessHint()
+        XCTAssertEqual(field.text, "បានដ៏")
+        XCTAssertNil(view.engine.pendingKhmerSwipeChoices)
+
+        let hint = try XCTUnwrap(view.stripView.subviews.first { $0 is FullAccessHintView })
+        XCTAssertFalse(hint.isHidden)
+        let openHex = try XCTUnwrap(hint.subviews.compactMap { $0 as? UIButton }.first)
+        openHex.sendActions(for: .touchUpInside)
+        XCTAssertEqual(opened, KeyboardLaunchRequest.setup.url)
+    }
+
+    func testAmbiguousKhmerSwipeInsertsBestReadingBehindEmojiShortcodes() throws {
+        let store = try XCTUnwrap(UserDefaults(suiteName: KeyboardBridge.appGroup))
+        let key = "experiments.emojiShortcodes"
+        let previous = store.object(forKey: key)
+        defer { store.set(previous, forKey: key) }
+        FullKeyboardSettings(defaults: store).emojiShortcodes = true
+
+        let field = FixtureTextTarget(text: ":pizza")
+        let view = FullKeyboardView(model: KeyboardViewModel(), target: field)
+        view.frame = CGRect(x: 0, y: 0, width: 390, height: 300)
+        view.languageOverride = .khmer
+        view.emojiOverride = true
+        view.swipeOverride = true
+        view.layoutIfNeeded()
+        XCTAssertTrue(view.emojiShortcodeSuggestions()?.contains { $0.replacement == "🍕" } == true)
+
+        swipe("ដៃ", on: view.plane)
+
+        XCTAssertEqual(field.text, ":pizzaដ៏")
+        XCTAssertNil(view.engine.pendingKhmerSwipeChoices)
+    }
+
+    func testKhmerSwipeBackspaceFallsBackToOneDeleteBeforeExistingText() throws {
+        let field = FixtureTextTarget(text: "hello")
+        field.adjustTextPosition(byCharacterOffset: -5)
+        let (_, plane) = try swipeKeyboard(language: .khmer, target: field)
+
+        swipe("បាន", on: plane)
+        XCTAssertEqual(field.text, "បានhello")
+        plane.engine.deleteBackward()
+
+        XCTAssertEqual(field.text, String("បាន".dropLast()) + "hello")
+    }
+
     func testSwitchingAwayFromKhmerClearsSwipeAlternatives() throws {
         let (field, plane) = try swipeKeyboard("បាន", language: .khmer)
         swipe("ដៃ", on: plane)

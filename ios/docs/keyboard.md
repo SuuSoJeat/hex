@@ -656,10 +656,11 @@ double Space after a word types **។** and a space. iOS Text Replacement uses
 the shared shortcut behavior. Closing
 punctuation applies the correction and types the punctuation. Tap other dictionary
 guesses to use them. Tap the quoted spelling to keep it or tap the undo suggestion
-to restore it. After a correction with punctuation, Backspace reveals that option.
+to restore it when iOS identifies the field. After a correction with punctuation,
+Backspace reveals that option.
 Hold Backspace or swipe it left to delete a whole word at a known Khmer word
-boundary. Without a known boundary, the hold uses regular Backspace and the
-swipe leaves the text in place.
+boundary. When the boundary is uncertain or a word cannot be safely removed, the
+hold uses regular Backspace and the swipe leaves the text in place.
 
 **Settings › Keyboard › Khmer** appears when Khmer is configured. Both options
 work in either layout and are on by default. Turning off the main **Swipe typing**
@@ -671,7 +672,8 @@ switch also turns off Khmer swipe typing. Saved choices are kept.
 - **Khmer swipe typing** reads one word from the positions of its characters on your
   layout, including shifted glyphs, coeng and vowel signs. Trace the keys in
   typing order and lift to insert the word. Near-tied spellings wait for a tap in the suggestion
-  strip when suggestions are visible. Swipe can read saved words whose characters
+  strip when suggestions are visible. When a chip or notice covers them, the
+  best reading goes in directly. Swipe can read saved words whose characters
   are in the model and offer iOS Text Replacement shortcuts in the strip. Consecutive
   swipes join without spaces, and Backspace takes back the last swiped word unless letter-by-letter deletion
   is enabled.

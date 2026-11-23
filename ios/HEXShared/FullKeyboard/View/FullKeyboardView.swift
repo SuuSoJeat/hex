@@ -243,17 +243,19 @@ final class FullKeyboardView: UIView {
         plane.onAccentMenuOpened = { [weak self] in self?.selectionFeedback() }
         engine.onSelectionStep = { [weak self] in self?.selectionFeedback() }
         engine.onChange = { [weak self] in self?.engineChanged() }
-        engine.onEdit = { [weak self] in
+        engine.onEdit = { [weak self] kind in
             guard let self else { return }
             if self.routedTarget.isSearching {
                 self.refreshEmojiSearch()
                 return
             }
             self.hideUndo()
-            self.vocabularyOffer = nil
-            self.hideFullAccessHint()
-            self.hideAllowPasteHint()
-            self.hideModelNotice()
+            if case .normal = kind {
+                self.vocabularyOffer = nil
+                self.hideFullAccessHint()
+                self.hideAllowPasteHint()
+                self.hideModelNotice()
+            }
             self.refreshReturnKey()
             self.refreshStrip()
             self.onTextEdit?()
@@ -639,7 +641,6 @@ final class FullKeyboardView: UIView {
     /// Each supported layout uses its own bundled model. Khmerism has its own swipe setting.
     /// Off under VoiceOver, which has its own way to type.
     private func syncSwipeTyping() {
-        engine.khmerSwipeOffersChoices = !hidesWordSuggestions
         let language: KeyboardLanguage = engine.layout.language == .khmer ? .khmer : engine.language
         let model = UIAccessibility.isVoiceOverRunning ? nil
             : FullKeyboardSettings().swipeTypingModel(for: language, override: swipeOverride)
@@ -940,7 +941,10 @@ final class FullKeyboardView: UIView {
             if case .code = clipboardOffer {} else { clipboardOffer = .dictation }
         }
         stripOffer = clipboardOffer
-        var suggestions = withStripEmoji(engine.suggestions, quiet: lastDictation != nil || status != nil || clipboardOffer != nil)
+        let shortcodes = emojiShortcodeSuggestions()
+        var suggestions = shortcodes ?? withStripEmoji(
+            engine.suggestions, quiet: lastDictation != nil || status != nil || clipboardOffer != nil
+        )
         // The experiment hides the words, not the strip: Undo, Paste, status, notices and the
         // Hex key keep their places, and an empty strip offers the clipboard as it does when no
         // word is suggested. What you typed before a correction (`.revert`) stays, so Delete
@@ -958,6 +962,8 @@ final class FullKeyboardView: UIView {
             fullAccessHint: showsFullAccessHint && !model.hasFullAccess,
             notice: allowPasteNotice ?? vocabularyNotice ?? translationNotice ?? modelNotice
         )
+        engine.khmerSwipeOffersChoices = shortcodes == nil && !hidesWordSuggestions && !stripView.isHidden
+            && stripView.acceptsSuggestions
     }
 
     /// The last dictation went in as spoken while Translate what I say was on: what happened,

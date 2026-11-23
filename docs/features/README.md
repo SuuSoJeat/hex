@@ -2968,10 +2968,11 @@ iOS prototype (`HEXMobile`) -> Record/transcribe/copy and keyboard handoff
 │   Closing punctuation applies the
 │   correction and types the punctuation. Other dictionary guesses are tap-to-accept.
 │   After a correction accepted with Space, the strip offers the original spelling
-│   immediately. After a correction with punctuation, Backspace reveals that option.
-│   Held and swiped word deletion use dictionary boundaries for joined Khmer. When no
-│   boundary is established, holding deletes one unit through the host and swiping
-│   leaves the text as it is. A delayed delete is restored when the host confirms
+│   immediately. After a correction with punctuation, Backspace reveals that option in
+│   the same field when iOS identifies it. Held and swiped word deletion use
+│   dictionary boundaries for joined Khmer and stop at a Khmer–Latin boundary. When
+│   the word boundary is uncertain or the edit cannot start safely, holding deletes
+│   one unit through the host and swiping leaves the text as it is. A delayed delete is restored when the host confirms
 │   what changed at the same caret.
 │   Checks:
 │   `KhmerAutocompleteTests`, `FullKeyboardEngineTests`.
@@ -2991,7 +2992,9 @@ iOS prototype (`HEXMobile`) -> Record/transcribe/copy and keyboard handoff
 │   └── Khmer swipe typing → trace one word using the positions of its characters on the selected
 │       layout, including shifted glyphs, coeng and vowel signs. Lift to insert
 │       without an automatic space. Near-tied words on the same path wait for a strip pick
-│       when suggestions are visible. The main Swipe typing switch also disables Khmer
+│       when suggestions are visible. A chip, emoji shortcode, or notice covering the
+│       suggestions lets the swipe insert its best reading while the notice remains usable.
+│       The main Swipe typing switch also disables Khmer
 │       swipe. Personal words and iOS Text Replacement use Hex's shared swipe suggestions.
 │       Backspace and replacement respect the last swipe's
 │       boundary. VoiceOver and a caret immediately after coeng keep regular key input.

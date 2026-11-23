@@ -53,7 +53,7 @@ final class DeleteWordSwipe {
         }
         if changed {
             engine.textDidChange()
-            engine.onEdit?()
+            engine.onEdit?(.normal)
         }
         return true
     }
@@ -76,7 +76,7 @@ final class DeleteWordSwipe {
         guard let before = engine.target.documentContextBeforeInput else { return false }
         if engine.layout.language == .khmer {
             guard let text = engine.khmerWordToDelete(before: before),
-                  engine.deleteKhmerWord(text, before: before, source: "delete_swipe") else { return false }
+                  case .removed = engine.deleteKhmerWord(text, before: before, source: "delete_swipe") else { return false }
             deleted.append(text)
             engine.onSelectionStep?()
             return true
@@ -110,7 +110,7 @@ final class DeleteWordSwipe {
     /// How many characters at the end of `before` make up its last word with the spaces and
     /// punctuation after it, as Option-Delete counts them ("Hello, world. " ends in
     /// "world. "); nil when nothing is before the cursor. Only spaces and punctuation go at once.
-    static func wordLength(before: String) -> Int? {
+    static func wordLength(before: String, stopsAtKhmer: Bool = false) -> Int? {
         guard !before.isEmpty else { return nil }
         var count = 0
         var index = before.endIndex
@@ -118,8 +118,11 @@ final class DeleteWordSwipe {
             index = before.index(before: index)
             count += 1
         }
-        while index > before.startIndex, isWordCharacter(before[before.index(before: index)]) {
-            index = before.index(before: index)
+        while index > before.startIndex {
+            let previous = before.index(before: index)
+            guard isWordCharacter(before[previous]),
+                  !stopsAtKhmer || !KhmerAutocomplete.endsWithWordText(before[previous..<index]) else { break }
+            index = previous
             count += 1
         }
         return count
