@@ -921,7 +921,7 @@ final class FullKeyboardEngine {
     /// keyboard does (black box, iOS 27.2), and the strip then offers what you typed
     /// (`offeringRevert`); Adaptive touch keeps the word's taps for that revert.
     func deleteBackward(takesSwipeBack: Bool = true, source: String = "key") {
-        guard khmerDeleteRecovery == nil else { return }
+        if consumeDeleteDuringKhmerRecovery() || cancelPendingKhmerSwipeOnBackspace() { return }
         if deleteHangulBackward() { return }
         // The held space is a boundary question that deletes nothing: ask it before forgetting
         // what Hex typed, and keep the record when it answers, as the text has not changed.

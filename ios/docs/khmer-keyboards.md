@@ -130,9 +130,13 @@ Both layouts use the existing **Autocorrect** and **Swipe typing** switches in
   Address, credential and correction-disabled fields retain literal input.
 - With **Swipe typing** on, trace one
   word in encoded order, including coeng and vowel signs, on the selected
-  layout. Main and shifted characters can share a physical position. When
-  two readings are close, an identified field with a visible suggestion strip
-  can wait for a choice. Otherwise, lifting inserts the best reading.
+  layout. Personal words can be swiped too, including a single syllable
+  traced across two keys. Main and shifted characters can share a physical
+  position. Lifting normally inserts the best reading. When two readings
+  are close, an identified field with a visible suggestion strip can wait
+  for a choice. Backspace dismisses the choice and preserves the field text.
+  Swiping also works in emoji search and ordinary text fields that turn off
+  spelling correction. Address and credential fields keep literal key input.
   Consecutive swipes join without spaces. Normal taps and holds remain
   available, including while VoiceOver is active or the caret follows coeng.
   In an identified field, Backspace can take back the last swipe as one word

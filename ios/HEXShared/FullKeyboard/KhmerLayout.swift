@@ -26,11 +26,11 @@ nonisolated enum KhmerLayout {
         glyphs(". , ' ? !"),
     ]
 
-    /// A Khmerism letter offers the other layer's character on an upward flick.
-    static func row(_ base: String, shifted: String, flicksBetweenLayers: Bool = false) -> [Key] {
+    /// Holding a Khmerism letter types the character on its other layer.
+    static func row(_ base: String, shifted: String, holdForOtherLayer: Bool = false) -> [Key] {
         zip(glyphs(base), glyphs(shifted)).map { main, shift in
-            Key(text: main, shifted: shift, alternate: flicksBetweenLayers ? shift : nil,
-                shiftedAlternate: flicksBetweenLayers ? main : nil)
+            Key(text: main, shifted: shift, alternate: holdForOtherLayer ? shift : nil,
+                shiftedAlternate: holdForOtherLayer ? main : nil)
         }
     }
 

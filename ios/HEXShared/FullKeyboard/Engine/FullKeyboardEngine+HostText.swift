@@ -36,6 +36,14 @@ extension KeyboardTextTarget {
     var documentIdentifier: UUID? { nil }
     var inputRouteRevision: Int { 0 }
     func adjustTextPosition(byCharacterOffset offset: Int) {}
+
+    var hasRestrictedTextContentType: Bool {
+        switch textContentType {
+        case .password, .newPassword, .oneTimeCode, .username, .emailAddress, .URL,
+             .creditCardNumber, .telephoneNumber: true
+        default: false
+        }
+    }
 }
 
 @MainActor

@@ -41,7 +41,7 @@ nonisolated struct KeyboardKey: Equatable, Sendable {
     /// keys (, and !, . and ?), which show both (`KeyboardLayout.padPairs`), and the Dvorak
     /// punctuation keys (<, > and :).
     var shifted: String?
-    /// Khmerism's swipe-up output on each letter layer.
+    /// What holding a Khmerism key types on each letter layer.
     var alternate: String?
     var shiftedAlternate: String?
 

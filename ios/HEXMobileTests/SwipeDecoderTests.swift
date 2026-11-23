@@ -83,6 +83,28 @@ final class SwipeDecoderTests: XCTestCase {
         XCTAssertTrue(reading.requiresChoice)
     }
 
+    func testKhmerPersonalWordCanSwipeAcrossTwoKeysInOneGrapheme() throws {
+        let (base, keys) = try decoder(.khmer, letters: .khmer)
+        var decoder = base
+        let word = "ឈី" // Shift-ឆ and Shift-ិ form a single Swift Character.
+        let path = SwipePath.through(word, keys: keys)
+        XCTAssertFalse(decoder.decode(path, keys: keys, limit: 32).contains { $0.text == word })
+        decoder.extraWords.add([word, "ឈ"], cost: SwipeDecoder.ownWordCost, model: decoder.model)
+        XCTAssertEqual(decoder.extraWords.texts, [word])
+        XCTAssertTrue(decoder.decode(path, keys: keys, limit: 32).contains { $0.text == word })
+    }
+
+    func testKhmerSwipePitchMatchesAdjacentKeyCentres() throws {
+        for letters in KeyboardLanguage.khmer.letterLayouts {
+            let layout = KeyboardLayout(width: 440, language: .khmer, letters: letters)
+            let row = layout.keys.filter { $0.row == 1 && $0.character != nil }
+            let keys = try XCTUnwrap(TypingDecoder.Keys(layout: layout))
+            let first = try XCTUnwrap(row.first)
+            let next = try XCTUnwrap(row.dropFirst().first)
+            XCTAssertEqual(keys.pitch.width, next.frame.midX - first.frame.midX, accuracy: 0.001, "\(letters)")
+        }
+    }
+
     func testRegularKhmerSwipesUseItsOwnBaseAndShiftedPositions() throws {
         let (decoder, keys) = try decoder(.khmer, letters: .khmer)
         let (khmerism, khmerismKeys) = try self.decoder(.khmer, letters: .khmerism)

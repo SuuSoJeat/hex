@@ -104,6 +104,7 @@ extension FullKeyboardEngineTests {
     func testKhmerCorrectionWaitsForTheHostToConfirmTheDeleteBeforeRestoring() async {
         let textTarget = KhmerScalarDeletingTarget(text: "ខ្ញុំចំនុច")
         textTarget.laggingReadsAfterDeleting = 6
+        textTarget.hidesAfterText = true
         target = textTarget
         target.documentIdentifier = UUID()
         await loadKhmerKeyboard(for: target)
@@ -115,6 +116,41 @@ extension FullKeyboardEngineTests {
 
         XCTAssertEqual(target.text, "ខ្ញុំចំនុច ")
         XCTAssertFalse(engine.suggestions.contains { $0.kind == .revert })
+    }
+
+    func testBackspaceDuringKhmerRecoveryCanRemoveQueuedInput() async throws {
+        let field = KhmerScalarDeletingTarget(text: "ខ្ញុំកមពុជា")
+        field.laggingReadsAfterDeleting = 6
+        field.documentIdentifier = UUID()
+        await loadKhmerKeyboard(for: field)
+
+        tap(.space)
+        let recovery = try XCTUnwrap(engine.khmerDeleteRecovery)
+        tap(.character("ក"))
+        tap(.delete)
+        tap(.delete)
+        await recovery.task.value
+
+        XCTAssertEqual(field.text, "ខ្ញុំកមពុជា")
+    }
+
+    func testKhmerRecoveryDoesNotRestoreTextAtAMovedCaretWithHiddenRightContext() async throws {
+        let field = KhmerScalarDeletingTarget(text: "ខ្ញុំកមពុជា")
+        field.laggingReadsAfterDeleting = 6
+        field.hidesAfterText = true
+        field.documentIdentifier = UUID()
+        await loadKhmerKeyboard(for: field)
+
+        tap(.space)
+        let recovery = try XCTUnwrap(engine.khmerDeleteRecovery)
+        let textAfterHostDelete = field.text
+        field.adjustTextPosition(byCharacterOffset: -3)
+        engine.selectionDidChange()
+        let newCaret = field.cursorIndex
+        await recovery.task.value
+
+        XCTAssertEqual(field.text, textAfterHostDelete)
+        XCTAssertEqual(field.cursorIndex, newCaret)
     }
 
     func testKhmerDeleteRecoveryDoesNotWriteAfterTheFieldChanges() async throws {

@@ -427,6 +427,13 @@ extension FullKeyboardEngine {
         cancelAllTouches()
     }
 
+    /// Backspace can undo input waiting behind the outstanding proxy delete.
+    func consumeDeleteDuringKhmerRecovery() -> Bool {
+        guard let recovery = khmerDeleteRecovery else { return false }
+        if !recovery.input.isEmpty { khmerDeleteRecovery?.input.removeLast() }
+        return true
+    }
+
     private func sameKhmerDeleteCaret(_ caret: KhmerDeleteCaret) -> Bool {
         target.documentIdentifier == caret.document && target.inputRouteRevision == caret.routeRevision
             && target.documentContextAfterInput == caret.after && (target.selectedText ?? "").isEmpty
@@ -455,6 +462,13 @@ extension FullKeyboardEngine {
                 guard let self, !Task.isCancelled else { return }
                 guard self.sameKhmerDeleteCaret(caret) else { break }
                 if let confirmed = self.observedKhmerDelete(in: original, before: before, end: end) {
+                    // With no right-hand context a cursor move can also reveal a shorter prefix.
+                    // Only a scalar or a whole grapheme can confirm the one outstanding Backspace.
+                    if caret.after == nil, self.target.hasText, let last = before.last {
+                        let removed = end - confirmed.end
+                        let cluster = String(last)
+                        guard removed == cluster.utf16.count || removed == cluster.unicodeScalars.last?.utf16.count else { break }
+                    }
                     let removed = String(decoding: original.dropFirst(confirmed.end), as: UTF16.self)
                     self.finishKhmerDeleteRecovery(restoring: removed, at: caret)
                     return

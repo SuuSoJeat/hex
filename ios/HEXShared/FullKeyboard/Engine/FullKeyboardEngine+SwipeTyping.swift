@@ -109,7 +109,7 @@ extension FullKeyboardEngine {
         guard layerState.layer == .letters, field.takesWords, activeAccentMenu == nil else { return false }
         // Leave the next key to finish an explicitly tapped coeng.
         return layout.language != .khmer || (!isAfterKhmerCoeng && target.isSecureTextEntry != true
-            && TypingJournal.allows(field: field, target: target))
+            && !target.hasRestrictedTextContentType)
     }
 
     /// The letter keys a swipe is read against, where they're drawn.
@@ -224,6 +224,13 @@ extension FullKeyboardEngine {
 
     func dismissKhmerSwipeChoices() {
         pendingKhmerSwipeChoices = nil
+    }
+
+    func cancelPendingKhmerSwipeOnBackspace() -> Bool {
+        guard khmerSwipeChoicesAreCurrent else { return false }
+        dismissKhmerSwipeChoices()
+        refreshSuggestions()
+        return true
     }
 
     var khmerSwipeChoicesAreCurrent: Bool {

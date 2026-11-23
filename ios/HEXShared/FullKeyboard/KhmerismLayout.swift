@@ -3,7 +3,7 @@
 /// and corner characters at each position.
 nonisolated enum KhmerismLayout {
     private static func row(_ main: String, shifted: String) -> [KhmerLayout.Key] {
-        KhmerLayout.row(main, shifted: shifted, flicksBetweenLayers: true)
+        KhmerLayout.row(main, shifted: shifted, holdForOtherLayer: true)
     }
 
     static let base: [[KhmerLayout.Key]] = [

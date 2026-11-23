@@ -2949,6 +2949,8 @@ iOS prototype (`HEXMobile`) -> Record/transcribe/copy and keyboard handoff
 │   ├── Type joined words → offline completions, spelling suggestions and word deletion
 │   ├── Khmerism → hold for corner characters; coeng brings subscript consonants onto the keys
 │   ├── Autocorrect → smart typing; Swipe typing → trace a word (both on by default)
+│   ├── Swipe in emoji search → only the query changes; Backspace on an uncommitted
+│   │   swipe choice dismisses it and preserves the preceding text
 │   └── Checks: KeyboardLayoutTests, KhmerAutocompleteTests and FullKeyboardEngineTests use
 │       key maps, simulated fields and synthetic paths. Physical swipe accuracy is unmeasured.
 ├── Korean keyboard (두벌식) (off by default, `experiments.koreanKeyboard`): Settings ›
