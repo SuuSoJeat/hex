@@ -158,10 +158,13 @@ extension FullKeyboardEngine {
 
     private func khmerFollowingWords(_ previous: String, prefix: String = "") -> [String] {
         func allowed(_ word: String) -> Bool {
-            word != previous && word.utf16.count > prefix.utf16.count && word.utf16.starts(with: prefix.utf16)
-                && autocorrect.mayOffer(word, after: previous)
+            word != previous && autocorrect.mayOffer(word, after: previous)
         }
-        var words = TypingDecoderModel.bundled(KeyboardLanguage.khmer.rawValue)?.nextWords(after: previous, allowing: allowed) ?? []
+        let compact = TypingDecoderModel.bundled(KeyboardLanguage.khmer.rawValue)
+        // Keep the established first-key ranking. With a known boundary or a
+        // longer prefix, the wider set of continuations becomes more useful.
+        let model = prefix.utf16.count == 1 ? compact : (khmerAutocomplete?.expandedWords ?? compact)
+        var words = model?.nextWords(after: previous, khmerPrefix: prefix, allowing: allowed) ?? []
         // While typing a prefix, the ordinary frequency-ranked completions fill any spare slots.
         guard prefix.isEmpty else { return words }
         for word in Self.khmerCommonWords where words.count < 3 && !words.contains(word) && allowed(word) {
@@ -215,6 +218,11 @@ extension FullKeyboardEngine {
             ]
             if let word = correction.dictionaryAlternative {
                 choices.append(KeyboardSuggestion(displayText: word, replacement: word, kind: .khmerCorrection(autoReplace: false)))
+            } else if correction.typed.utf16.count >= 2, index.expandedWords != nil,
+                      let completion = autocorrect.khmerCompletions(using: index, beforeInput: correction.typed).first(where: {
+                          $0.word != correction.replacement && $0.word.utf16.starts(with: correction.typed.utf16)
+                      }) {
+                choices.append(KeyboardSuggestion(displayText: completion.word, replacement: completion.suffix, kind: .khmerCompletion))
             }
             return choices
         }

@@ -149,6 +149,17 @@ struct AcknowledgementsView: View {
             """
         ),
         Entry(
+            title: "Expanded Khmer typing dictionary",
+            body: """
+            Hex adds Khmer spellings from the ICU Khmer break dictionary (Unicode and \
+            contributors, Unicode License V3), Google's Khmer pronunciation dictionary \
+            (© 2018 Google Inc., CC BY 4.0), and English Wiktionary contributors via \
+            Kaikki (CC BY-SA 4.0). Hex selects spellings and ranks continuations using \
+            Khmer Wikipedia. Source links, licences and changes are included in the \
+            keyboard's km-expanded-license.txt.
+            """
+        ),
+        Entry(
             title: "Khmerism keyboard layout",
             body: """
             Hex's Khmerism layout builds on the original Khmerism Keyboard Project by \
