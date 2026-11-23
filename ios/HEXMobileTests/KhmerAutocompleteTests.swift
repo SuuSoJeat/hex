@@ -148,6 +148,19 @@ final class KhmerAutocompleteTests: XCTestCase {
         XCTAssertEqual(model.suggestions(beforeInput: "សួស").first?.word, "សួស្តី")
     }
 
+    func testSupplementalWordsCompleteAndStayAsTyped() throws {
+        let bundled = try XCTUnwrap(KhmerAutocomplete.bundled)
+        for word in ["គច្ឆាមិ", "មហាយាន"] {
+            let prefix = String(decoding: word.utf16.dropLast(), as: UTF16.self)
+            XCTAssertTrue(bundled.suggestions(beforeInput: prefix).contains { $0.word == word })
+            XCTAssertNil(bundled.correction(beforeInput: word))
+        }
+
+        let model = KhmerAutocomplete(wordlist: "មួយ\t1", supplementalWords: "មហាយាន")
+        XCTAssertEqual(model.suggestions(beforeInput: "ម").map(\.word), ["មួយ", "មហាយាន"])
+        XCTAssertNil(model.correction(beforeInput: "មហាាយាន"))
+    }
+
     func testCorrectionsUseExactSuffixAfterEstablishedWordBoundaries() throws {
         let model = try XCTUnwrap(KhmerAutocomplete.bundled)
         let correction = KhmerAutocomplete.Correction(typed: "ចំនុច", replacement: "ចំណុច", automaticallyApplies: false)

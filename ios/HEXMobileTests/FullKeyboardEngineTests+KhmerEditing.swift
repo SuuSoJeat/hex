@@ -36,6 +36,58 @@ extension FullKeyboardEngineTests {
         }
     }
 
+    func testKhmerWordPairsAfterJoinedPicksOnBothLayouts() async throws {
+        for letters in [KeyboardLetterLayout.khmer, .khmerism] {
+            smartField(language: .khmer)
+            engine.letterLayout = letters
+            engine.autocorrect.isEnabled = false
+            await engine.khmerAutocompleteLoad?.value
+
+            for word in ["សូម", "អរគុណ"] {
+                engine.acceptSuggestion(try XCTUnwrap(engine.suggestions.first { $0.displayText == word }))
+            }
+            XCTAssertEqual(target.text, "សូមអរគុណ")
+            let next = try XCTUnwrap(engine.suggestions.first)
+            XCTAssertEqual(next.displayText, "ច្រើន")
+            XCTAssertEqual(next.kind, .khmerPrediction)
+            XCTAssertFalse(next.willAutoReplace)
+
+            tap(.character("ច"))
+            let completion = try XCTUnwrap(engine.suggestions.first)
+            XCTAssertEqual(completion.displayText, next.displayText)
+            XCTAssertEqual(completion.kind, .khmerCompletion)
+            engine.acceptSuggestion(completion)
+            XCTAssertEqual(target.text, "សូមអរគុណច្រើន")
+        }
+    }
+
+    func testKhmerWordPairsAfterTypedSeparatorsOnBothLayouts() async throws {
+        for letters in [KeyboardLetterLayout.khmer, .khmerism] {
+            for separator in [" ", "\u{200B}"] {
+                smartField(language: .khmer)
+                engine.letterLayout = letters
+                await engine.khmerAutocompleteLoad?.value
+                target.insertText("ញ៉ាំ" + separator)
+                engine.textDidChange()
+                XCTAssertEqual(engine.suggestions.first?.displayText, "បាយ")
+
+                tap(.character("ប"))
+                let completion = try XCTUnwrap(engine.suggestions.first)
+                XCTAssertEqual(completion.displayText, "បាយ")
+                engine.acceptSuggestion(completion)
+                XCTAssertEqual(target.text, "ញ៉ាំ" + separator + "បាយ")
+            }
+        }
+    }
+
+    func testKhmerCommonWordsFillSparsePredictionRows() async {
+        smartField(language: .khmer)
+        await engine.khmerAutocompleteLoad?.value
+        target.insertText("នមោ ")
+        engine.textDidChange()
+        XCTAssertEqual(engine.suggestions.map(\.displayText), ["តស្ស", "បាន", "មាន"])
+    }
+
     func testKhmerFirstKeyAndWholeWordCompletionsOnBothLayouts() async throws {
         for letters in [KeyboardLetterLayout.khmer, .khmerism] {
             smartField(language: .khmer)
@@ -43,22 +95,28 @@ extension FullKeyboardEngineTests {
             engine.letterLayout = letters
             engine.autocorrect.isEnabled = false
             await engine.khmerAutocompleteLoad?.value
+            tap(.character("ក"))
+            XCTAssertEqual(engine.suggestions.map(\.displayText), ["ការ", "ក្នុង", "កម្ពុជា"])
+            tap(.delete)
             engine.acceptSuggestion(try XCTUnwrap(engine.suggestions.first { $0.displayText == "ខ្ញុំ" }))
             tap(.character("ក"))
             XCTAssertEqual(target.text, "ខ្ញុំក")
-            XCTAssertEqual(engine.suggestions.map(\.displayText), ["ការ", "ក្នុង", "កម្ពុជា"])
-            let completion = try XCTUnwrap(engine.suggestions.first { $0.displayText == "កម្ពុជា" })
+            let completion = try XCTUnwrap(engine.suggestions.first)
+            XCTAssertEqual(completion.displayText, "ក៏")
             engine.acceptSuggestion(completion)
-            XCTAssertEqual(target.text, "ខ្ញុំកម្ពុជា")
+            XCTAssertEqual(target.text, "ខ្ញុំក៏")
 
-            tap(.space)
+            smartField(language: .khmer)
+            engine.letterLayout = letters
+            engine.autocorrect.isEnabled = false
+            await engine.khmerAutocompleteLoad?.value
             tap(.character("ស"))
             tap(.character("ា"))
-            XCTAssertEqual(target.text, "ខ្ញុំកម្ពុជា សា")
+            XCTAssertEqual(target.text, "សា")
             let school = try XCTUnwrap(engine.suggestions.first { $0.displayText == "សាលា" })
             XCTAssertFalse(school.willAutoReplace)
             engine.acceptSuggestion(school)
-            XCTAssertEqual(target.text, "ខ្ញុំកម្ពុជា សាលា")
+            XCTAssertEqual(target.text, "សាលា")
         }
     }
 
