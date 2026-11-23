@@ -308,17 +308,6 @@ extension FullKeyboardEngineTests {
         XCTAssertEqual(target.text, "១ហ")
     }
 
-    func testKhmerismCancellingHeldShiftAfterTypingReleasesTheChord() {
-        useKhmerism()
-        let key = KeyKind.character("ហ")
-        down(10, .shift)
-        tap(key)
-        engine.touchCancelled(id: 10)
-        XCTAssertFalse(engine.shift.isHeld)
-        tap(key)
-        XCTAssertEqual(target.text, "១ហ")
-    }
-
     func testKhmerismCornerHoldTypesOnceAndPreservesUnicodeScalars() throws {
         useKhmerism()
         tap(.character("ក"))

@@ -891,12 +891,8 @@ final class FullKeyboardEngine {
             activeAccentTouchID = nil
             typingLog?.ui("accent_cancel", [TypingLogField("id", .int(id))])
         }
-        guard let touch = touches.removeValue(forKey: id) else { return }
+        guard touches.removeValue(forKey: id) != nil else { return }
         touchOrder.removeAll { $0 == id }
-        if layout.language == .khmer, touch.key.kind == .shift {
-            shift.shiftUp()
-            logState("cancel")
-        }
         onChange?()
     }
 
