@@ -86,6 +86,7 @@ static MEETING_NOTES_FILE: AtomicBool = AtomicBool::new(false);
 const RETENTION_UNSET: u8 = u8::MAX;
 static MEETING_OUTPUT_FOLDER: OnceLock<RwLock<Option<PathBuf>>> = OnceLock::new();
 static MEETING_PROVIDERS: OnceLock<RwLock<Vec<MeetingProviderChoice>>> = OnceLock::new();
+static MEETING_DEFAULT_POLICY: AtomicU8 = AtomicU8::new(MeetingPolicy::Ask as u8);
 static CALENDAR_SETTINGS: OnceLock<RwLock<CalendarSettings>> = OnceLock::new();
 static MICROPHONE_POLICY: AtomicU8 = AtomicU8::new(0);
 static CUSTOM_TRANSFORMATIONS_SELECTED: AtomicBool = AtomicBool::new(false);
@@ -880,6 +881,7 @@ impl AppSettings {
             .get_or_init(Default::default)
             .write()
             .unwrap_or_else(|error| error.into_inner()) = self.meetings.providers.clone();
+        MEETING_DEFAULT_POLICY.store(self.meetings.default_policy as u8, Ordering::Release);
         *CALENDAR_SETTINGS
             .get_or_init(Default::default)
             .write()
@@ -1092,10 +1094,6 @@ impl AppSettings {
         RuntimeHotkeys {
             dictation: self.dictation_hotkey.runtime(),
             paste_last: self.paste_last_hotkey.as_ref().map(HotkeyBinding::runtime),
-            paste_meeting: self
-                .meetings
-                .available()
-                .then(|| HotkeyBinding::paste_meeting_default().runtime()),
             #[cfg(hex_capture)]
             capture: self.capture_on().then(|| self.capture.hotkey.runtime()),
             #[cfg(not(hex_capture))]
@@ -3281,20 +3279,7 @@ mod tests {
                 hotkeys.paste_last,
                 Some(HotkeyBinding::paste_last_default().runtime())
             );
-            #[cfg(debug_assertions)]
-            assert_eq!(
-                hotkeys.paste_meeting,
-                Some(HotkeyBinding::paste_meeting_default().runtime())
-            );
-            #[cfg(not(debug_assertions))]
-            assert_eq!(hotkeys.paste_meeting, None);
         }
-        let mut opted_in = AppSettings::default();
-        opted_in.meetings.enabled = true;
-        assert_eq!(
-            opted_in.runtime_hotkeys().paste_meeting,
-            Some(HotkeyBinding::paste_meeting_default().runtime())
-        );
     }
 
     /// Launched on Dvorak, then switched to U.S. (t1304): letter shortcuts,
@@ -3308,15 +3293,16 @@ mod tests {
             settings.map_or_else(RuntimeHotkeys::default, AppSettings::runtime_hotkeys)
         };
         test_layout::set([('v', 47)]);
-        let mut settings = AppSettings::default();
-        settings.meetings.enabled = true;
-        settings.raw_dictation_hotkey = Some(HotkeyBinding {
-            modifiers: HotkeyModifiers::option(),
-            key: Some(HotkeyKey {
-                code: 96,
-                label: "F5".into(),
+        let settings = AppSettings {
+            raw_dictation_hotkey: Some(HotkeyBinding {
+                modifiers: HotkeyModifiers::option(),
+                key: Some(HotkeyKey {
+                    code: 96,
+                    label: "F5".into(),
+                }),
             }),
-        });
+            ..AppSettings::default()
+        };
         let saved_on_dvorak = settings.paste_last_hotkey.clone().unwrap();
         assert_eq!(saved_on_dvorak.key.as_ref().unwrap().code, 47);
         let applied = RwLock::new(AppliedHotkeys {
@@ -3325,18 +3311,14 @@ mod tests {
         });
         let key = |applied: &RwLock<AppliedHotkeys>| {
             let runtime = applied.read().unwrap().runtime;
-            [
-                runtime.paste_last,
-                runtime.paste_meeting,
-                runtime.raw_dictation,
-            ]
-            .map(|hotkey| hotkey.and_then(|hotkey| hotkey.key_code))
+            [runtime.paste_last, runtime.raw_dictation]
+                .map(|hotkey| hotkey.and_then(|hotkey| hotkey.key_code))
         };
-        assert_eq!(key(&applied), [Some(47), Some(47), Some(96)]);
+        assert_eq!(key(&applied), [Some(47), Some(96)]);
 
         test_layout::set([('v', 9)]);
         AppliedHotkeys::resolve_again(&applied, resolve);
-        assert_eq!(key(&applied), [Some(9), Some(9), Some(96)]);
+        assert_eq!(key(&applied), [Some(9), Some(96)]);
 
         // A layout without the letter keeps the recorded key.
         test_layout::set([('x', 7)]);
@@ -3494,7 +3476,6 @@ mod tests {
         for binding in [
             HotkeyBinding::default(),
             HotkeyBinding::paste_last_default(),
-            HotkeyBinding::paste_meeting_default(),
         ] {
             let json = serde_json::to_value(&binding).unwrap();
             assert_eq!(

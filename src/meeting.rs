@@ -1,9 +1,9 @@
 use std::fs::{self, File, OpenOptions};
 use std::io::{BufWriter, Write};
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::mpsc::{self, Receiver, SyncSender};
-use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::{Duration, Instant};
 
@@ -69,6 +69,7 @@ mod recovery;
 mod retention;
 #[cfg(any(target_os = "linux", target_os = "windows"))]
 pub(crate) mod runtime;
+pub(crate) mod seen_calls;
 pub(crate) mod sweep;
 mod transcript;
 mod warning;
@@ -299,14 +300,6 @@ impl MeetingStatus {
     pub fn is_active(self) -> bool {
         matches!(self, Self::Starting | Self::Recording | Self::Transcribing)
     }
-}
-
-pub fn active(meetings: &[MeetingManifest]) -> Option<&MeetingManifest> {
-    meetings.iter().find(|meeting| meeting.status.is_active())
-}
-
-pub fn active_or_latest(meetings: &[MeetingManifest]) -> Option<&MeetingManifest> {
-    active(meetings).or_else(|| meetings.first())
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
@@ -551,7 +544,6 @@ pub fn record(
         let mut rolling =
             transcript::Rolling::start(meeting_dir.clone(), transcription_selection.clone());
         let rolling_feed = rolling.feed();
-        let flush_registration = transcript::register_flusher(&manifest.id, rolling.flusher());
         let writer_dir = meeting_dir.clone();
         let writer = thread::spawn(move || write_tracks(&writer_dir, receiver, rolling_feed));
         let cleanup_failed_setup =
@@ -622,7 +614,6 @@ pub fn record(
         drop(titles);
         drop(live_chapters);
         keep_rename(&meeting_dir, &mut manifest);
-        drop(flush_registration);
         drop(system_capture);
         drop(microphone_capture);
         drop(sender);

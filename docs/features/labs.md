@@ -25,7 +25,8 @@ window, and its OSes `labs::Feature::oses`.
 
 **On the web.** Every `Everyone` lab (not Dev ones, nor the labs that only
 matter once Annotate is on: Screenshots, Annotate last 15 seconds, Record the
-screen under the pointer, Copy a capture as one file, Agent tools for captures)
+screen under the pointer, Copy a capture as one file, Agent tools for captures,
+Dictate while annotating)
 has a page at `anoma.ly/hex/labs/<id>` (`dev.anoma.ly` for
 the dev site), listed newest first at `/hex/labs`, with a 1200 × 630 social
 card. The pages come from `site/src/labs.json`, which only the registry
@@ -84,6 +85,16 @@ Feature             Pane  Toggle (settings.json, hex settings)   On: what it doe
 ├── Keep mic open after dictating no labs.keep_microphone_open + labs.keep_microphone_open_seconds (30/60/180/300/1800, default 60)
 │                                        with Turn off the mic when not dictating on, the microphone stays open for that
 │                                        long after a capture, so the next dictation starts at once
+├── Voice isolation no    labs.voice_isolation            (macOS) dictation's microphone opens through Apple's voice
+│                                        processing, so Control Center's Mic Mode can offer Voice Isolation and background
+│                                        noise is reduced; meetings, captures, the level meter, the local API's host
+│                                        audio, and named opens stay on the raw cpal path; an open stream is replaced only while capture is
+│                                        idle; an actual voice-processing failure (an open, a wrong device, a stall, or
+│                                        more than three engine reconfigurations in 30 s) falls back to normal capture
+│                                        until the lab is toggled or the resolved microphone changes
+│                                        // checks: voice_isolation_is_its_own_bit_and_off_by_default (labs.rs);
+│                                        // a_voice_isolation_change_reopens_only_while_capture_is_idle (audio/recovering/tests.rs);
+│                                        // not run on a Mac, and no hardware confirmed Control Center offers the mode for Hex
 ├── Keep dictation on clipboard no labs.keep_on_clipboard (every OS) a pasted dictation stays on the clipboard; the previous one is not restored (#200)
 ├── Signature       no    labs.signature + labs.signature_text ("Sent from Hex", every OS)
 │                                        every normal dictation pastes with the signature on its own line at the end, and
@@ -340,6 +351,15 @@ Feature             Pane  Toggle (settings.json, hex settings)   On: what it doe
 │                                        // lines, every refusal), control::cli::annotate_read's clap conflicts, and
 │                                        // agent_tools_for_captures_is_its_own_switch_and_everywhere (labs.rs); the video decode
 │                                        // path is unverified on a real bundle, and no capture was recorded for this change
+├── Dictate while annotating no labs.dictate_while_annotating (every OS)
+│                                        while an Annotate capture records, the dictation shortcut dictates as usual: hold,
+│                                        toggle, or lock it and the text pastes into the app in front, History and Paste Last keep
+│                                        it, and the capture goes on recording and keeps the dictated words in its own track
+│                                        (both copies of the same microphone timeline). Off, a press during a capture starts
+│                                        nothing, as before
+│                                        // checks: dictate_while_annotating_is_its_own_switch_and_everywhere (labs.rs);
+│                                        // a_dictation_during_a_capture_shows_at_the_bottom_clear_of_the_capsule (rune_hud);
+│                                        // not observed with a real Mac, Linux session, or Windows PC recording while dictating
 ├── Install agent skill from Annotate no labs.annotate_agent_install (every OS)
 │                                        Annotate gains an Agents section: one row per coding agent writes the
 │                                        hex-annotate skill into its own skills folder (Claude Code, OpenCode; Codex and
@@ -744,6 +764,61 @@ last free bit and the window lives in its own atomic, both written by
 page goldens were regenerated for the new card. Not yet observed on a real
 Mac, Windows PC, or Linux desktop: no capture has been run with the lab on.
 
+Voice isolation (`voice-isolation`, macOS only): while on, dictation's warm
+microphone opens through Apple's voice processing instead of cpal's raw
+input stream, so Control Center's Mic Mode can offer Voice Isolation for Hex
+and background noise is reduced. The voice-processed microphone stays open
+while dictation is idle, exactly like the raw warm microphone, so macOS's
+ducking applies whenever Hex is listening and not only while a dictation
+records; with General's Release microphone while idle on, it closes after a
+capture and the ducking ends with it. `OpenRequest` gains
+`voice_processing` (true only from `RecoveringAudioInput` while
+`labs::voice_isolation()` is on) and a remembered
+`voice_processing_fallback`; meetings, Annotate captures, the microphone
+level meter (`open_dictation_input`), `open_named_input`,
+`open_meeting_input`, the local API's host-audio and stream transcription
+(which never opens a microphone), and every other OS stay on the cpal path.
+The Swift bridge (`src/voice_processing.swift`) resolves the cpal device's
+UID to a CoreAudio device
+(`kAudioHardwarePropertyTranslateUIDToDevice`), sets
+`kAudioOutputUnitProperty_CurrentDevice` on the input node's audio unit,
+enables `setVoiceProcessingEnabled(true)`, connects the input through a
+silent main mixer to the output (voice processing is duplex), and taps
+channel 0 at the bus rate in a standard Float32 non-interleaved format with
+`AVAudioTime.hostTime`; Rust converts the Mach ticks with
+`CaptureInstant::from_mach_ticks` and feeds the same chunk and Hex
+Microphone channels a cpal stream does. The bridge reads
+`kAudioOutputUnitProperty_CurrentDevice` back after start. It observes
+`AVAudioEngineConfigurationChange` only once start has returned, and reports
+it through a separate error callback only while the engine has stopped; that
+is a plain reopen, so the next open tries voice processing again. More than
+three such reopens within 30 s count as a failure. An actual voice-processing
+failure falls back to normal capture: an exception from the graph (the
+Objective-C `@try/@catch` guard in `native/voice_processing_guard.m`), a
+refused format, device, or start, a device that isn't the requested one after
+start, or a stream that stalls or fails. `RecoveringAudioInput` remembers that
+failure for the resolved microphone, so every later open uses the raw cpal
+stream without reopening the engine, until Labs › Voice isolation is toggled
+or the resolved microphone changes (the saved selection, the OS default, or a
+stand-in). A configuration change reopens through voice processing again, so
+it never disables the lab. A silence recovery's renegotiating open is raw too.
+A gate change is applied by `DictationAudio::reconcile_input` only while
+nothing records and no capture sink holds the microphone; the same device
+is then reopened on the other path rather than kept as unchanged, and a
+change during a capture waits for it to end. Off, every open is
+byte-for-byte the existing cpal path. macOS may lower other audio while the
+duplex unit runs: advanced ducking lowers it only while speech is heard,
+and `.min` is the least ducking macOS offers. A Bluetooth headset may
+switch to its call profile. Not verified on hardware: no Mac has run this
+path; Control Center's Mic Mode offering Voice Isolation for Hex; the tap's
+latency against the 200 ms release tail; and a meeting sharing the
+microphone while dictation's voice-processed stream is open. Checks:
+`voice_isolation_is_its_own_bit_and_off_by_default` in
+[labs.rs](../../src/labs.rs) and
+`a_voice_isolation_change_reopens_only_while_capture_is_idle` in
+[audio/recovering/tests.rs](../../src/audio/recovering/tests.rs). The macOS
+Labs goldens were regenerated for the new card.
+
 Restore shortcut default (`restore-shortcut-default`, issue 613) graduated:
 Paste last dictation's row always offers Reset when its shortcut isn't the
 default (see [dictation.md](dictation.md)). `labs.restore_shortcut_default`
@@ -858,8 +933,7 @@ Windows reports it as `copied`, not `pasted` (so does a dictation whose paste
 target was the desktop or a taskbar; see
 [dictation.md](dictation.md#windows-paste-target)).
 History and Paste last dictation
-update as for a paste, and Paste last dictation still pastes (meeting pastes
-on macOS too). With Labs › YOLO mode on, a dictation YOLO mode sends (its
+update as for a paste, and Paste last dictation still pastes. With Labs › YOLO mode on, a dictation YOLO mode sends (its
 chosen apps, or every app with none chosen) is pasted and sent anyway; a
 rescued microphone-loss dictation on macOS is always only copied. Off, output
 is exactly as before. Checks:
@@ -1387,8 +1461,9 @@ not). Checks: `styles_differ_on_ordinary_short_dictation`,
 in [dictation/processor.rs](../../src/dictation/processor.rs);
 `dictation_style_is_its_own_atomic_and_carries_its_choice` in
 [labs.rs](../../src/labs.rs);
-`dictation_style_shows_its_choices_on_its_card_while_on` and
-`output_shows_the_style_row_while_its_lab_is_on` in
+`dictation_style_shows_its_choices_on_its_card_while_on`,
+`output_shows_the_style_row_while_its_lab_is_on`, and
+`the_style_menu_shows_every_name_whole_beside_its_hint` in
 [panes.rs](../../src/rune_ui/tests/panes.rs);
 `every_dictation_style_string_has_every_language` in
 [i18n.rs](../../src/desktop/i18n.rs). Not yet observed with a real
@@ -1712,7 +1787,7 @@ lone modifier keeps Double-tap, and the machine's own
 `labs::double_tap_modifiers()` check admits it; off, the row folds to Hold or
 double-tap as before, and turning the lab off folds the saved mode while the
 dictation shortcut's `double_tap_only` is cleared. It dictates and pastes with processing, as
-the dictation shortcut does; Paste last and meeting paste still come only
+the dictation shortcut does; Paste last still comes only
 from the main machine. The shortcut that starts a capture owns it, and the
 others stand down until its keys lift while it records. Escape cancels a
 recording row once it is locked, in Tap mode, or while a bare key or mouse
@@ -2799,8 +2874,8 @@ another app collides with Hex's shortcuts and who don't want to quit. With the
 lab on, the menu bar's action block starts with Pause Hex; pressing it pauses
 Hex and the row reads Resume Hex. A pause is runtime-only and never saved, so a
 restart starts unpaused. While paused every capture shortcut is inert:
-dictation (main, second, extra, Caps Lock, and raw), Paste Last Dictation and
-meeting paste, Annotate and Screenshots, and the Carbon hotkeys registered under
+dictation (main, second, extra, Caps Lock, and raw), Paste Last Dictation,
+Annotate and Screenshots, and the Carbon hotkeys registered under
 Secure Event Input. The event tap passes every key event through unmodified,
 exactly as while a new binding is recorded, because every suspension site reads
 `app_settings::shortcuts_suspended()` (a recording binding or a pause) instead
@@ -3636,7 +3711,7 @@ export, and Movable meeting capsules graduated: they always work now
 ([meetings.md](meetings.md)), and a panel capsule thrown on release glides
 into the corner it heads for. Stop when the call ends, Expire meeting audio
 separately, Descriptive meeting file names, and Separate notes file became
-Meetings › Settings rows: Detected calls › Stop when the call ends
+Meetings › Settings rows: Calls › Stop when the call ends
 (`meetings.stop_when_call_ends`), After a meeting › Keep audio
 (`meetings.audio_retention`), and Export › Descriptive meeting file names and
 Separate notes file (`meetings.export.descriptive_filenames`,
@@ -3747,8 +3822,10 @@ vocabulary list itself (rewriting and search), and Linux's Terminal paste.
   off by default). Its switch is `labs.paste_last_picker`, and the gate,
   `labs::paste_last_picker()`, is where the work starts: the picker and its
   gesture, History's unified list and the rows it reads, and the words a
-  deliberate cancel keeps. Off, Paste Last and History behave exactly as
-  before. Checks: `paste_last_picker_is_its_own_switch_and_macos_only` in
+  deliberate cancel keeps. It applies live, without a restart. Off, Paste
+  Last and History behave exactly as before. Checks:
+  `toggling_the_lab_after_start_changes_what_holding_paste_last_does` in
+  [recognition/paste_picker.rs](../../src/recognition/paste_picker.rs); `paste_last_picker_is_its_own_switch_and_macos_only` in
   [labs.rs](../../src/labs.rs); the picker's `paste::browse`,
   `paste::recent`, `paste::gesture` and `paste::capture` tests; History's
   `history::` tests; `one_history_filters_and_searches_the_real_owners_without_enlarging_paste_last`

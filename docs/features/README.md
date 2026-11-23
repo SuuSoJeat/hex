@@ -1872,6 +1872,10 @@ Hex checks the release service            // maintain.updates
 ├── Direct install -> download (resumable) -> size + SHA-256 -> code signature -> stage
 │   ├── macOS -> unpack beside Hex.app -> Developer ID 5NZ4Q7NXJ4, anomaly.hex, notarized
 │   ├── Windows -> Authenticode valid, signer AUTHENTICODE_SIGNER -> new version directory
+│   │   └── .lnk files in Start Menu, Desktop, and taskbar pins -> retargeted in one PowerShell run
+│   │       // target is versions\<version>\hex.exe; arguments and name stay, an old-version icon is repointed
+│   │       // a Start Menu Hex.lnk that reads as empty (zero-filled) is recreated, but never when it is gone
+│   │       // saves flush updates\shortcut.tmp.lnk; a failed replace saves the retarget in place, the repair copies
 │   ├── Linux -> SHA-256 only -> new version directory, `current` switched
 │   ├── Staged -> checks continue; Restart to update stays offered meanwhile
 │   │   ├── Another release this install takes (update, required) -> download -> replaces the staged one
@@ -2878,7 +2882,7 @@ macOS `hex app` -> one menu-bar process, Rune window // dev.rune-ui-macos
 ├── While the window shows, its poll re-checks timed state every 250 ms (Rune Tx::wake_after); close hides it (Dock policy restored)
 ├── ⌘Q / menu-bar Quit / Ctrl-C quit and join
 ├── Meeting capsules: Rune interactive overlays (offer, call ended, ready, recording
-│   with Copy new (N) / Copy all of the in-call transcript; compact until hovered,
+│   with Copy agent prompt / Copy all of the in-call transcript; compact until hovered,
 │   dragged to any corner)
 └── Modes app icons: Finder's icon (NSWorkspace) in the picker, chips, and mode rows
 Windows `hex app` -> one tray process, Rune window // dev.rune-ui-windows
@@ -3245,10 +3249,10 @@ discovery or installed-app behavior.
 
 `default_paste_hotkeys_follow_build_capabilities` in
 [app_settings.rs](../../src/app_settings.rs) checks the production default runtime
-and settings projections: Paste Last remains available in both build profiles;
-meeting paste is present in debug or after the Meetings opt-in. `meeting_paste_is_only_active_in_developer_builds`
-in [suppression.rs](../../src/suppression.rs) checks the corresponding constructed
-hotkey event, including ordinary-chord discard in release. These replace an
+and settings projections: Paste Last remains available in both build profiles.
+`option_control_v_is_an_ordinary_chord` in [suppression.rs](../../src/suppression.rs)
+checks that Option-Control-V, the removed meeting paste, is an ordinary chord
+that discards a capture. These replace an
 unconditional debug-only expectation and a test-only copy of the reservation rule;
 they do not establish native keyboard delivery or meeting insertion.
 

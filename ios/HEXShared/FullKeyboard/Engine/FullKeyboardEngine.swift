@@ -116,7 +116,7 @@ final class FullKeyboardEngine {
         }
     }
 
-    /// Adaptive touch where this field lets it learn (plain text that allows autocorrect).
+    /// Adaptive touch where this field lets it learn (text or web search allowing autocorrect).
     private var adaptiveLearning: AdaptiveTouch?
 
     private func syncAdaptiveField() {
@@ -468,6 +468,7 @@ final class FullKeyboardEngine {
             revertCorrection()
             return
         }
+        if suggestion.kind == .emoji { return acceptEmoji(suggestion) }
         // What the suggestion takes the place of: the word being typed, or a text
         // replacement's shortcut, which may hold digits or punctuation ("ad2").
         let before = textBefore
@@ -1248,7 +1249,7 @@ final class FullKeyboardEngine {
     /// shortcut ends the text.
     private func applyTextReplacement(ending: String) -> Bool {
         let before = textBefore
-        guard field == .text, target.autocorrectionType != .no,
+        guard field.takesWords, target.autocorrectionType != .no,
               let replaced = autocorrect.textReplacement(before: before) else { return false }
         adaptiveLearning?.finish(token: replaced.typed, corrected: replaced.replacement, before: before)
         let inserted = replaced.replacement + ending
@@ -1303,7 +1304,7 @@ final class FullKeyboardEngine {
         let before = textBefore ?? ""
         guard let token = AutocorrectEngine.currentToken(in: before) else { return false }
         if let finished = finishedWord, before == finished.before + token,
-           let taps = finished.taps, let space = finished.space, field == .text, target.autocorrectionType != .no,
+           let taps = finished.taps, let space = finished.space, field.takesWords, target.autocorrectionType != .no,
            let merged = autocorrect.merge(
                first: finished.typed, firstTaps: taps, space: space, second: token,
                before: String(finished.before.dropLast())
@@ -1375,7 +1376,7 @@ final class FullKeyboardEngine {
     }
 
     /// Keeps the autocorrection just typed (`corrected` then `ending`) for the strip's revert.
-    private func recordCorrection(original: String, corrected: String, ending: String, changes: [AutocorrectEngine.AppliedCorrection.Change]) {
+    func recordCorrection(original: String, corrected: String, ending: String, changes: [AutocorrectEngine.AppliedCorrection.Change]) {
         let before = textBefore ?? ""
         let anchor = before.range(of: corrected, options: .backwards).map { String(before[..<$0.upperBound]) } ?? before
         autocorrect.recordAppliedCorrection(original: original, corrected: corrected, anchor: anchor, changes: changes)

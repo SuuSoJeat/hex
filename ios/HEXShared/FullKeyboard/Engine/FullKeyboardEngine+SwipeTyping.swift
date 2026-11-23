@@ -97,17 +97,19 @@ extension FullKeyboardEngine {
             ownEdit = true
         }
 
-        private static func place(of before: String?) -> String? {
-            guard var text = before else { return nil }
+        /// A real iPhone reports nothing before the cursor in an empty field (nil, where a
+        /// swipe's record keeps ""): the same place.
+        private static func place(of before: String?) -> String {
+            var text = before ?? ""
             while text.last == " " { text.removeLast() }
             return text
         }
     }
 
-    /// Whether a letter touch may become a swipe now: on the letters page of a text field
-    /// (not an address or a URL), with no accent menu open.
+    /// Whether a letter touch may become a swipe now: on the letters page of a text or web
+    /// search field (not an address or a URL), with no accent menu open.
     var allowsSwipes: Bool {
-        guard layerState.layer == .letters, field == .text, activeAccentMenu == nil else { return false }
+        guard layerState.layer == .letters, field.takesWords, activeAccentMenu == nil else { return false }
         // Leave the next key to finish an explicitly tapped coeng.
         return layout.language != .khmer || (!isAfterKhmerCoeng && target.isSecureTextEntry != true
             && TypingJournal.allows(field: field, target: target))

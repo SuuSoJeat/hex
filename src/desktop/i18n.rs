@@ -12,6 +12,8 @@ use std::sync::atomic::{AtomicU8, Ordering};
 use strings::TRANSLATIONS;
 
 mod agents;
+mod annotate_dictation;
+mod calls;
 mod clock;
 mod failures;
 mod french;
@@ -30,6 +32,7 @@ mod strings;
 mod style;
 mod text_language;
 mod traditional_chinese;
+mod voice_isolation;
 
 pub(crate) use clock::{clock_time, twelve_hour_clock};
 
@@ -384,6 +387,7 @@ pub(super) fn all_translations() -> impl Iterator<Item = &'static (&'static str,
         .chain(labs::TRANSLATIONS)
         .chain(style::TRANSLATIONS)
         .chain(signature::TRANSLATIONS)
+        .chain(annotate_dictation::TRANSLATIONS)
         .chain(agents::TRANSLATIONS)
         .chain(failures::TRANSLATIONS)
         .chain(onboarding::TRANSLATIONS)
@@ -666,6 +670,8 @@ mod tests {
         include_str!("../rune_ui/settings.rs"),
         include_str!("../rune_ui/shortcut_mode.rs"),
         include_str!("../rune_ui/sound_sets.rs"),
+        include_str!("../rune_ui/calls.rs"),
+        include_str!("../rune_ui/meeting_capsules/offer.rs"),
         include_str!("../rune_ui/speech_model.rs"),
         include_str!("../rune_ui/vocabulary.rs"),
         include_str!("../rune_ui/windows_host.rs"),
