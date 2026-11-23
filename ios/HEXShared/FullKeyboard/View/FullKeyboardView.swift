@@ -542,11 +542,12 @@ final class FullKeyboardView: UIView {
         model.onLanguageSelected?(nil)
     }
 
-    /// With two or more languages the space bar names the keyboard's; otherwise, with Full
-    /// Access, the dictation language's.
+    /// Space names the keyboard language while switching, or the dictation language when
+    /// available. A Khmer keyboard without either label shows its own name.
     private func refreshSpaceLabel() {
-        plane.spaceLabel = languages.spaceLabel ?? (engine.layout.language == .khmer ? KeyboardLanguage.khmer.shortName
-            : model.hasFullAccess ? model.languageSummary : nil)
+        let dictation = model.hasFullAccess ? model.languageSummary : nil
+        let khmer = engine.layout.language == .khmer ? KeyboardLanguage.khmer.shortName : nil
+        plane.spaceLabel = languages.spaceLabel ?? dictation ?? khmer
     }
 
     /// Settings › Experiments › Emoji shortcodes, in the App Group: cached for the strip, and

@@ -937,7 +937,7 @@ final class FullKeyboardEngineTests: XCTestCase {
 
     func testKhmerCorrectionReadsThroughTransientStaleAndUnavailableContext() async throws {
         let textTarget = KhmerScalarDeletingTarget(text: "ខ្ញុំចំនុច")
-        textTarget.lagsAfterDeleting = true
+        textTarget.laggingReadsAfterDeleting = 2
         target = textTarget
         engine = FullKeyboardEngine(target: target, autocorrect: AutocorrectEngine(learnedWords: LearnedWordsStore(defaults: defaults)))
         engine.language = .khmer
@@ -949,6 +949,57 @@ final class FullKeyboardEngineTests: XCTestCase {
         XCTAssertEqual(revert.kind, .revert)
         engine.acceptSuggestion(revert)
         XCTAssertEqual(target.text, "ខ្ញុំចំនុច")
+    }
+
+    func testKhmerCorrectionWaitsForTheHostToConfirmTheDeleteBeforeRestoring() async {
+        let textTarget = KhmerScalarDeletingTarget(text: "ខ្ញុំចំនុច")
+        textTarget.laggingReadsAfterDeleting = 6
+        target = textTarget
+        engine = FullKeyboardEngine(target: target, autocorrect: AutocorrectEngine(learnedWords: LearnedWordsStore(defaults: defaults)))
+        engine.language = .khmer
+        await engine.khmerAutocompleteLoad?.value
+
+        XCTAssertEqual(engine.suggestions.first(where: \.willAutoReplace)?.replacement, "ចំណុច")
+        tap(.space)
+        XCTAssertNotNil(engine.khmerDeleteRecovery)
+        await engine.khmerDeleteRecovery?.value
+
+        XCTAssertEqual(target.text, "ខ្ញុំចំនុច ")
+        XCTAssertFalse(engine.suggestions.contains { $0.kind == .revert })
+    }
+
+    func testKhmerWordDeletionUsesTheEstablishedJoinedBoundary() async {
+        target = KhmerScalarDeletingTarget(text: "ខ្ញុំទៅសាលា។ ")
+        engine = FullKeyboardEngine(target: target, autocorrect: AutocorrectEngine(learnedWords: LearnedWordsStore(defaults: defaults)))
+        engine.language = .khmer
+        await engine.khmerAutocompleteLoad?.value
+
+        let slide = DeleteWordSwipe(engine: engine, touchID: 1, startX: 0)
+        let step = engine.layout.letterWidth
+        XCTAssertTrue(slide.move(to: -step * 1.2))
+        XCTAssertEqual(slide.deletedWordCount, 1)
+        XCTAssertEqual(target.text, "ខ្ញុំទៅ")
+        XCTAssertTrue(slide.move(to: 0))
+        XCTAssertEqual(target.text, "ខ្ញុំទៅសាលា។ ")
+        slide.finish()
+
+        engine.repeatDelete(heldFor: FullKeyboardEngine.wordDeleteAfter)
+        XCTAssertEqual(target.text, "ខ្ញុំទៅ")
+    }
+
+    func testKhmerWordDeletionLeavesAnIncompleteRunToNormalBackspace() async {
+        target = KhmerScalarDeletingTarget(text: "ខ្ញុំស្")
+        engine = FullKeyboardEngine(target: target, autocorrect: AutocorrectEngine(learnedWords: LearnedWordsStore(defaults: defaults)))
+        engine.language = .khmer
+        await engine.khmerAutocompleteLoad?.value
+
+        let slide = DeleteWordSwipe(engine: engine, touchID: 1, startX: 0)
+        XCTAssertTrue(slide.move(to: -engine.layout.letterWidth * 1.2))
+        XCTAssertEqual(slide.deletedWordCount, 0)
+        XCTAssertEqual(target.text, "ខ្ញុំស្")
+
+        engine.repeatDelete(heldFor: FullKeyboardEngine.wordDeleteAfter)
+        XCTAssertEqual(target.text, "ខ្ញុំស")
     }
 
     func testKhmerCorrectionRestoresExactTextWhenHostDeletesAcrossTheBoundary() async {
@@ -971,6 +1022,7 @@ final class FullKeyboardEngineTests: XCTestCase {
 
         XCTAssertEqual(engine.suggestions.first(where: \.willAutoReplace)?.replacement, "ចំណុច")
         tap(.space)
+        await engine.khmerDeleteRecovery?.value
         XCTAssertEqual(target.text, "ខ្ញុំចំនុច ")
         XCTAssertFalse(engine.suggestions.contains { $0.kind == .revert })
     }
@@ -1548,7 +1600,7 @@ final class FullKeyboardEngineTests: XCTestCase {
 /// Matches the UIKit host that removes Khmer combining marks one scalar at a time.
 @MainActor
 final class KhmerScalarDeletingTarget: FixtureTextTarget {
-    var lagsAfterDeleting = false
+    var laggingReadsAfterDeleting = 0
     private var pendingReports: [String?] = []
 
     override var documentContextBeforeInput: String? {
@@ -1560,7 +1612,7 @@ final class KhmerScalarDeletingTarget: FixtureTextTarget {
         guard let previous = super.documentContextBeforeInput, let cluster = previous.last else { return }
         super.deleteBackward()
         super.insertText(String(String(cluster).unicodeScalars.dropLast()))
-        if lagsAfterDeleting { pendingReports = [previous, nil] }
+        pendingReports = (0..<laggingReadsAfterDeleting).map { $0.isMultiple(of: 2) ? previous : nil }
     }
 }
 

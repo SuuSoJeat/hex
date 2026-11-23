@@ -4546,6 +4546,16 @@
         }
       }
     },
+    "Khmer swipe typing" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "高棉语滑行输入"
+          }
+        }
+      }
+    },
     "Smart Mode" : {
       "localizations" : {
         "zh-Hans" : {

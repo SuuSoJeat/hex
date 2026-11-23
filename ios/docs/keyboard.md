@@ -339,15 +339,16 @@ alone. A word it may not offer, typed in full, is never corrected (as on Android
 On by default (stored as
 `experiments.swipeTyping` from when it was an experiment off by default: unset or true
 is on, false off, so testers who turned it off keep it off), for the
-English and Spanish layouts (every other layout keeps a drag as a slide to
-another key), and with Settings › Experiments › Swipe typing in more languages on
+English, Spanish, and enabled Khmer layouts, and with Settings › Experiments ›
+Swipe typing in more languages on
 (`experiments.swipeMoreLanguages`, off by default) for every language with a typing
 model too: French (France), Polish, and German while Spatial autocorrect and German
 spatial autocorrect are on. Off under VoiceOver. A touch that goes down on a letter and
 travels more than a key's pitch (width plus gap) is a swipe (`SwipeTyping`): its key
 no longer types, a light trail (a shape layer, the last 0.45 s of the path) follows the finger,
 and the strip shows what the path reads as so far, decoded off the main thread at most
-every 70 ms. Lifting types the best reading after a space, unless the text before
+every 70 ms. See [Khmer keyboard layouts](#khmer-keyboard-layouts) for Khmer
+swipe spacing and suggestions. In space-delimited languages, lifting types the best reading after a space, unless the text before
 ends in a space, a line break, an attachment (U+FFFC: a shared link's card in Messages,
 a picture in the text) or opening punctuation (`( [ { « “ ‘ ¿ ¡ @ # /`, or a
 straight quote after a space), as Apple's QuickPath does; shift capitalises its first
@@ -632,7 +633,7 @@ hold it for its corner character, shown in the pop-up when enabled. Tap Shift
 for one character or double-tap to lock the shifted layer. Tap Shift again to
 unlock. Space, Return and **កខគ** go from 123 or #+= back to the letters and
 clear Shift. Those pages use English rows with two Khmer punctuation keys beside Space.
-Arabic digits use the keyboard theme. Web search fields add a period before Return. On #+=,
+Arabic digits use the keyboard theme. On #+=,
 hold **។** or **៖** to type **៙** or **៚**. The five letter rows use Hex's key
 height and corner radius, with teal marks, green
 independent vowels and rose Khmer digits. The background and press colors follow
@@ -644,9 +645,10 @@ main keys and the corner labels hide. Hold a changed key to type its usual
 character. Shift still selects the full shifted layer. The usual labels return
 when the caret moves past or away from coeng.
 
-On either layout, the space bar shows **ខ្មែរ** and switches languages with the
-standard swipe. Emoji opens Hex's picker and Number Row follows the shared
-setting. The suggestion strip offers up to three offline completions. Tap one
+Both layouts keep Hex's usual Search, URL and email shortcuts before Return.
+Space switches languages with the standard swipe and shows the active language
+label, with **ខ្មែរ** as a fallback. Emoji opens Hex's picker and Number Row
+follows the shared setting. The suggestion strip offers up to three offline completions. Tap one
 to append the missing characters. **Settings › Keyboard › Autocorrect** enables offline Khmer
 spelling suggestions. Space accepts a confident correction without inserting a
 space. Press Space again if you want a space after the corrected word. A quick
@@ -655,18 +657,23 @@ the shared shortcut behavior. Closing
 punctuation applies the correction and types the punctuation. Tap other dictionary
 guesses to use them. Tap the quoted spelling to keep it or tap the undo suggestion
 to restore it. After a correction with punctuation, Backspace reveals that option.
+Hold Backspace or swipe it left to delete a whole word at a known Khmer word
+boundary. Without a known boundary, the hold uses regular Backspace and the
+swipe leaves the text in place.
 
-Under **Settings › Keyboard › Khmer**, both options work in either layout and
-are off by default.
+**Settings › Keyboard › Khmer** appears when Khmer is configured. Both options
+work in either layout and are on by default. Turning off the main **Swipe typing**
+switch also turns off Khmer swipe typing. Saved choices are kept.
 
 - **Smart Mode** adds shortcuts such as **ញ** + **ំ** → **ខ្ញុំ**, adapts the
   diacritic key (**៉** in Khmerism, **៊** in Khmer) after common consonants,
   and orders marks within the syllable you just typed.
-- **Swipe typing** reads one word from the positions of its characters on your
+- **Khmer swipe typing** reads one word from the positions of its characters on your
   layout, including shifted glyphs, coeng and vowel signs. Trace the keys in
   typing order and lift to insert the word. Near-tied spellings wait for a tap in the suggestion
-  strip when suggestions are visible. Consecutive swipes join without spaces,
-  and Backspace takes back the last swiped word unless letter-by-letter deletion
+  strip when suggestions are visible. Swipe can read saved words whose characters
+  are in the model and offer iOS Text Replacement shortcuts in the strip. Consecutive
+  swipes join without spaces, and Backspace takes back the last swiped word unless letter-by-letter deletion
   is enabled.
 
 Under **Settings › Experiments › Khmerism**, **No colors** uses the keyboard theme

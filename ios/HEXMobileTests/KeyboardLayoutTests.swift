@@ -627,6 +627,23 @@ final class KeyboardLayoutTests: XCTestCase {
         XCTAssertTrue(footer.contains(.character("។")))
     }
 
+    func testKhmerLayoutsKeepFieldKeysBeforeReturn() {
+        let fields: [(KeyboardFieldKind, [KeyKind])] = [
+            (.webSearch, [.character(".")]),
+            (.url, [.character("."), .character("/")]),
+            (.email, [.character("@"), .character(".")]),
+        ]
+        for letters in [KeyboardLetterLayout.khmerism, .khmer] {
+            for layer in [KeyboardLayer.letters, .numbers, .symbols] {
+                for (field, keys) in fields {
+                    let layout = KeyboardLayout(width: 402, layer: layer, field: field, language: .khmer, letters: letters)
+                    let footer = layout.keys.filter { $0.row == layout.bottomRowIndex }.map(\.kind)
+                    XCTAssertEqual(Array(footer.suffix(keys.count + 1)), keys + [.returnKey], describe(layout))
+                }
+            }
+        }
+    }
+
     func testKhmerismMatchesTheDesignerAtProMaxWidth() {
         let layout = KeyboardLayout(width: 440, showsGlobe: true, showsEmoji: true, language: .khmer, phoneSize: .large)
         let native = KeyboardMetrics.phonePortrait(.large)
@@ -3673,7 +3690,7 @@ final class FullKeyboardSettingsTests: XCTestCase {
         XCTAssertEqual(defaults.object(forKey: "experiments.hideWordSuggestions") as? Bool, true)
     }
 
-    func testKhmerismSettingsDefaultOffAndPersistIndependently() throws {
+    func testKhmerismAppearanceDefaultsAndTypingPreferences() throws {
         let suite = "FullKeyboardSettingsTests-\(UUID().uuidString)"
         let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
         defer { defaults.removePersistentDomain(forName: suite) }
@@ -3681,12 +3698,12 @@ final class FullKeyboardSettingsTests: XCTestCase {
 
         XCTAssertFalse(settings.khmerismNoColors)
         XCTAssertFalse(settings.khmerismNoSuperscripts)
-        XCTAssertFalse(settings.khmerismSmartMode)
-        XCTAssertFalse(settings.khmerismSwipeTyping)
+        XCTAssertTrue(settings.khmerismSmartMode)
+        XCTAssertTrue(settings.khmerismSwipeTyping)
         XCTAssertFalse(FullKeyboardSettings(defaults: nil).khmerismNoColors)
         XCTAssertFalse(FullKeyboardSettings(defaults: nil).khmerismNoSuperscripts)
-        XCTAssertFalse(FullKeyboardSettings(defaults: nil).khmerismSmartMode)
-        XCTAssertNil(FullKeyboardSettings(defaults: nil).swipeTypingModel(for: .khmer))
+        XCTAssertTrue(FullKeyboardSettings(defaults: nil).khmerismSmartMode)
+        XCTAssertEqual(FullKeyboardSettings(defaults: nil).swipeTypingModel(for: .khmer)?.language, "km")
 
         settings.khmerismNoColors = true
         XCTAssertTrue(FullKeyboardSettings(defaults: defaults).khmerismNoColors)
@@ -3697,21 +3714,20 @@ final class FullKeyboardSettingsTests: XCTestCase {
         XCTAssertTrue(FullKeyboardSettings(defaults: defaults).khmerismNoSuperscripts)
         XCTAssertFalse(FullKeyboardSettings(defaults: defaults).khmerismNoColors)
 
-        XCTAssertNil(settings.swipeTypingModel(for: .khmer), "the Latin swipe setting does not enable Khmerism")
-        settings.khmerismSwipeTyping = true
-        XCTAssertEqual(defaults.object(forKey: "experiments.khmerismSwipeTyping") as? Bool, true)
+        XCTAssertEqual(settings.swipeTypingModel(for: .khmer)?.language, "km")
         settings.swipeTyping = false
-        XCTAssertFalse(settings.khmerismSmartMode)
-        XCTAssertEqual(FullKeyboardSettings(defaults: defaults).swipeTypingModel(for: .khmer)?.language, "km")
+        XCTAssertNil(settings.swipeTypingModel(for: .khmer), "The main switch disables Khmer swipe typing")
         XCTAssertNil(settings.swipeTypingModel(for: .english))
-        XCTAssertNil(settings.typingModel(for: .khmer), "swipe model stays out of spatial autocorrect")
+        settings.swipeTyping = true
+        XCTAssertEqual(settings.swipeTypingModel(for: .khmer)?.language, "km")
+        XCTAssertNil(settings.typingModel(for: .khmer), "The swipe model stays out of spatial autocorrect")
 
         settings.khmerismSwipeTyping = false
-        settings.khmerismSmartMode = true
-        XCTAssertTrue(FullKeyboardSettings(defaults: defaults).khmerismSmartMode)
-        XCTAssertEqual(defaults.object(forKey: "experiments.khmerismSmartMode") as? Bool, true)
-        XCTAssertNil(settings.swipeTypingModel(for: .khmer))
+        XCTAssertEqual(defaults.object(forKey: "experiments.khmerismSwipeTyping") as? Bool, false)
+        XCTAssertNil(FullKeyboardSettings(defaults: defaults).swipeTypingModel(for: .khmer))
+        XCTAssertNotNil(settings.swipeTypingModel(for: .english))
         settings.khmerismSmartMode = false
+        XCTAssertEqual(defaults.object(forKey: "experiments.khmerismSmartMode") as? Bool, false)
         XCTAssertFalse(FullKeyboardSettings(defaults: defaults).khmerismSmartMode)
     }
 

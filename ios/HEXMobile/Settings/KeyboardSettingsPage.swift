@@ -112,15 +112,27 @@ struct KeyboardSettingsPage: View {
         fullAccessOn ? nil : String(localized: "Needs Full Access")
     }
 
+    private var usesKhmer: Bool {
+        _ = revision
+        let chosen = LanguageSettings().keyboardLanguages
+        return chosen.isEmpty ? automaticKeyboardLanguage() == .khmer : chosen.contains(.khmer)
+    }
+
     /// Swipe typing's detail: the layouts that swipe.
     private var swipeLanguages: String {
         _ = revision
-        let current = FullKeyboardSettings()
-        guard current.swipeMoreLanguages else { return String(localized: "English and Spanish only") }
-        guard current.spatialAutocorrect, current.germanSpatialAutocorrect else {
-            return String(localized: "English, Spanish, French and Polish")
+        let settings = FullKeyboardSettings()
+        var languages: [KeyboardLanguage] = [.english, .spanish]
+        if settings.swipeMoreLanguages {
+            languages += [.french, .polish]
+            if settings.spatialAutocorrect, settings.germanSpatialAutocorrect {
+                languages.append(.german)
+            }
         }
-        return String(localized: "English, Spanish, French, Polish and German")
+        if usesKhmer, settings.khmerismSwipeTyping { languages.append(.khmer) }
+        return ListFormatter.localizedString(byJoining: languages.map {
+            Locale.current.localizedString(forLanguageCode: $0.rawValue) ?? $0.displayName
+        })
     }
 
     var body: some View {
@@ -260,22 +272,25 @@ struct KeyboardSettingsPage: View {
                     KeyboardVocabularyRow()
                 }
 
-                SettingsSectionHeader(title: "Khmer")
+                if usesKhmer {
+                    SettingsSectionHeader(title: "Khmer")
 
-                SettingsCard {
-                    SettingsToggleRow(
-                        title: String(localized: "Smart Mode"),
-                        detail: String(localized: "Use shortcuts like ញ + ំ → ខ្ញុំ, double-tap vowels, and arrange marks as you type."),
-                        isOn: binding(\.khmerismSmartMode)
-                    )
+                    SettingsCard {
+                        SettingsToggleRow(
+                            title: String(localized: "Smart Mode"),
+                            detail: String(localized: "Use shortcuts like ញ + ំ → ខ្ញុំ, double-tap vowels, and arrange marks as you type."),
+                            isOn: binding(\.khmerismSmartMode)
+                        )
 
-                    SettingsDivider()
+                        SettingsDivider()
 
-                    SettingsToggleRow(
-                        title: String(localized: "Swipe typing"),
-                        detail: String(localized: "Trace a Khmer word across the keys, then lift to type it."),
-                        isOn: binding(\.khmerismSwipeTyping)
-                    )
+                        SettingsToggleRow(
+                            title: String(localized: "Khmer swipe typing"),
+                            detail: String(localized: "Trace a Khmer word across the keys, then lift to type it."),
+                            isOn: binding(\.khmerismSwipeTyping)
+                        )
+                        .disabled(!settings.swipeTyping)
+                    }
                 }
             }
 

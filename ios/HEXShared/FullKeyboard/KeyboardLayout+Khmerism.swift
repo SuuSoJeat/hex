@@ -129,13 +129,8 @@ extension KeyboardLayout {
             if index == 0 { entry.weight = 101 }
             footer.append(entry)
         }
-        if isKhmerism {
-            switch field {
-            case .text: break
-            case .webSearch: footer.append(character(.init(text: ".")))
-            case .url: footer.append(contentsOf: [character(.init(text: ".")), character(.init(text: "/"))])
-            case .email: footer.append(contentsOf: [character(.init(text: "@")), character(.init(text: "."))])
-            }
+        for (kind, weight, label) in field.keysRightOfSpace(width: 100) {
+            footer.append((kind, label, weight, nil))
         }
         footer.append((.returnKey, "↵", 221, nil))
         if metrics.pad?.isDocked == true { footer.append((.dismiss, "dismiss", 100, nil)) }

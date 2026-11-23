@@ -102,6 +102,28 @@ struct KhmerAutocomplete: Sendable {
         return isWordUnit(first)
     }
 
+    static func endsWithWordText(_ text: Substring) -> Bool {
+        text.utf16.last.map(isWordUnit) ?? false
+    }
+
+    /// The longest known final word that starts at a boundary reached by whole words.
+    /// If the run is incomplete or extends beyond the lookback, leave word deletion alone.
+    func wordSuffix(in before: Substring, personalWords: [String] = []) -> String? {
+        let tail = before.utf16.reversed().prefix(Self.contextLength + 1)
+        let run = Array(tail.prefix(while: Self.isWordUnit).reversed())
+        guard let first = run.first, Self.beginsWord(first),
+              run.count <= Self.contextLength, Self.hasCompleteClusters(run[...]) else { return nil }
+        let personal = PersonalLexicon(personalWords)
+        var wordStarts = Array(repeating: false, count: run.count + 1)
+        wordStarts[0] = true
+        for start in run.indices where wordStarts[start] {
+            let candidate = run[start...]
+            if contains(candidate, personal: personal) { return String(decoding: candidate, as: UTF16.self) }
+            markWordEnds(from: start, in: run, personal: personal, into: &wordStarts)
+        }
+        return nil
+    }
+
     func suggestions(
         beforeInput: String?, limit: Int = 3, personalWords: [String] = [],
         mayOffer: (String) -> Bool = { _ in true }

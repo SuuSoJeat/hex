@@ -35,6 +35,7 @@ final class DeleteWordSwipe {
             isActive = true
             engine.typingLog?.ui("delete_swipe_start", [TypingLogField("id", .int(touchID))])
         }
+        guard engine.khmerDeleteRecovery == nil else { return true }
         var changed = false
         while deleted.count < wanted, deleteWord() {
             changed = true
@@ -72,8 +73,15 @@ final class DeleteWordSwipe {
         // A word delete writes the field directly: it ends any Hangul run first. A finger's
         // jitter before the first word must not, so this is here, not in `move`.
         engine.commitHangulComposition()
-        guard let before = engine.target.documentContextBeforeInput,
-              let count = Self.wordLength(before: before) else { return false }
+        guard let before = engine.target.documentContextBeforeInput else { return false }
+        if engine.layout.language == .khmer {
+            guard let text = engine.khmerWordToDelete(before: before),
+                  engine.deleteKhmerWord(text, before: before, source: "delete_swipe") else { return false }
+            deleted.append(text)
+            engine.onSelectionStep?()
+            return true
+        }
+        guard let count = Self.wordLength(before: before) else { return false }
         let text = String(before.suffix(count))
         engine.typingLog?.edit("delete_word", [
             TypingLogField("deleted", .string(text)),
@@ -86,6 +94,17 @@ final class DeleteWordSwipe {
         deleted.append(text)
         engine.onSelectionStep?()
         return true
+    }
+
+    static func splitTrailingSeparators(in before: String) -> (Substring, Substring) {
+        var end = before.endIndex
+        while end > before.startIndex {
+            let previous = before.index(before: end)
+            let cluster = before[previous..<end]
+            guard !isWordCharacter(before[previous]), !KhmerAutocomplete.endsWithWordText(cluster) else { break }
+            end = previous
+        }
+        return (before[..<end], before[end...])
     }
 
     /// How many characters at the end of `before` make up its last word with the spaces and

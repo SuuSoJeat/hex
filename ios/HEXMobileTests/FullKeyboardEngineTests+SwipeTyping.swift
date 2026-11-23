@@ -5,7 +5,7 @@ import XCTest
 extension FullKeyboardEngineTests {
     func testKhmerSwipesJoinAndUndoStopsAtTheLastWordsBoundary() throws {
         let field = KhmerScalarDeletingTarget(text: "")
-        field.lagsAfterDeleting = true
+        field.laggingReadsAfterDeleting = 2
         let (_, plane) = try swipeKeyboard(language: .khmer, target: field)
         swipe("បាន", on: plane)
         swipe("ខ្ញុំ", on: plane)
@@ -18,7 +18,7 @@ extension FullKeyboardEngineTests {
 
     func testRegularKhmerSwipesJoinAndUndoAfterSwitchingLayouts() throws {
         let field = KhmerScalarDeletingTarget(text: "")
-        field.lagsAfterDeleting = true
+        field.laggingReadsAfterDeleting = 2
         let (_, plane) = try swipeKeyboard(language: .khmer, target: field)
         swipe("បាន", on: plane)
         plane.engine.letterLayout = .khmer
@@ -71,6 +71,31 @@ extension FullKeyboardEngineTests {
         XCTAssertNil(plane.engine.swipedWord)
         plane.engine.acceptSuggestion(alternate)
         XCTAssertEqual(field.text, "បានដៃ")
+    }
+
+    func testKhmerSwipeTypesAVocabularyWordOutsideTheBundledModel() throws {
+        let word = "សុវណ្ណបញ្ញា"
+        let (field, plane) = try swipeKeyboard(language: .khmer)
+        let model = try XCTUnwrap(plane.swipe?.model)
+        XCTAssertNotNil(model.encode(word))
+        XCTAssertNil(model.index(of: word))
+        plane.engine.autocorrect.setVocabulary([word])
+        swipe(word, on: plane)
+        XCTAssertEqual(field.text, word)
+    }
+
+    func testKhmerSwipeOffersTextReplacementWithoutInsertingSpaces() throws {
+        let field = KhmerScalarDeletingTarget(text: "ខ្ញុំ")
+        let (_, plane) = try swipeKeyboard(language: .khmer, target: field)
+        plane.engine.autocorrect.loadLexiconEntries([("បាន", "យល់ព្រម")])
+        swipe("បាន", on: plane)
+        XCTAssertEqual(field.text, "ខ្ញុំបាន")
+
+        let offer = try XCTUnwrap(plane.engine.suggestions.first { $0.replacement == "យល់ព្រម" })
+        plane.engine.acceptSuggestion(offer)
+        XCTAssertEqual(field.text, "ខ្ញុំយល់ព្រម")
+        tap(.delete, on: plane)
+        XCTAssertEqual(field.text, "ខ្ញុំ")
     }
 
     func testKhmerSwipeLeavesTapsAndCornerHoldsAvailable() throws {

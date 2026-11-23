@@ -183,23 +183,24 @@ struct FullKeyboardSettings {
         nonmutating set { defaults?.set(newValue, forKey: Key.khmerismNoSuperscripts) }
     }
 
-    /// Settings › Keyboard › Khmer › Smart Mode. Shared by both layouts, off by default.
+    /// Settings › Keyboard › Khmer › Smart Mode. Shared by both layouts, on by default.
     var khmerismSmartMode: Bool {
-        get { defaults?.bool(forKey: Key.khmerismSmartMode) ?? false }
+        get { defaults?.object(forKey: Key.khmerismSmartMode) as? Bool ?? true }
         nonmutating set { defaults?.set(newValue, forKey: Key.khmerismSmartMode) }
     }
 
-    /// Settings › Keyboard › Khmer › Swipe typing. Shared by both layouts, off by default.
+    /// Settings › Keyboard › Khmer › Swipe typing. Shared by both layouts, on by default.
     var khmerismSwipeTyping: Bool {
-        get { defaults?.bool(forKey: Key.khmerismSwipeTyping) ?? false }
+        get { defaults?.object(forKey: Key.khmerismSwipeTyping) as? Bool ?? true }
         nonmutating set { defaults?.set(newValue, forKey: Key.khmerismSwipeTyping) }
     }
 
     func swipeTypingModel(for language: KeyboardLanguage, override: Bool? = nil) -> TypingDecoderModel? {
+        guard override ?? swipeTyping else { return nil }
         if language == .khmer {
             return (override ?? khmerismSwipeTyping) ? TypingDecoderModel.bundled(language.rawValue) : nil
         }
-        guard override ?? swipeTyping, swipesIn(language) else { return nil }
+        guard swipesIn(language) else { return nil }
         return typingModel(for: language)
     }
 
@@ -316,7 +317,8 @@ struct FullKeyboardSettings {
     }
 
     /// Settings › Keyboard › Swipe typing: slide through a word's letters to type it, on the
-    /// English and Spanish layouts (`SwipeTyping`), and with Swipe typing in more languages on
+    /// English and Spanish layouts (`SwipeTyping`), Khmer when enabled in its controls,
+    /// and with Swipe typing in more languages on
     /// also every layout with a typing model (`swipesIn(_:)`). On by default. Stored as
     /// `experiments.swipeTyping`, from when it was an experiment (off by default): unset or
     /// true is on and false off, so testers who turned it off keep it off.

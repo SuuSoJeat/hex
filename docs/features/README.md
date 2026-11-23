@@ -2953,7 +2953,9 @@ iOS prototype (`HEXMobile`) -> Record/transcribe/copy and keyboard handoff
 │   layer. The usual labels return when the caret moves past or away from coeng. The five-row
 │   letter plane stays joined on the unfolded Duo. Checks: `KhmerKeyboardLanguageTests`,
 │   `KeyboardLayoutTests`, `FullKeyboardEngineTests`.
-│   On both layouts, Space shows ខ្មែរ and uses the regular language swipe. The emoji key
+│   Both layouts have the usual Search, URL, and email keys. Space uses the regular
+│   language swipe and keeps the active dictation or translation label when applicable.
+│   The emoji key
 │   opens Hex's picker and Number Row follows the shared setting. With Smart Mode off, marks
 │   insert as entered and the host handles backspace. The suggestion strip offers up to three
 │   offline completions from a bundled SIL/Keyman dictionary. It draws each Khmer suggestion as one word so coeng
@@ -2967,9 +2969,14 @@ iOS prototype (`HEXMobile`) -> Record/transcribe/copy and keyboard handoff
 │   correction and types the punctuation. Other dictionary guesses are tap-to-accept.
 │   After a correction accepted with Space, the strip offers the original spelling
 │   immediately. After a correction with punctuation, Backspace reveals that option.
+│   Held and swiped word deletion use dictionary boundaries for joined Khmer. When no
+│   boundary is established, holding deletes one unit through the host and swiping
+│   leaves the text as it is. A delayed delete is restored when the host confirms
+│   what changed at the same caret.
 │   Checks:
 │   `KhmerAutocompleteTests`, `FullKeyboardEngineTests`.
-│   Settings › Keyboard › Khmer, with Full chosen (for both layouts, off by default, App Group)
+│   Settings › Keyboard › Khmer appears when Khmer is configured with Full chosen. Both
+│   options apply to both layouts and default on. Saved choices are kept in the App Group.
 │   ├── Smart Mode
 │   │   ├── Tap ញ then ំ → ខ្ញុំ, including next to another word. Subscript ញ and
 │   │   │   text already in the field keep their literal spelling.
@@ -2981,10 +2988,12 @@ iOS prototype (`HEXMobile`) -> Record/transcribe/copy and keyboard handoff
 │   │       and replaces a conflicting shifter. A late vowel moves before trailing
 │   │       signs when the syllable has no vowel yet. Rewrites that delete text
 │   │       require the field to confirm the syllable. Checks: `FullKeyboardEngineTests`.
-│   └── Swipe typing → trace one word using the positions of its characters on the selected
+│   └── Khmer swipe typing → trace one word using the positions of its characters on the selected
 │       layout, including shifted glyphs, coeng and vowel signs. Lift to insert
 │       without an automatic space. Near-tied words on the same path wait for a strip pick
-│       when suggestions are visible. Backspace and replacement respect the last swipe's
+│       when suggestions are visible. The main Swipe typing switch also disables Khmer
+│       swipe. Personal words and iOS Text Replacement use Hex's shared swipe suggestions.
+│       Backspace and replacement respect the last swipe's
 │       boundary. VoiceOver and a caret immediately after coeng keep regular key input.
 │       Checks: `SwipeDecoderTests`, `FullKeyboardEngineTests`, `FullKeyboardSettingsTests`.
 │       These cover synthetic paths and proxy fixtures. Real Khmer swipe accuracy is unmeasured.
