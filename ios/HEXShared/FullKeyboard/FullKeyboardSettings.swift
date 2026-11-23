@@ -82,6 +82,7 @@ struct FullKeyboardSettings {
         static let koreanKeyboard = KoreanKeyboardExperiment.key
         static let khmerismNoColors = "experiments.khmerismNoColors"
         static let khmerismNoSuperscripts = "experiments.khmerismNoSuperscripts"
+        static let khmerismSwipeTyping = "experiments.khmerismSwipeTyping"
         static let keyPopups = "settings.keyboardKeyPopups"
         static let haptics = "settings.keyboardHaptics"
         static let hapticStrength = "settings.keyboardHapticStrength"
@@ -180,6 +181,20 @@ struct FullKeyboardSettings {
         nonmutating set { defaults?.set(newValue, forKey: Key.khmerismNoSuperscripts) }
     }
 
+    /// Settings › Experiments › Khmerism › Swipe typing. Off by default.
+    var khmerismSwipeTyping: Bool {
+        get { defaults?.bool(forKey: Key.khmerismSwipeTyping) ?? false }
+        nonmutating set { defaults?.set(newValue, forKey: Key.khmerismSwipeTyping) }
+    }
+
+    func swipeTypingModel(for language: KeyboardLanguage, override: Bool? = nil) -> TypingDecoderModel? {
+        if language == .khmer {
+            return (override ?? khmerismSwipeTyping) ? TypingDecoderModel.bundled(language.rawValue) : nil
+        }
+        guard override ?? swipeTyping, swipesIn(language) else { return nil }
+        return typingModel(for: language)
+    }
+
     /// The typing model the keyboard may read `language`'s taps with: its bundled model, with
     /// German's only while both Spatial autocorrect and the German experiment are on. English,
     /// Spanish and French never wait on the experiment; Canada's and Switzerland's French
@@ -187,6 +202,7 @@ struct FullKeyboardSettings {
     /// decoder and a bilingual partner, so one gate keeps a German model out of everything
     /// until it is chosen; `TypingDecoderModel.bundled` still loads any bundled file for tests.
     func typingModel(for language: KeyboardLanguage) -> TypingDecoderModel? {
+        if language == .khmer { return nil } // Khmerism's unigram model is for swipes only.
         if language == .german, !(spatialAutocorrect && germanSpatialAutocorrect) { return nil }
         return TypingDecoderModel.bundled(language.rawValue)
     }

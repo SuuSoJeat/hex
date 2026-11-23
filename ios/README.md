@@ -834,11 +834,10 @@ never at a launch by itself.
   - **Swipe typing (Settings › Keyboard › Swipe typing):** On by default (stored as
     `experiments.swipeTyping` from when it was an experiment off by default: unset or true
     is on, false off, so testers who turned it off keep it off), for the
-    English and Spanish layouts (every other layout keeps a drag as a slide to
-    another key), and with Settings › Experiments › Swipe typing in more languages on
+    English and Spanish layouts, and with Settings › Experiments › Swipe typing in more languages on
     (`experiments.swipeMoreLanguages`, off by default) for every language with a typing
     model too: French (France), Polish, and German while Spatial autocorrect and German
-    spatial autocorrect are on. Off under VoiceOver. A touch that goes down on a letter and
+    spatial autocorrect are on. Khmerism has its own experiment. Off under VoiceOver. A touch that goes down on a letter and
     travels more than a key's pitch (width plus gap) is a swipe (`SwipeTyping`): its key
     no longer types, a light trail (a shape layer, the last 0.45 s of the path) follows the finger,
     and the strip shows what the path reads as so far, decoded off the main thread at most
@@ -1320,7 +1319,13 @@ never at a launch by itself.
   to restore it. After a correction with punctuation, Backspace reveals that option.
   Under **Settings › Experiments › Khmerism**, **No colors** uses the keyboard theme
   for every key, and **No superscripts** hides the small corner labels while keeping
-  hold-to-type. Both switches are off by default.
+  hold-to-type. **Swipe typing** reads one word from the positions of its main and
+  corner glyphs, including coeng and vowel signs. Trace the keys in typing order
+  and lift to insert the word. Near-tied spellings with the same path wait for a
+  tap in the suggestion strip when suggestions are visible. Consecutive swipes
+  join without spaces, and Backspace immediately after insertion takes back the
+  last swiped word unless letter-by-letter deletion is enabled. All three
+  experiments are off by default.
 - **Layout per language (Settings › Keyboard › Languages › Layout):** each language the keys
   show (every chosen one, Automatic's while none is, and only the first of English and
   Español together) gets a menu of the layouts Apple's Keyboard Layout list offers for it

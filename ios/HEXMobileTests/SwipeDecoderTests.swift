@@ -63,6 +63,24 @@ final class SwipeDecoderTests: XCTestCase {
         }
     }
 
+    func testKhmerSwipesKeepCoengAndCornerGlyphsInTypingOrder() throws {
+        let (decoder, keys) = try decoder(.khmer)
+        XCTAssertEqual(keys.swipeAliases["ខ"], "ិ")
+        XCTAssertNotNil(keys.centres["្"])
+        XCTAssertNotNil(keys.centres["ំ"])
+        let word = "ខ្ញុំ"
+        XCTAssertEqual(decoder.model.encode(word)?.count, 5)
+        XCTAssertEqual(read(word, decoder, keys).first, word)
+    }
+
+    func testKhmerNearTieAtTheSamePositionsOffersAChoice() throws {
+        let (decoder, keys) = try decoder(.khmer)
+        XCTAssertEqual(SwipePath.through("ដៃ", keys: keys), SwipePath.through("ដ៏", keys: keys))
+        let reading = decoder.read(SwipePath.through("ដៃ", keys: keys), keys: keys)
+        XCTAssertEqual(Set(reading.candidates.prefix(2).map(\.text)), ["ដៃ", "ដ៏"])
+        XCTAssertTrue(reading.requiresChoice)
+    }
+
     /// Google Books splits "don't" into "do n't", so the model barely counts it: the decoder
     /// reads Hex's English contractions as common words.
     func testContractionsReadAsCommonWords() throws {
@@ -148,9 +166,10 @@ enum SwipePath {
     /// letter's key, an apostrophe on none), a point every `step` points, moved by `offset`.
     static func through(_ word: String, keys: TypingDecoder.Keys, offset: CGVector = .zero, step: CGFloat = 6) -> [CGPoint] {
         var centres: [CGPoint] = []
-        for letter in word.lowercased() where letter != "'" {
+        let letters = keys.swipeAliases.isEmpty ? Array(word.lowercased()) : word.unicodeScalars.map(Character.init)
+        for letter in letters where letter != "'" {
             let base = String(letter).decomposedStringWithCanonicalMapping.unicodeScalars.first.map(Character.init)
-            guard let centre = keys.centres[letter] ?? base.flatMap({ keys.centres[$0] }) else { continue }
+            guard let centre = keys.centres[keys.swipeAliases[letter] ?? letter] ?? base.flatMap({ keys.centres[$0] }) else { continue }
             if centres.last != centre { centres.append(centre) }
         }
         guard let first = centres.first else { return [] }

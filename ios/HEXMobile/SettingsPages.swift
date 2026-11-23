@@ -681,6 +681,7 @@ struct ExperimentsSettingsPage: View {
     @State private var koreanKeyboard = FullKeyboardSettings().koreanKeyboard
     @State private var khmerismNoColors = FullKeyboardSettings().khmerismNoColors
     @State private var khmerismNoSuperscripts = FullKeyboardSettings().khmerismNoSuperscripts
+    @State private var khmerismSwipeTyping = FullKeyboardSettings().khmerismSwipeTyping
     @State private var dvorakPunctuation = FullKeyboardSettings().dvorakPunctuation
     @State private var commaPeriodKeys = FullKeyboardSettings().commaPeriodKeys
     @State private var quickAccents = FullKeyboardSettings().quickAccents
@@ -812,12 +813,23 @@ struct ExperimentsSettingsPage: View {
                 detail: String(localized: "Hide the corner labels. Holding a key still types its alternate."),
                 isOn: $khmerismNoSuperscripts
             )
+
+            SettingsDivider()
+
+            SettingsToggleRow(
+                title: String(localized: "Swipe typing"),
+                detail: String(localized: "Trace a Khmer word across its main or corner glyphs, then lift to type it."),
+                isOn: $khmerismSwipeTyping
+            )
         }
         .onChange(of: khmerismNoColors) { _, enabled in
             FullKeyboardSettings().khmerismNoColors = enabled
         }
         .onChange(of: khmerismNoSuperscripts) { _, enabled in
             FullKeyboardSettings().khmerismNoSuperscripts = enabled
+        }
+        .onChange(of: khmerismSwipeTyping) { _, enabled in
+            FullKeyboardSettings().khmerismSwipeTyping = enabled
         }
     }
 
@@ -1085,6 +1097,7 @@ struct ExperimentsSettingsPage: View {
         koreanKeyboard = FullKeyboardSettings().koreanKeyboard
         khmerismNoColors = FullKeyboardSettings().khmerismNoColors
         khmerismNoSuperscripts = FullKeyboardSettings().khmerismNoSuperscripts
+        khmerismSwipeTyping = FullKeyboardSettings().khmerismSwipeTyping
         dvorakPunctuation = FullKeyboardSettings().dvorakPunctuation
         commaPeriodKeys = FullKeyboardSettings().commaPeriodKeys
         quickAccents = FullKeyboardSettings().quickAccents

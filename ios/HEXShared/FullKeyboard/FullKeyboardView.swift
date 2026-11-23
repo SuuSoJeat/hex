@@ -631,16 +631,13 @@ final class FullKeyboardView: UIView {
     /// Fixtures and tests turn Swipe typing on or off; otherwise its switch in Settings › Keyboard.
     var swipeOverride: Bool? { didSet { syncSwipeTyping() } }
 
-    /// Settings › Keyboard › Swipe typing (on by default): on the English and Spanish layouts, a
-    /// drag across the letters types a word, read with the layout language's bundled model, and
-    /// with Settings › Experiments › Swipe typing in more languages on also in every language
-    /// that has one (`FullKeyboardSettings.swipesIn`). Off under VoiceOver, which has its own
-    /// way to type. Elsewhere a drag stays a slide to another key.
+    /// Each supported layout uses its own bundled model. Khmerism has a separate experiment.
+    /// Off under VoiceOver, which has its own way to type.
     private func syncSwipeTyping() {
-        let settings = FullKeyboardSettings()
-        let on = (swipeOverride ?? settings.swipeTyping) && settings.swipesIn(engine.language)
-            && !UIAccessibility.isVoiceOverRunning
-        let model = on ? settings.typingModel(for: engine.language) : nil
+        engine.khmerSwipeOffersChoices = !hidesWordSuggestions
+        let language: KeyboardLanguage = engine.layout.language == .khmer ? .khmer : engine.language
+        let model = UIAccessibility.isVoiceOverRunning ? nil
+            : FullKeyboardSettings().swipeTypingModel(for: language, override: swipeOverride)
         if plane.swipe?.model !== model {
             plane.swipe = model.map { SwipeTyping(engine: engine, model: $0) }
         } else {

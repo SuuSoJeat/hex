@@ -133,6 +133,7 @@ extension FullKeyboardEngine {
     /// host should report.
     func forgetTypingContext() {
         expectedTypingContext = nil
+        dismissKhmerSwipeChoices()
     }
 
     /// Whether the host's update is Hex's own edit (an echo, or a host still behind it) rather

@@ -7,6 +7,13 @@ The keyboard extension bundles the wordlist and its [upstream MIT notice](km-aut
 
 Wordlist SHA-256 `1127f2c9676e49688fb408b93c87cc9e5a1338ace9ea66b08862ce4b679ed3fc`.
 
+Khmerism Swipe typing uses a memory-mapped unigram model compiled from the same
+list. From `ios/`, regenerate it with:
+
+```sh
+python3 scripts/build-typing-model.py km KhmerLexicon/km-autocomplete.tsv HEXKeyboard/TypingModel/km.hextm
+```
+
 Spelling suggestions use the same frequencies to rank one-edit matches. Valid
 dictionary readings and unfinished prefixes take precedence. The keyboard can
 automatically repair an unambiguous doubled dependent vowel sign or coeng. It
