@@ -14,6 +14,11 @@ English also takes two things the books can't give it:
   "csv"), each at its tier's cost; a word the books have only gets commoner.
 Both join the vocabulary before pairs are counted, so their pairs are counted too.
 
+Khmer takes word counts from the bundled SIL/Keyman list, additional Khmer-script
+Buddhist terms from km-buddhist.txt alongside that list, and pair counts from
+km-corpus-pairs.tsv.gz beside this script. For familiar conversational contexts
+Hex's km-next-words.tsv supplies the preferred follow-ups.
+
 Polish has no Google Books counts. Its words and word pairs come from the National Corpus of
 Polish's n-grams (NKJP, its 300M-word balanced subcorpus), kept only where PoliMorf lists the
 word and the word isn't a plain spelling at least 20 times rarer than its marked twin in NKJP or
@@ -294,7 +299,7 @@ def main(lang, work, out_path):
     write_model(lang, vocab, total, pairs, out_path)
 
 
-def write_model(lang, vocab, total, pairs, out_path, min_pair=MIN_PAIR):
+def write_model(lang, vocab, total, pairs, out_path, min_pair=MIN_PAIR, context_totals=None):
     scalars = sorted({c for w in vocab for c in w})
     code = {c: i + 1 for i, c in enumerate(scalars)}
     def base(c):
@@ -314,7 +319,7 @@ def write_model(lang, vocab, total, pairs, out_path, min_pair=MIN_PAIR):
         if c < min_pair:
             continue
         a, b = k.decode("utf-8").split(" ")
-        p = c / vocab[a]
+        p = c / (context_totals[a] if context_totals is not None else vocab[a])
         gain = c * math.log(p / (0.4 * vocab[b] / total))
         if gain > 0:
             scored.append((gain, index[a], index[b], min(p, 1.0)))
@@ -490,6 +495,58 @@ def main_polish(work, out_path, source):
     print(f"{valid_path}: {len(valid)} words outside the model")
 
 
+def khmer_pair_counts(vocab):
+    # SIL's word counts and the corpus counts come from different texts. Normalize
+    # each corpus row against its own observations before pruning its followers.
+    rows = {}
+    corpus_path = os.path.join(os.path.dirname(__file__), "km-corpus-pairs.tsv.gz")
+    with gzip.open(corpus_path, "rt", encoding="utf-8") as source:
+        for line_number, line in enumerate(source, 1):
+            previous, word, raw_count = line.rstrip("\r\n").split("\t")
+            count = int(raw_count)
+            # The corpus tokenizer can find SIL entries with digits or punctuation
+            # that the letters-only decoder omits from its vocabulary.
+            if previous not in vocab or word not in vocab:
+                continue
+            row = rows.setdefault(previous, {})
+            if word in row or count <= 0:
+                raise ValueError(f"{corpus_path}:{line_number}: invalid pair {previous} {word}")
+            row[word] = count
+
+    # A small reserve for unseen words avoids assigning near-certainty to a
+    # continuation on the strength of a handful of examples.
+    totals = {previous: 16 + sum(row.values()) for previous, row in rows.items()}
+    editorial_contexts = set()
+    ranked_path = os.path.join(os.path.dirname(__file__), "km-next-words.tsv")
+    with open(ranked_path, encoding="utf-8") as source:
+        for line_number, line in enumerate(source, 1):
+            if line.startswith("#") or not line.strip():
+                continue
+            previous, *following = line.rstrip("\r\n").split("\t")
+            if (previous not in vocab or previous in editorial_contexts or not following
+                    or len(set(following)) != len(following) or any(w not in vocab for w in following)):
+                raise ValueError(f"{ranked_path}:{line_number}: invalid suggestions for {previous!r}")
+            editorial_contexts.add(previous)
+            total = totals.setdefault(previous, 16)
+            # Editorial weights introduce likely chat words with descending scores.
+            # Preserve the relative ranking of the other observed follow-ups below
+            # them, so a typed prefix outside this short list can still use context.
+            curated = {word: total * 0.08 / (2 ** rank) for rank, word in enumerate(following)}
+            row = rows.setdefault(previous, {})
+            for word in curated:
+                row.pop(word, None)
+            if row:
+                scale = min(1, min(curated.values()) / (2 * max(row.values())))
+                row.update((word, count * scale) for word, count in row.items())
+            row.update(curated)
+
+    pairs = {}
+    for previous, row in rows.items():
+        for word, count in sorted(row.items(), key=lambda item: (-item[1], item[0]))[:64]:
+            pairs[f"{previous} {word}".encode("utf-8")] = count
+    return pairs, totals
+
+
 def build_khmer(wordlist, out_path):
     # The bundled SIL/Keyman model supplies word counts. The Swift layouts
     # supply the physical positions of base and alternate glyphs.
@@ -499,20 +556,33 @@ def build_khmer(wordlist, out_path):
     def begins_word(character):
         return 0x1780 <= ord(character) <= 0x17B3
 
+    def valid_word(word):
+        if not word or not begins_word(word[0]) or word.endswith(coeng):
+            return False
+        if any(not (0x1780 <= ord(c) <= 0x17D2 or c == "\u17dd") for c in word):
+            return False
+        return all(a != coeng or begins_word(b) for a, b in zip(word, word[1:]))
+
     with open(wordlist, encoding="utf-8") as source:
         for line in source:
             word, frequency = line.rstrip("\r\n").split("\t")
             count = int(frequency)
-            if not word or count <= 0 or not begins_word(word[0]):
+            if count > 0 and valid_word(word):
+                vocab[word] = vocab.get(word, 0) + count
+
+    # Preserve the measured costs of SIL words when adding uncounted terms.
+    total = sum(vocab.values())
+    extra_path = os.path.join(os.path.dirname(wordlist), "km-buddhist.txt")
+    with open(extra_path, encoding="utf-8") as source:
+        for line_number, line in enumerate(source, 1):
+            word = line.strip()
+            if not word or word.startswith("#"):
                 continue
-            if any(not (0x1780 <= ord(c) <= 0x17D2 or c == "\u17dd") for c in word):
-                continue
-            if word.endswith(coeng) or any(
-                first == coeng and not begins_word(second) for first, second in zip(word, word[1:])
-            ):
-                continue
-            vocab[word] = vocab.get(word, 0) + count
-    write_model("km", vocab, sum(vocab.values()), {}, out_path)
+            if not valid_word(word):
+                raise ValueError(f"{extra_path}:{line_number}: invalid Khmer word {word!r}")
+            vocab.setdefault(word, 1)
+    pairs, context_totals = khmer_pair_counts(vocab)
+    write_model("km", vocab, total, pairs, out_path, min_pair=0, context_totals=context_totals)
 
 
 if __name__ == "__main__":

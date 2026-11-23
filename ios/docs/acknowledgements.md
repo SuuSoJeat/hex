@@ -53,6 +53,21 @@ The app shows these under Settings › Acknowledgements (`HEXMobile/Acknowledgem
   `python3 scripts/build-typing-model.py km HEXKeyboard/TypingModel/km-autocomplete.tsv HEXKeyboard/TypingModel/km.hextm`.
   Copyright © 2024 SIL International.
   The keyboard includes the [MIT licence notice](../HEXKeyboard/TypingModel/km-autocomplete-license.txt).
+- **Khmer Wikipedia contributors.** Khmer next-word predictions use adjacent words
+  from the [November 2023 Khmer Wikipedia snapshot](https://huggingface.co/datasets/wikimedia/wikipedia/tree/b04c8d1ceb2f5cd4588862100d08de323dccfbaa/20231101.km).
+  The snapshot credits Wikipedia contributors and lists CC BY-SA 3.0. Hex distributes the
+  adapted pair data under [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/).
+  Each article URL in the snapshot links to the contributors through its history.
+  To reproduce the counts, download the linked Parquet file and run
+  `python3 ios/scripts/count-khmer-word-pairs.py path/to/snapshot.parquet` with
+  ICU 78.3, PyICU 2.16.2 and PyArrow 23.0.1. The script checks the snapshot hash,
+  segments the text, and counts known words seen together on two or more pages.
+  The model builder combines those counts with Hex's ranked conversational phrases.
+- **Pali, Sanskrit and Buddhist vocabulary.** The [supplemental wordlist](../HEXKeyboard/TypingModel/km-buddhist.txt)
+  credits English Wiktionary contributors for Khmer-script entries and Khmer loanwords,
+  and lists the spelling references for additional chanting and Buddhist terms. The
+  Wiktionary-derived lists are distributed under [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/).
+  The keyboard gives these uncounted spellings lower completion priority than the SIL terms.
 - **Khmerism keyboard layout.** Hex's Khmerism layout builds on the original
   [Khmerism Keyboard Project by Lyheng Phuoy](https://solve.mit.edu/solutions/2452).
   See the [key maps](khmer-keyboards.md#key-maps) for the Hex adaptation.

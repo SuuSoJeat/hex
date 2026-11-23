@@ -96,8 +96,15 @@ options each default off. Hiding corner labels preserves hold-to-type.
 - At the start of a sentence, offer **ខ្ញុំ**, **សូម** and **តើ**. Show up to
   three offline completions from the first letter, including when the letters
   already spell a word. Choosing a completion appends only its missing suffix.
-  After a choice, suggest words that can follow it. Tapping **ខ្ញុំ** then
-  **ចង់** writes **ខ្ញុំចង់**. Predictions and completions work with Autocorrect off.
+  After a choice, a space, or a zero-width space, rank likely next words from
+  the local word-pair model. Typing the start of the next word narrows those
+  choices. Tapping **សូម**, **អរគុណ**, then **ច្រើន** writes **សូមអរគុណច្រើន**.
+  Predictions and completions work with Autocorrect off.
+- The word-pair model uses Khmer Wikipedia counts and preferred continuations
+  for common conversational phrases. The vocabulary includes Khmer-script Pali
+  and Sanskrit. The added spellings complete from a prefix and count as valid
+  words. Only terms with measured Khmer dictionary frequencies are eligible
+  as dictionary spelling repairs. See the [data credits](acknowledgements.md).
 - With Autocorrect on, Space accepts a confident repair and leaves the next word
   joined. A second Space after that repair inserts a literal space. Closing punctuation
   accepts the repair and inserts the typed mark. The double-space punctuation
@@ -151,6 +158,7 @@ Both layouts use the existing **Autocorrect** and **Swipe typing** switches in
 | Try this in the Full keyboard | Expected result |
 | --- | --- |
 | In an empty field, tap **ខ្ញុំ**, then **ចង់**. Type **។**. | The field reads **ខ្ញុំចង់។** and the three sentence starters reappear. |
+| Start typing **គច្ឆាមិ** or **មហាយាន** on either layout. | The strip can complete the spelling. Selecting it inserts the remaining letters. |
 | Type **ក**, then try **សា** in a fresh field. | **ក** offers **ការ**, **ក្នុង** and **កម្ពុជា**. **សា** offers **សាលា** and stays as typed until a choice is tapped. |
 | Enter **ស + ◌្** on each layout. On Khmer, tap **ថ**. On Khmerism, tap the position that usually types **◌ោ**. | Both give **ស្ថ**. The Khmerism key then shows **◌ោ** again. |
 | Tap **ញ + ◌ំ** in an ordinary text field with the default settings. Repeat with Autocorrect off. | **ខ្ញុំ** first, then literal **ញំ**. |
@@ -163,3 +171,12 @@ Both layouts use the existing **Autocorrect** and **Swipe typing** switches in
 The reference tests exercise key maps, editor behavior with simulated host
 fields, and synthetic swipe paths. Recognition accuracy with Khmer typists on
 physical devices remains unmeasured.
+
+For the November 2026 word-pair model, an offline evaluation used the
+[November 21 Khmer Tatoeba export](https://downloads.tatoeba.org/exports/per_language/khm/).
+After excluding sentences found verbatim after normalization in the Wikipedia
+training text, the evaluation ranked the next word given the preceding ICU-segmented
+word. The previous keyboard placed it in the first three choices on 496 of 8,529
+opportunities (5.82%). The new model did so on 1,095 (12.84%). These are
+sentence-level data from a small set of contributors. The comparison supplies
+word boundaries and does not measure taps saved in real conversations.

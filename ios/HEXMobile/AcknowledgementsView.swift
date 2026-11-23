@@ -136,6 +136,19 @@ struct AcknowledgementsView: View {
             """
         ),
         Entry(
+            title: "Khmer Wikipedia and Wiktionary contributors",
+            body: """
+            Hex counted word pairs in the November 2023 Khmer Wikipedia snapshot \
+            (huggingface.co/datasets/wikimedia/wikipedia). It keeps aggregate counts across \
+            articles and gives common conversational phrases priority. Article histories at \
+            km.wikipedia.org credit individual contributors. The Khmer-script supplement \
+            includes Pali and Sanskrit headwords from English Wiktionary (en.wiktionary.org), \
+            whose entry histories credit the contributors. The adapted Wikimedia data is \
+            available under Creative Commons Attribution-ShareAlike 4.0 \
+            (creativecommons.org/licenses/by-sa/4.0/).
+            """
+        ),
+        Entry(
             title: "Khmerism keyboard layout",
             body: """
             Hex's Khmerism layout builds on the original Khmerism Keyboard Project by \

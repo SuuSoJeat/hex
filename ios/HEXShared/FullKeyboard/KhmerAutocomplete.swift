@@ -75,18 +75,30 @@ struct KhmerAutocomplete: Sendable {
             url = keyboard.url(forResource: "km-autocomplete", withExtension: "tsv")
         }
         guard let url, let wordlist = try? String(contentsOf: url, encoding: .utf8) else { return nil }
-        let model = KhmerAutocomplete(wordlist: wordlist)
+        let supplementURL = url.deletingLastPathComponent().appendingPathComponent("km-buddhist.txt")
+        let supplement = (try? String(contentsOf: supplementURL, encoding: .utf8)) ?? ""
+        let model = KhmerAutocomplete(wordlist: wordlist, supplementalWords: supplement)
         return model.entries.isEmpty ? nil : model
     }()
 
-    init(wordlist: String) {
-        let entries = wordlist.split(whereSeparator: \.isNewline).compactMap { line -> Entry? in
+    init(wordlist: String, supplementalWords: String = "") {
+        var entries = wordlist.split(whereSeparator: \.isNewline).compactMap { line -> Entry? in
             let fields = line.split(separator: "\t")
             guard fields.count == 2, let frequency = Int(fields[1]), frequency > 0 else { return nil }
             let units = Array(fields[0].utf16)
             guard let first = units.first, Self.beginsWord(first), units.allSatisfy(Self.isWordUnit),
                   units.last != Self.coeng else { return nil }
             return Entry(word: String(fields[0]), units: units, frequency: frequency)
+        }
+        // Uncounted Pali and Sanskrit spellings are valid as typed and can complete
+        // a prefix. A measured Khmer word always ranks ahead of an uncounted one.
+        var known = Set(entries.map(\.word))
+        for line in supplementalWords.split(whereSeparator: \.isNewline) {
+            let word = String(line)
+            let units = Array(word.utf16)
+            guard let first = units.first, Self.beginsWord(first), units.allSatisfy(Self.isWordUnit),
+                  units.last != Self.coeng, known.insert(word).inserted else { continue }
+            entries.append(Entry(word: word, units: units, frequency: 0))
         }
         self.entries = entries.sorted { $0.units.lexicographicallyPrecedes($1.units) }
         longestWord = entries.map(\.units.count).max() ?? 0
@@ -100,6 +112,17 @@ struct KhmerAutocomplete: Sendable {
 
     static func endsWithWordText(_ text: Substring) -> Bool {
         text.utf16.last.map(isWordUnit) ?? false
+    }
+
+    /// A space or zero-width space marks the previous word even after the next word has begun.
+    func separatedContext(in before: String, personalWords: [String]) -> (word: String, prefix: String)? {
+        let prefixLength = before.utf16.reversed().prefix(Self.contextLength + 1).prefix(while: Self.isWordUnit).count
+        guard prefixLength <= Self.contextLength else { return nil }
+        let start = before.utf16.index(before.endIndex, offsetBy: -prefixLength)
+        var preceding = before[..<start]
+        while preceding.last == " " || preceding.last == "\u{200B}" { preceding = preceding.dropLast() }
+        guard preceding.endIndex != start, let word = wordSuffix(in: preceding, personalWords: personalWords) else { return nil }
+        return (word, String(before[start...]))
     }
 
     /// The longest known final word that starts at a boundary reached by whole words.
@@ -257,7 +280,8 @@ struct KhmerAutocomplete: Sendable {
         guard repeated.count == 1, let extra = repeated.first else { return nil }
         var repaired = Array(spelling)
         repaired.remove(at: extra - spelling.startIndex)
-        guard Self.hasCompleteClusters(repaired[...]), let match = entry(for: repaired[...]) else { return nil }
+        guard Self.hasCompleteClusters(repaired[...]), let match = entry(for: repaired[...]),
+              match.frequency > 0 else { return nil }
         return (extra, Correction(typed: String(decoding: spelling, as: UTF16.self), replacement: match.word))
     }
 
@@ -269,7 +293,8 @@ struct KhmerAutocomplete: Sendable {
         var spatial: (entry: Entry, gain: Double)?
         var unique = true
         func consider(_ units: [UInt16], insertsCoeng: Bool = false, substitution: Int? = nil) {
-            guard let match = entry(for: units[...]), Self.hasCompleteClusters(match.units[...]) else { return }
+            guard let match = entry(for: units[...]), match.frequency > 0,
+                  Self.hasCompleteClusters(match.units[...]) else { return }
             if let i = substitution, original[i] != Self.coeng, units[i] != Self.coeng,
                let tapGain = gain?(original.count - i - 1, original[i], units[i]),
                tapGain >= Self.minimumSubstitutionGain, mayOffer(match.word),
