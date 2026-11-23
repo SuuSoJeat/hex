@@ -250,6 +250,191 @@ final class FullKeyboardEngineTests: XCTestCase {
         XCTAssertEqual(target.text, "១ ហ")
     }
 
+    func testKhmerismSmartModeExpandsIInJoinedText() {
+        engine.language = .khmer
+        engine.khmerismSmartMode = true
+
+        tap(.character("ប"))
+        tap(.character("ា"))
+        tap(.character("ន"))
+        tap(.character("ញ"))
+        XCTAssertEqual(target.text, "បានញ")
+        tap(.character("ំ"))
+
+        XCTAssertEqual(Array(target.text.unicodeScalars), Array("បានខ្ញុំ".unicodeScalars))
+    }
+
+    func testKhmerismSmartModeDefaultsToLiteralTyping() {
+        engine.language = .khmer
+
+        tap(.character("ញ"))
+        tap(.character("ំ"))
+        tap(.character("ស"))
+        tap(.character("៉"))
+        tap(.character("ា"))
+        tap(.character("ា"))
+
+        XCTAssertEqual(Array(target.text.unicodeScalars), Array("ញំស៉ាា".unicodeScalars))
+    }
+
+    func testKhmerismSmartModePreservesSubscriptNyo() {
+        engine.language = .khmer
+        engine.khmerismSmartMode = true
+
+        tap(.character("ក"))
+        tap(.character("្"))
+        tap(.character("ញ"))
+        tap(.character("ំ"))
+
+        XCTAssertEqual(Array(target.text.unicodeScalars), Array("ក្ញំ".unicodeScalars))
+    }
+
+    func testKhmerismSmartModeDoesNotRewriteNyoAfterCaretMovement() {
+        engine.language = .khmer
+        engine.khmerismSmartMode = true
+
+        tap(.character("ញ"))
+        target.adjustTextPosition(byCharacterOffset: -1)
+        engine.selectionDidChange()
+        target.adjustTextPosition(byCharacterOffset: 1)
+        engine.selectionDidChange()
+        tap(.character("ំ"))
+
+        XCTAssertEqual(Array(target.text.unicodeScalars), Array("ញំ".unicodeScalars))
+    }
+
+    func testKhmerismSmartModeDoesNotRewriteExistingNyo() {
+        target.insertText("ញ")
+        engine.language = .khmer
+        engine.khmerismSmartMode = true
+
+        tap(.character("ំ"))
+
+        XCTAssertEqual(Array(target.text.unicodeScalars), Array("ញំ".unicodeScalars))
+    }
+
+    func testKhmerismSmartModeKeepsLiteralKeysAtAnUnverifiableLeftEdge() {
+        target = KhmerNilBeforeStartTarget(text: "បាន")
+        target.adjustTextPosition(byCharacterOffset: -target.text.count)
+        engine = FullKeyboardEngine(target: target)
+        engine.language = .khmer
+        engine.khmerismSmartMode = true
+
+        tap(.character("ញ"))
+        tap(.character("ំ"))
+
+        XCTAssertEqual(Array(target.text.unicodeScalars), Array("ញំបាន".unicodeScalars))
+    }
+
+    func testKhmerismSmartModeUpdatesDiacriticKeyFollowingAConsonant() throws {
+        let pairs = [("ក", "៏"), ("ដ", "៏"), ("ន", "៍"), ("ស", "៊"), ("ហ", "៊"), ("អ", "៊"), ("ប", "៉")]
+        for (consonant, sign) in pairs {
+            smartField(language: .khmer)
+            engine.khmerismSmartMode = true
+            let diacritic = KeyKind.character("៉")
+            let key = try XCTUnwrap(engine.layout.key(diacritic))
+
+            tap(.character(consonant))
+            XCTAssertEqual(engine.keycapLabel(for: key), sign, consonant)
+            down(10, diacritic)
+            XCTAssertEqual(engine.keyPreview?.label, sign, consonant)
+            up(10, diacritic)
+
+            XCTAssertEqual(Array(target.text.unicodeScalars), Array((consonant + sign).unicodeScalars))
+            XCTAssertEqual(engine.keycapLabel(for: key), "៉")
+        }
+    }
+
+    func testKhmerismSmartModeUsesLastExplicitDiacritic() {
+        engine.language = .khmer
+        engine.khmerismSmartMode = true
+        let diacritic = KeyKind.character("៉")
+
+        tap(.character("ប"))
+        tap(diacritic)
+        XCTAssertEqual(target.text, "ប៉")
+        down(10, diacritic)
+        XCTAssertTrue(engine.handleCharacterHold(forTouch: 10))
+        up(10, diacritic)
+        XCTAssertEqual(Array(target.text.unicodeScalars), Array("ប៊".unicodeScalars))
+
+        tap(.character("ន"))
+        tap(diacritic)
+        XCTAssertEqual(target.text, "ប៊ន៍")
+        let asda = KeyKind.character("ៃ")
+        down(11, asda)
+        XCTAssertTrue(engine.handleCharacterHold(forTouch: 11))
+        up(11, asda)
+        XCTAssertEqual(Array(target.text.unicodeScalars), Array("ប៊ន៏".unicodeScalars))
+    }
+
+    func testKhmerismSmartModeCombinesQuickRepeatedVowels() {
+        let pairs = [("ា", "ាំ"), ("េ", "េះ"), ("ោ", "ោះ")]
+        for (vowel, combined) in pairs {
+            smartField(language: .khmer)
+            engine.khmerismSmartMode = true
+            tap(.character("ក"))
+            tap(.character(vowel))
+            now += 0.1
+            tap(.character(vowel))
+
+            XCTAssertEqual(Array(target.text.unicodeScalars), Array(("ក" + combined).unicodeScalars))
+        }
+    }
+
+    func testKhmerismSmartModeLeavesSlowRepeatedVowelsLiteral() {
+        engine.language = .khmer
+        engine.khmerismSmartMode = true
+
+        tap(.character("ក"))
+        tap(.character("ា"))
+        now += 0.75
+        tap(.character("ា"))
+
+        XCTAssertEqual(Array(target.text.unicodeScalars), Array("កាា".unicodeScalars))
+    }
+
+    func testKhmerismSmartModeOrdersAnExplicitShifterBeforeTheVowel() {
+        for field in [FixtureTextTarget(), KhmerScalarDeletingTarget()] {
+            target = field
+            engine = FullKeyboardEngine(target: field)
+            engine.language = .khmer
+            engine.khmerismSmartMode = true
+            tap(.character("ម"))
+            tap(.character("ក"))
+            tap(.character("ា"))
+            tap(.shift)
+            let diacritic = KeyKind.character("៉")
+            down(10, diacritic)
+            XCTAssertTrue(engine.handleCharacterHold(forTouch: 10))
+            up(10, diacritic)
+
+            XCTAssertEqual(Array(field.text.unicodeScalars), Array("មក៉ា".unicodeScalars))
+        }
+    }
+
+    func testKhmerismSmartModeOrdersAnExplicitShifterBeforeTheSubscript() {
+        engine.language = .khmer
+        engine.khmerismSmartMode = true
+        tap(.character("ស"))
+        tap(.character("្"))
+        tap(.character("រ"))
+        tap(.shift)
+        tap(.character("៉"))
+
+        XCTAssertEqual(Array(target.text.unicodeScalars), Array("ស៊្រ".unicodeScalars))
+    }
+
+    func testKhmerismSmartModeOrdersALateVowelBeforeTheFinalSign() {
+        engine.language = .khmer
+        engine.khmerismSmartMode = true
+        tap(.character("ក"))
+        tap(.character("ំ"))
+        tap(.character("ា"))
+
+        XCTAssertEqual(Array(target.text.unicodeScalars), Array("កាំ".unicodeScalars))
+    }
+
     func testKhmerismDoubleTapLocksShiftUntilTappedAgain() {
         engine.language = .khmer
         let key = KeyKind.character("ហ")
@@ -1373,5 +1558,13 @@ private final class KhmerStopsDeletingTarget: FixtureTextTarget {
     override func deleteBackward() {
         deletes += 1
         if deletes == 1 { super.deleteBackward() }
+    }
+}
+
+@MainActor
+private final class KhmerNilBeforeStartTarget: FixtureTextTarget {
+    override var documentContextBeforeInput: String? {
+        guard cursorIndex > 0 else { return nil }
+        return super.documentContextBeforeInput
     }
 }

@@ -3606,9 +3606,11 @@ final class FullKeyboardSettingsTests: XCTestCase {
 
         XCTAssertFalse(settings.khmerismNoColors)
         XCTAssertFalse(settings.khmerismNoSuperscripts)
+        XCTAssertFalse(settings.khmerismSmartMode)
         XCTAssertFalse(settings.khmerismSwipeTyping)
         XCTAssertFalse(FullKeyboardSettings(defaults: nil).khmerismNoColors)
         XCTAssertFalse(FullKeyboardSettings(defaults: nil).khmerismNoSuperscripts)
+        XCTAssertFalse(FullKeyboardSettings(defaults: nil).khmerismSmartMode)
         XCTAssertNil(FullKeyboardSettings(defaults: nil).swipeTypingModel(for: .khmer))
 
         settings.khmerismNoColors = true
@@ -3623,9 +3625,18 @@ final class FullKeyboardSettingsTests: XCTestCase {
         XCTAssertNil(settings.swipeTypingModel(for: .khmer), "the Latin swipe setting does not enable Khmerism")
         settings.khmerismSwipeTyping = true
         settings.swipeTyping = false
+        XCTAssertFalse(settings.khmerismSmartMode)
         XCTAssertEqual(FullKeyboardSettings(defaults: defaults).swipeTypingModel(for: .khmer)?.language, "km")
         XCTAssertNil(settings.swipeTypingModel(for: .english))
         XCTAssertNil(settings.typingModel(for: .khmer), "swipe model stays out of spatial autocorrect")
+
+        settings.khmerismSwipeTyping = false
+        settings.khmerismSmartMode = true
+        XCTAssertTrue(FullKeyboardSettings(defaults: defaults).khmerismSmartMode)
+        XCTAssertEqual(defaults.object(forKey: "experiments.khmerismSmartMode") as? Bool, true)
+        XCTAssertNil(settings.swipeTypingModel(for: .khmer))
+        settings.khmerismSmartMode = false
+        XCTAssertFalse(FullKeyboardSettings(defaults: defaults).khmerismSmartMode)
     }
 
     /// The experiment is off until its switch is turned on, and it keeps its App Group key.

@@ -285,6 +285,7 @@ final class FullKeyboardView: UIView {
         engine.trackpadSelectionState.enabled = FullKeyboardSettings().twoThumbSelection
         engine.deletesSwipedWordsLetterByLetter = FullKeyboardSettings().deletesSwipedWordsLetterByLetter
         engine.quickAccentsEnabled = FullKeyboardSettings().quickAccents
+        engine.khmerismSmartMode = FullKeyboardSettings().khmerismSmartMode
         syncEmojiShortcodes()
         hidesWordSuggestions = FullKeyboardSettings().hideWordSuggestions
         syncHexPlacement()
@@ -599,6 +600,7 @@ final class FullKeyboardView: UIView {
             applyAppearance()
         }
         let settings = FullKeyboardSettings()
+        engine.khmerismSmartMode = settings.khmerismSmartMode
         plane.showsKhmerismColors = !settings.khmerismNoColors
         plane.showsKhmerismSuperscripts = !settings.khmerismNoSuperscripts
         hapticStrength = FullKeyboardSettings().hapticStrength

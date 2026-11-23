@@ -120,6 +120,7 @@ extension FullKeyboardEngine {
     /// goes in: the text a host that has caught up reports next, for `typingContext` while
     /// it hasn't. Both are as `textBefore` reads them: quotes straight.
     func rememberTypingContext(before: String?, inserted: String) {
+        clearKhmerSmartRun()
         expectedTypingContext = ExpectedTypingContext(
             reported: textBefore,
             expected: (before ?? "") + SmartPunctuation.plain(inserted),
@@ -132,6 +133,7 @@ extension FullKeyboardEngine {
     /// A delete, a cursor move, a pick or a field change: what Hex typed is no longer what the
     /// host should report.
     func forgetTypingContext() {
+        clearKhmerSmartRun()
         expectedTypingContext = nil
         dismissKhmerSwipeChoices()
     }

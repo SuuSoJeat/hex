@@ -90,7 +90,9 @@ extension FullKeyboardEngine {
 
     private func khmerismLabel(for key: KeyboardKey, base: String, shifted: Bool) -> String {
         if shifted { return key.shifted ?? base }
-        return showsKhmerismCoengLayer ? KhmerismLayout.afterCoeng[base] ?? base : base
+        if showsKhmerismCoengLayer { return KhmerismLayout.afterCoeng[base] ?? base }
+        if layout.layer == .letters, base == "៉", let sign = adaptiveKhmerSign { return sign }
+        return base
     }
 
     private var showsKhmerismCoengLayer: Bool { isAfterKhmerCoeng && layout.layer == .letters }
@@ -101,6 +103,9 @@ extension FullKeyboardEngine {
         if showsKhmerismCoengLayer {
             if onKeycap { return nil }
             if let base = key.character, KhmerismLayout.afterCoeng[base] != nil { return base }
+        }
+        if layout.layer == .letters, key.character == "៉", let sign = adaptiveKhmerSign, sign == key.alternate {
+            return key.character
         }
         return key.alternate
     }

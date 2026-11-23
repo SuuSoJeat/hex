@@ -355,6 +355,14 @@ struct ExperimentsSettingsPage: View {
 
         SettingsCard {
             SettingsToggleRow(
+                title: String(localized: "Smart Mode"),
+                detail: String(localized: "Use shortcuts like ញ + ំ → ខ្ញុំ, double-tap vowels, and arrange marks as you type."),
+                isOn: keyboardBinding(\.khmerismSmartMode)
+            )
+
+            SettingsDivider()
+
+            SettingsToggleRow(
                 title: String(localized: "No colors"),
                 detail: String(localized: "Use the keyboard theme for all Khmerism keys"),
                 isOn: keyboardBinding(\.khmerismNoColors)
