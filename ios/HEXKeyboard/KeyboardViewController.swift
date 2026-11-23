@@ -362,11 +362,10 @@ final class KeyboardViewController: UIInputViewController {
         handOffNumericPadIfNeeded()
     }
 
-    /// The cursor moved or a selection changed: a Hangul run that is no longer right before
-    /// the cursor commits, as its text is already in the field.
+    /// The cursor or selection changed, which can end Hangul composition or change the Khmer keys.
     override func selectionDidChange(_ textInput: UITextInput?) {
         super.selectionDidChange(textInput)
-        fullKeyboard?.engine.commitHangulIfHostMoved()
+        fullKeyboard?.engine.selectionDidChange()
     }
 
     // MARK: - Record typing logs

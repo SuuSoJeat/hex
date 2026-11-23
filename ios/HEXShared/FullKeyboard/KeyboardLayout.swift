@@ -41,6 +41,9 @@ nonisolated struct KeyboardKey: Equatable, Sendable {
     /// keys (, and !, . and ?), which show both (`KeyboardLayout.padPairs`), and the Dvorak
     /// punctuation keys (<, > and :).
     var shifted: String?
+    /// Khmerism's swipe-up output on each letter layer.
+    var alternate: String?
+    var shiftedAlternate: String?
 
     var character: String? {
         if case .character(let text) = kind { return text }
@@ -192,7 +195,7 @@ nonisolated struct KeyboardMetrics: Equatable, Sendable {
     let keyHeight: CGFloat
     let stripTop: CGFloat
     let stripHeight: CGFloat
-    let stripBottom: CGFloat
+    var stripBottom: CGFloat
     let keysTop: CGFloat
     let keysBottom: CGFloat
     let cornerRadius: CGFloat
@@ -221,6 +224,8 @@ nonisolated struct KeyboardMetrics: Equatable, Sendable {
     /// Settings › Keyboard › Number row: the keycap height of the row of 1 to 0 above row 1
     /// (`withNumberRow()`), with a row gap under it; 0 without it.
     var numberRowHeight: CGFloat = 0
+    /// Khmer letter pages use five rows. Other pages use four.
+    var keyRowCount: Int = 4
     /// The strip is Apple's prediction bar (`withAppleBar(turned:)`): as thick as Apple's, its
     /// words on Apple's line and a pending word in Apple's cell-wide bubble.
     var appleBar = false
@@ -394,12 +399,18 @@ nonisolated struct KeyboardMetrics: Equatable, Sendable {
         phoneSize: KeyboardPhoneSize = .regular,
         pad: KeyboardPadPlacement? = nil,
         numberRow: Bool = false,
-        joinsUnfoldedKeyboard: Bool = false
+        joinsUnfoldedKeyboard: Bool = false,
+        language: KeyboardLanguage = .english,
+        layer: KeyboardLayer = .letters,
+        letters: KeyboardLetterLayout? = nil
     ) -> KeyboardMetrics {
-        let rows = letterRows(
+        let usesKhmerism = language == .khmer && language.offered(letters) == .khmerism
+        var rows = letterRows(
             orientation, innerWidth: innerWidth, posture: posture, windowInset: windowInset,
-            phoneSize: phoneSize, pad: pad, joinsUnfoldedKeyboard: joinsUnfoldedKeyboard
+            phoneSize: phoneSize, pad: pad, joinsUnfoldedKeyboard: joinsUnfoldedKeyboard || usesKhmerism
         )
+        if language == .khmer, layer == .letters { rows.keyRowCount = 5 }
+        if usesKhmerism { rows.stripBottom = max(rows.stripBottom, stripGap) }
         return numberRow && pad == nil ? rows.withNumberRow() : rows
     }
 
@@ -516,7 +527,7 @@ nonisolated struct KeyboardMetrics: Equatable, Sendable {
             bottomRowTrim: bottomRowTrim, bottomRowReturnColumn: bottomRowReturnColumn,
             bottomRowLeadColumn: bottomRowLeadColumn,
             modifierLetterRatio: modifierLetterRatio, pad: pad, accentCellWidth: accentCellWidth,
-            numberRowHeight: numberRowHeight
+            numberRowHeight: numberRowHeight, keyRowCount: keyRowCount
         )
         m.appleBar = appleBar
         return m
@@ -537,7 +548,7 @@ nonisolated struct KeyboardMetrics: Equatable, Sendable {
         }
         let keys = height - stripArea
         guard height < totalHeight - 0.5, keys >= keysArea / 2 else { return self }
-        let scale = (keys - keysTop - keysBottom + bottomRowTrim) / (4 * keyHeight + 3 * rowGap + numberRowPitch)
+        let scale = (keys - keysTop - keysBottom + bottomRowTrim) / (keysArea - keysTop - keysBottom + bottomRowTrim)
         var fitted = KeyboardMetrics(
             side: side, gap: gap, rowGap: rowGap * scale, keyHeight: keyHeight * scale,
             stripTop: stripTop, stripHeight: stripHeight, stripBottom: stripBottom,
@@ -545,16 +556,18 @@ nonisolated struct KeyboardMetrics: Equatable, Sendable {
             bottomRowTrim: bottomRowTrim, bottomRowReturnColumn: bottomRowReturnColumn,
             bottomRowLeadColumn: bottomRowLeadColumn,
             modifierLetterRatio: modifierLetterRatio, pad: pad, accentCellWidth: accentCellWidth,
-            numberRowHeight: numberRowHeight * scale
+            numberRowHeight: numberRowHeight * scale, keyRowCount: keyRowCount
         )
         fitted.appleBar = appleBar
         return fitted
     }
 
     var stripArea: CGFloat { stripTop + stripHeight + stripBottom }
-    /// Row 4's keycap height.
+    /// The footer's keycap height.
     var bottomRowHeight: CGFloat { keyHeight - bottomRowTrim }
-    var keysArea: CGFloat { keysTop + numberRowPitch + 4 * keyHeight + 3 * rowGap + keysBottom - bottomRowTrim }
+    var keysArea: CGFloat {
+        keysTop + numberRowPitch + CGFloat(keyRowCount) * keyHeight + CGFloat(keyRowCount - 1) * rowGap + keysBottom - bottomRowTrim
+    }
     var totalHeight: CGFloat { stripArea + keysArea }
 }
 
@@ -617,6 +630,7 @@ nonisolated struct KeyboardLayout: Equatable, Sendable {
     /// them, an iPad, and Dvorak letters with Dvorak punctuation, which puts them on row 1). True
     /// even where the space bar has no room and they are skipped, so a bar too narrow is key for
     /// key the same either way.
+    /// Khmerism keeps its own punctuation beside the space bar.
     let commaPeriodKeys: Bool
     /// Where the Hex key sits: Settings › Keyboard › Hex key picks the strip's trailing
     /// (Right) or leading (Left) end.
@@ -656,8 +670,14 @@ nonisolated struct KeyboardLayout: Equatable, Sendable {
         let offered = language.offered(letters)
         let letters = pad?.isDocked == true && language == .german && offered == .own ? .qwertz : offered
         self.letters = letters
-        // Docked on an iPad the Hex key is on the bottom row, where Apple's dictation key is.
-        self.hexPlacement = pad?.isDocked == true ? .leftOfSpace : hexPlacement
+        let usesKhmerism = letters == .khmerism
+        let usesSplit = posture.splitsKeyboard && orientation == .portrait && !joinsUnfoldedKeyboard
+        // Khmerism keeps room for its two additional footer keys.
+        if usesKhmerism {
+            self.hexPlacement = hexPlacement == .stripLeading || hexPlacement == .leftOfSpace ? .stripLeading : .stripTrailing
+        } else {
+            self.hexPlacement = pad?.isDocked == true ? .leftOfSpace : hexPlacement
+        }
         self.orientation = orientation
         self.layer = layer
         self.field = field
@@ -672,14 +692,25 @@ nonisolated struct KeyboardLayout: Equatable, Sendable {
         // An iPhone's letters page in a text field only (not web search, whose `.` is Apple's),
         // and not where Dvorak punctuation already puts comma and period on row 1.
         self.commaPeriodKeys = commaPeriodKeys && pad == nil && layer == .letters && field == .text
-            && !self.dvorakPunctuation
+            && !usesKhmerism && !self.dvorakPunctuation
         let innerWidth = width - 2 * self.horizontalInset
         var metrics = KeyboardMetrics.for(
             orientation, innerWidth: innerWidth, posture: posture, windowInset: windowInset, phoneSize: phoneSize, pad: pad,
-            numberRow: numberRow, joinsUnfoldedKeyboard: joinsUnfoldedKeyboard
+            numberRow: numberRow, joinsUnfoldedKeyboard: joinsUnfoldedKeyboard, language: language, layer: layer,
+            letters: letters
         )
         if let availableHeight { metrics = metrics.fitted(toHeight: availableHeight) }
         self.metrics = metrics
+        if language == .khmer, usesKhmerism || !usesSplit || pad?.isDocked == true {
+            self.keys = Self.buildKhmerKeys(
+                width: width, metrics: metrics, layer: layer, field: field, inset: self.horizontalInset,
+                showsGlobe: showsGlobe, showsEmoji: showsEmoji, hexPlacement: self.hexPlacement, letters: letters,
+                commaPeriodKeys: self.commaPeriodKeys
+            )
+            self.split = nil
+            self.padLetterWidth = nil
+            return
+        }
         if metrics.pad?.isDocked == true {
             padLetterWidth = Self.padLetterWidth(innerWidth: innerWidth, metrics: metrics, layer: layer, language: language, letters: letters)
             self.keys = Self.buildPadKeys(
@@ -690,7 +721,7 @@ nonisolated struct KeyboardLayout: Equatable, Sendable {
             return
         }
         padLetterWidth = nil
-        if posture.splitsKeyboard, orientation == .portrait, !joinsUnfoldedKeyboard {
+        if usesSplit {
             let built = Self.buildSplitKeys(
                 width: width,
                 metrics: metrics,
@@ -728,6 +759,7 @@ nonisolated struct KeyboardLayout: Equatable, Sendable {
     }
 
     var isSplit: Bool { split != nil }
+    var bottomRowIndex: Int { metrics.keyRowCount - 1 }
 
     /// Whether this layout draws the experiment's row: Dvorak letters in a text field (a URL,
     /// email or web search field keeps its own `.`). Only then is its row 1 a key plane
@@ -753,9 +785,16 @@ nonisolated struct KeyboardLayout: Equatable, Sendable {
         posture: KeyboardPosture = .phone,
         phoneSize: KeyboardPhoneSize = .regular,
         pad: KeyboardPadPlacement? = nil,
-        numberRow: Bool = false
+        numberRow: Bool = false,
+        language: KeyboardLanguage = .english,
+        innerWidth: CGFloat? = nil,
+        layer: KeyboardLayer = .letters,
+        letters: KeyboardLetterLayout? = nil
     ) -> CGFloat {
-        KeyboardMetrics.for(orientation, posture: posture, phoneSize: phoneSize, pad: pad, numberRow: numberRow).totalHeight
+        KeyboardMetrics.for(
+            orientation, innerWidth: innerWidth, posture: posture, phoneSize: phoneSize,
+            pad: pad, numberRow: numberRow, language: language, layer: layer, letters: letters
+        ).totalHeight
     }
 
     /// `KeyboardKey.row` for Settings › Keyboard › Number row's digits (row 1 is 0, the strip's
@@ -769,6 +808,32 @@ nonisolated struct KeyboardLayout: Equatable, Sendable {
     /// types that digit.
     static func drawsNumberRow(_ metrics: KeyboardMetrics, layer: KeyboardLayer) -> Bool {
         metrics.numberRowHeight > 0 && layer != .numbers
+    }
+
+    /// Leave the margins beside 123 and Space inactive so an imprecise tap doesn't open Emoji.
+    static func emojiHitFrame(for frame: CGRect, rowBottom: CGFloat) -> CGRect {
+        CGRect(x: frame.minX + 6, y: frame.minY + 7.5, width: frame.width - 12, height: rowBottom - frame.minY - 7.5)
+    }
+
+    /// On iPhone the gap above Space takes Space where the row above is centred over it.
+    /// Other gaps still split so a low tap over Return stays with its original key.
+    static func giveSpaceBarItsTopGap(in keys: inout [KeyboardKey], metrics: KeyboardMetrics) {
+        let footer = metrics.keyRowCount - 1
+        guard metrics.pad == nil, let spaceIndex = keys.firstIndex(where: { $0.kind == .space && $0.row == footer }) else { return }
+        let space = keys[spaceIndex].frame
+        var band: (left: CGFloat, right: CGFloat)?
+        for index in keys.indices where keys[index].row == footer - 1 {
+            let cap = keys[index].frame
+            guard cap.midX > space.minX, cap.midX < space.maxX else { continue }
+            let hit = keys[index].hitFrame
+            keys[index].hitFrame.size.height = cap.maxY - hit.minY
+            band = (min(band?.left ?? hit.minX, hit.minX), max(band?.right ?? hit.maxX, hit.maxX))
+        }
+        if let band {
+            keys[spaceIndex].gapHitFrame = CGRect(
+                x: band.left, y: space.minY - metrics.rowGap, width: band.right - band.left, height: metrics.rowGap / 2
+            )
+        }
     }
 
     var totalHeight: CGFloat { metrics.totalHeight }
@@ -795,6 +860,7 @@ nonisolated struct KeyboardLayout: Equatable, Sendable {
         let full = stripBarFrame
         guard let hex = key(.hex), hex.row < 0 else { return full }
         let reserved = metrics.appleBar ? KeyboardMetrics.appleIconCellWidth : hex.frame.width + metrics.side + metrics.gap
+        if key(.globe).map({ $0.row < 0 }) == true { return full.insetBy(dx: reserved, dy: 0) }
         return hexOnLeading
             ? CGRect(x: full.minX + reserved, y: full.minY, width: full.width - reserved, height: full.height)
             : CGRect(x: full.minX, y: full.minY, width: full.width - reserved, height: full.height)
@@ -828,7 +894,7 @@ nonisolated struct KeyboardLayout: Equatable, Sendable {
     /// reach about 8 pt above their keycaps to the predictive bar, or `stripTouchBand`.
     var rowOneReach: CGFloat { max(metrics.stripBottom, Self.stripTouchBand) }
 
-    /// Where touches go to the keys: the key area plus `rowOneReach`. Hit frames tile it.
+    /// Where touches go to the key plane: the key area plus `rowOneReach`.
     var touchAreaFrame: CGRect {
         CGRect(x: 0, y: metrics.stripArea - rowOneReach, width: width, height: metrics.keysArea + rowOneReach)
     }
@@ -853,6 +919,10 @@ nonisolated struct KeyboardLayout: Equatable, Sendable {
     var characterWidth: CGFloat {
         if isSplit { return SplitGeometry.keyWidth }
         if let padLetterWidth { return padLetterWidth }
+        if language == .khmer, layer == .letters {
+            let columns = letters == .khmerism ? 11 : 12
+            return Self.letterWidth(innerWidth: width - 2 * horizontalInset, metrics: metrics, columns: columns)
+        }
         if layer == .letters, letters == .dvorak {
             return Self.dvorakLetterWidth(innerWidth: width - 2 * horizontalInset, metrics: metrics)
         }
@@ -915,11 +985,25 @@ nonisolated struct KeyboardLayout: Equatable, Sendable {
         max(10, rows.prefix(2).map(\.count).max() ?? 10)
     }
 
+    /// The English number and symbol pages align their five punctuation caps between the
+    /// two outer modifiers. Return the middle run's inset from the regular row's left edge.
+    static func numericPunctuationGeometry(
+        innerWidth: CGFloat, letterWidth: CGFloat, metrics: KeyboardMetrics, count: Int
+    ) -> (inset: CGFloat, width: CGFloat) {
+        let inset = 1.5 * (letterWidth + metrics.gap)
+        let span = innerWidth - 2 * metrics.side - 2 * inset - CGFloat(count - 1) * metrics.gap
+        return (inset, span / CGFloat(count))
+    }
+
     static func characterRows(
         for layer: KeyboardLayer,
         language: KeyboardLanguage = .english,
         letters: KeyboardLetterLayout? = nil
     ) -> [[String]] {
+        if language.offered(letters) == .khmer {
+            if layer == .numbers { return KhmerLayout.numbers }
+            if layer == .symbols { return KhmerLayout.symbols }
+        }
         // Greek's pages, as the system Greek keyboard shows them: ; is its question mark, so it
         // takes ?'s key on both, the ano teleia · takes ;'s key on 123, and ? takes |'s on #+=.
         let greek = language == .greek
@@ -1061,10 +1145,8 @@ nonisolated struct KeyboardLayout: Equatable, Sendable {
                 addCharacters(middle, row: 2, startX: centredStart(count: middle.count, keyWidth: lw), keyWidth: lw)
             } else {
                 // Apple's punctuation row: five wide keys aligned to the s..k columns between modifiers.
-                let edgeGap = 1.5 * (lw + m.gap) - modW
-                let count = CGFloat(middle.count)
-                let middleW = (innerWidth - 2 * m.side - 2 * modW - 2 * edgeGap - (count - 1) * m.gap) / count
-                addCharacters(middle, row: 2, startX: left + modW + edgeGap, keyWidth: middleW)
+                let punctuation = numericPunctuationGeometry(innerWidth: innerWidth, letterWidth: lw, metrics: m, count: middle.count)
+                addCharacters(middle, row: 2, startX: left + punctuation.inset, keyWidth: punctuation.width)
             }
             add(.delete, row: 2, x: right - row3ModW, w: row3ModW, label: "delete")
         }
@@ -1216,10 +1298,6 @@ nonisolated struct KeyboardLayout: Equatable, Sendable {
         let top = m.stripArea - max(m.stripBottom, stripTouchBand)
         let bottom = m.totalHeight
         var keys: [KeyboardKey] = []
-        // The gap above the space bar is the space bar's, as Apple's (iOS 27.2) is: row 3's keys over it
-        // end at their keycaps. Elsewhere gaps split, so a low m over return stays m (Ryan's taps).
-        let spaceKeycap = m.pad == nil ? drawn.first { $0.kind == .space && $0.row == 3 }?.frame : nil
-        var spaceBand: (CGFloat, CGFloat)?
         for row in (numberRow ? [numberRowIndex] : []) + Array(0..<4) {
             let rowKeys = drawn.filter { $0.row == row }.sorted { $0.frame.minX < $1.frame.minX }
             let y0 = row == numberRowIndex || (row == 0 && !numberRow) ? top : rowY(row) - m.rowGap / 2
@@ -1228,44 +1306,43 @@ nonisolated struct KeyboardLayout: Equatable, Sendable {
                 let x0 = i == 0 ? 0 : (rowKeys[i - 1].frame.maxX + item.frame.minX) / 2
                 let x1 = i == rowKeys.count - 1 ? width : (item.frame.maxX + rowKeys[i + 1].frame.minX) / 2
                 var hit = CGRect(x: x0, y: y0, width: x1 - x0, height: y1 - y0)
-                if row == 2, let space = spaceKeycap, item.frame.midX > space.minX, item.frame.midX < space.maxX {
-                    hit.size.height = item.frame.maxY - y0
-                    spaceBand = (min(spaceBand?.0 ?? x0, x0), max(spaceBand?.1 ?? x1, x1))
-                }
                 if item.kind == .emoji, row == 3, m.keyHeight >= 40 {
-                    // Apple's emoji key takes taps only well inside its keycap, 6 pt in from each
-                    // side and 7.5 pt below its top, and the margins around it type nothing:
-                    // a finger aimed at 123 or space that lands near it doesn't switch keyboards.
-                    hit = CGRect(x: item.frame.minX + 6, y: item.frame.minY + 7.5, width: item.frame.width - 12, height: y1 - item.frame.minY - 7.5)
+                    hit = emojiHitFrame(for: item.frame, rowBottom: y1)
                 }
-                var key = KeyboardKey(kind: item.kind, row: row, frame: item.frame, hitFrame: hit, label: item.label, shifted: item.shifted)
-                if item.kind == .space, row == 3, let band = spaceBand {
-                    key.gapHitFrame = CGRect(x: band.0, y: rowY(3) - m.rowGap, width: band.1 - band.0, height: m.rowGap / 2)
-                }
-                keys.append(key)
+                keys.append(KeyboardKey(
+                    kind: item.kind, row: row, frame: item.frame, hitFrame: hit, label: item.label, shifted: item.shifted
+                ))
             }
         }
+        giveSpaceBarItsTopGap(in: &keys, metrics: m)
         if placement.isInStrip {
-            // A bare mark in a target wider than tall, inset like the suggestion pills; in Apple's
-            // bar the same mark, centred in its cell on the words' line.
-            let height = m.appleBar ? KeyboardMetrics.barHexKeyHeight : m.stripPillHeight
-            let hexWidth: CGFloat = 44
-            let cell = KeyboardMetrics.appleIconCellWidth
-            let x = m.appleBar
-                ? (placement == .stripLeading ? inset + (cell - hexWidth) / 2 : width - inset - (cell + hexWidth) / 2)
-                : (placement == .stripLeading ? left : right - hexWidth)
-            let y = m.appleBar ? m.stripTop + m.stripTextCenter - height / 2 : m.stripTop + m.stripInset
-            let frame = CGRect(x: x, y: y, width: hexWidth, height: height)
-            // In Apple's bar the key takes its whole cell across, up to the slot beside it.
-            let target = m.appleBar
-                ? CGRect(x: x - (cell - hexWidth) / 2, y: frame.minY - 4, width: cell, height: frame.height + 8)
-                : frame.insetBy(dx: -4, dy: -4)
-            // Up to the strip's top at least: the room above the pill belongs to the key too.
-            let targetTop = min(target.minY, m.stripTop)
-            let hitFrame = CGRect(x: target.minX, y: targetTop, width: target.width, height: top - targetTop)
-            keys.append(KeyboardKey(kind: .hex, row: -1, frame: frame, hitFrame: hitFrame, label: "hex"))
+            keys.append(joinedStripHexKey(width: width, inset: inset, metrics: m, placement: placement))
         }
         return keys
+    }
+
+    /// The Hex mark in a joined strip, with the full space above it available to tap.
+    static func joinedStripHexKey(
+        width: CGFloat, inset: CGFloat, metrics m: KeyboardMetrics, placement: HexKeyPlacement
+    ) -> KeyboardKey {
+        let height = m.appleBar ? KeyboardMetrics.barHexKeyHeight : m.stripPillHeight
+        let hexWidth: CGFloat = 44
+        let cell = KeyboardMetrics.appleIconCellWidth
+        let left = inset + m.side
+        let right = width - inset - m.side
+        let x = m.appleBar
+            ? (placement == .stripLeading ? inset + (cell - hexWidth) / 2 : width - inset - (cell + hexWidth) / 2)
+            : (placement == .stripLeading ? left : right - hexWidth)
+        let y = m.appleBar ? m.stripTop + m.stripTextCenter - height / 2 : m.stripTop + m.stripInset
+        let frame = CGRect(x: x, y: y, width: hexWidth, height: height)
+        // In Apple's bar the key takes its whole cell across, up to the slot beside it.
+        let target = m.appleBar
+            ? CGRect(x: x - (cell - hexWidth) / 2, y: frame.minY - 4, width: cell, height: frame.height + 8)
+            : frame.insetBy(dx: -4, dy: -4)
+        let targetTop = min(target.minY, m.stripTop)
+        let keysTop = m.stripArea - max(m.stripBottom, stripTouchBand)
+        let hitFrame = CGRect(x: target.minX, y: targetTop, width: target.width, height: keysTop - targetTop)
+        return KeyboardKey(kind: .hex, row: -1, frame: frame, hitFrame: hitFrame, label: "hex")
     }
 }
 
@@ -1326,7 +1403,11 @@ extension KeyboardLayout {
     ) -> (keys: [KeyboardKey], split: SplitGeometry) {
         typealias G = SplitGeometry
         // Dvorak splits like the other layouts, delete ending row 3 (Apple's split Dvorak unobserved).
-        let rows = characterRows(for: layer, language: language, letters: letters)
+        let khmerLetters = letters == .khmer && layer == .letters ? KhmerLayout.letters : []
+        let rows = khmerLetters.isEmpty ? characterRows(for: layer, language: language, letters: letters)
+            : khmerLetters.map { $0.map(\.text) }
+        let footerRow = m.keyRowCount - 1
+        let modifierRow = footerRow - 1
         // Settings › Experiments › Dvorak punctuation, as on the joined keyboard: a URL, email or
         // web search field keeps its own `.` key, so its row 1 stays Apple's.
         let punctuation = layer == .letters && letters == .dvorak && dvorakPunctuation
@@ -1346,12 +1427,14 @@ extension KeyboardLayout {
         }
         func addRow(_ chars: [String], row: Int, leftStart: CGFloat, rightEnd: CGFloat) -> (CGFloat, CGFloat) {
             let (l, r) = G.halves(chars)
+            let variants = khmerLetters.indices.contains(row) ? khmerLetters[row] : []
+            func shifted(_ character: String) -> String? { variants.first { $0.text == character }?.shifted }
             for (i, ch) in l.enumerated() {
-                add(.character(ch), row: row, x: leftStart + CGFloat(i) * p, w: G.keyWidth, label: ch, rightHalf: false)
+                add(.character(ch), row: row, x: leftStart + CGFloat(i) * p, w: G.keyWidth, label: ch, rightHalf: false, shifted: shifted(ch))
             }
             let rStart = rightEnd - CGFloat(r.count) * p + G.gap
             for (i, ch) in r.enumerated() {
-                add(.character(ch), row: row, x: rStart + CGFloat(i) * p, w: G.keyWidth, label: ch, rightHalf: true)
+                add(.character(ch), row: row, x: rStart + CGFloat(i) * p, w: G.keyWidth, label: ch, rightHalf: true, shifted: shifted(ch))
             }
             return (leftStart + CGFloat(l.count) * p - G.gap, rStart)
         }
@@ -1389,41 +1472,45 @@ extension KeyboardLayout {
             leftEdge = edges.0
             rightEdge = edges.1
         }
-        _ = addRow(rows[1], row: 1, leftStart: left + p / 2, rightEnd: right - p / 2)
+        for row in 1..<modifierRow {
+            _ = addRow(rows[row], row: row, leftStart: left + p / 2, rightEnd: right - p / 2)
+        }
 
-        // Row 3: shift (or the page switch) and delete at the sides, the middle keys a key and a
+        // The last character row: shift (or the page switch) and delete at the sides, keys a key and a
         // half in from each side.
         switch layer {
-        case .letters: add(.shift, row: 2, x: left, w: G.modifierWidth, label: "shift", rightHalf: false)
-        case .numbers: add(.layerSwitch(.symbols), row: 2, x: left, w: G.modifierWidth, label: "#+=", rightHalf: false)
-        case .symbols: add(.layerSwitch(.numbers), row: 2, x: left, w: G.modifierWidth, label: "123", rightHalf: false)
+        case .letters: add(.shift, row: modifierRow, x: left, w: G.modifierWidth, label: "shift", rightHalf: false)
+        case .numbers: add(.layerSwitch(.symbols), row: modifierRow, x: left, w: G.modifierWidth, label: "#+=", rightHalf: false)
+        case .symbols: add(.layerSwitch(.numbers), row: modifierRow, x: left, w: G.modifierWidth, label: "123", rightHalf: false)
         }
-        _ = addRow(rows[2], row: 2, leftStart: left + 1.5 * p, rightEnd: right - 1.5 * p)
-        add(.delete, row: 2, x: right - G.modifierWidth, w: G.modifierWidth, label: "delete", rightHalf: true)
+        _ = addRow(rows[modifierRow], row: modifierRow, leftStart: left + 1.5 * p, rightEnd: right - 1.5 * p)
+        add(.delete, row: modifierRow, x: right - G.modifierWidth, w: G.modifierWidth, label: "delete", rightHalf: true)
 
-        // Row 4: 123/ABC, globe?, emoji? and a space bar on the left; a space bar, the field's
+        // Footer: 123/ABC, globe?, emoji? and a space bar on the left; a space bar, the field's
         // extras, Hex (when it sits in the row) and return on the right.
         var x = left
         let switchKind: KeyKind = layer == .letters ? .layerSwitch(.numbers) : .layerSwitch(.letters)
-        add(switchKind, row: 3, x: x, w: G.layerSwitchWidth, label: layer == .letters ? "123" : "ABC", rightHalf: false)
+        let switchLabel = layer == .letters ? "123" : (letters == .khmer ? "ក" : "ABC")
+        let spaceLabel = letters == .khmer ? "ខ្មែរ" : "space"
+        add(switchKind, row: footerRow, x: x, w: G.layerSwitchWidth, label: switchLabel, rightHalf: false)
         x += G.layerSwitchWidth + G.gap
         if showsGlobe {
-            add(.globe, row: 3, x: x, w: G.smallKeyWidth, label: "globe", rightHalf: false)
+            add(.globe, row: footerRow, x: x, w: G.smallKeyWidth, label: "globe", rightHalf: false)
             x += G.smallKeyWidth + G.gap
         }
         if showsEmoji {
-            add(.emoji, row: 3, x: x, w: G.smallKeyWidth, label: "emoji", rightHalf: false)
+            add(.emoji, row: footerRow, x: x, w: G.smallKeyWidth, label: "emoji", rightHalf: false)
             x += G.smallKeyWidth + G.gap
         }
         // With the experiment, a semicolon sits just before the left space bar, which keeps
         // ending where it did, where the bar holds a key and a space besides.
         var leftSpaceW = max(G.keyWidth, leftEdge - x)
         if punctuation, leftSpaceW >= 2 * G.keyWidth + G.gap {
-            add(.character(";"), row: 3, x: x, w: G.keyWidth, label: ";", rightHalf: false, shifted: ":")
+            add(.character(";"), row: footerRow, x: x, w: G.keyWidth, label: ";", rightHalf: false, shifted: ":")
             x += G.keyWidth + G.gap
             leftSpaceW -= G.keyWidth + G.gap
         }
-        add(.space, row: 3, x: x, w: leftSpaceW, label: "space", rightHalf: false)
+        add(.space, row: footerRow, x: x, w: leftSpaceW, label: spaceLabel, rightHalf: false)
 
         var trailing = field.keysRightOfSpace(width: G.smallKeyWidth)
         if !placement.isInStrip {
@@ -1432,25 +1519,27 @@ extension KeyboardLayout {
         trailing.append((.returnKey, G.returnWidth, "return"))
         let trailingWidth = trailing.reduce(0) { $0 + $1.1 + G.gap }
         let spaceRightWidth = max(G.keyWidth, right - rightEdge - trailingWidth)
-        add(.space, row: 3, x: rightEdge, w: spaceRightWidth, label: "space", rightHalf: true)
+        add(.space, row: footerRow, x: rightEdge, w: spaceRightWidth, label: spaceLabel, rightHalf: true)
         x = rightEdge + spaceRightWidth + G.gap
         for (kind, w, label) in trailing {
-            add(kind, row: 3, x: x, w: w, label: label, rightHalf: true)
+            add(kind, row: footerRow, x: x, w: w, label: label, rightHalf: true)
             x += w + G.gap
         }
 
         // Settings › Experiments › Comma and period keys: a comma just left of the left half's
         // space bar and a period just right of the right half's, taking their width from the
         // bars, where each still holds a letter-wide key and a space besides it.
-        if commaPeriodKeys { Self.addSplitCommaPeriodKeys(to: &drawn, keyWidth: G.keyWidth, gap: G.gap) }
+        if commaPeriodKeys {
+            Self.addSplitCommaPeriodKeys(to: &drawn, keyWidth: G.keyWidth, gap: G.gap, footerRow: footerRow)
+        }
 
         // Touch targets: each half tiles from its side to half a gap past its inner key; the
         // middle between the halves is no key's.
         let top = m.stripArea - max(m.stripBottom, stripTouchBand)
         var keys: [KeyboardKey] = []
-        for row in (numberRow ? [numberRowIndex] : []) + Array(0..<4) {
+        for row in (numberRow ? [numberRowIndex] : []) + Array(0...footerRow) {
             let y0 = row == numberRowIndex || (row == 0 && !numberRow) ? top : rowY(row) - m.rowGap / 2
-            let y1 = row == 3 ? m.totalHeight : rowY(row == numberRowIndex ? 0 : row + 1) - m.rowGap / 2
+            let y1 = row == footerRow ? m.totalHeight : rowY(row == numberRowIndex ? 0 : row + 1) - m.rowGap / 2
             for half in [false, true] {
                 let items = drawn.filter { $0.row == row && $0.rightHalf == half }.sorted { $0.frame.minX < $1.frame.minX }
                 for (i, item) in items.enumerated() {

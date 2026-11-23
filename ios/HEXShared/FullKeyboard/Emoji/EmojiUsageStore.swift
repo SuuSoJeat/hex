@@ -82,7 +82,12 @@ final class EmojiUsageStore {
 final class EmojiRoutedTarget: KeyboardTextTarget {
     let document: KeyboardTextTarget
     /// Set while searching; the keys type here.
-    var query: String?
+    var query: String? {
+        didSet {
+            if (oldValue == nil) != (query == nil) { inputRouteRevision += 1 }
+        }
+    }
+    private(set) var inputRouteRevision = 0
     /// Return while searching.
     var onSearchReturn: (() -> Void)?
 

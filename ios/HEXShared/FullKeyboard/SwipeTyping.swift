@@ -3,9 +3,8 @@ import UIKit
 
 /// Settings › Keyboard › Swipe typing: slide from a letter through the letters of a word and lift,
 /// and the word goes in, as with Apple's QuickPath and Gboard's glide typing. English and
-/// Spanish, and with Settings › Experiments › Swipe typing in more languages on every layout
-/// with a typing model (French (France), Polish, and German while its model is chosen); every
-/// other layout keeps a drag as a slide to another key.
+/// Spanish layouts. French (France), Polish, and German use Swipe typing in more languages.
+/// The Khmer layouts share their own swipe typing setting.
 ///
 /// A touch on a letter key becomes a swipe once it travels more than a key's pitch from
 /// where it went down: the key no longer types, a light trail follows the finger, and the
@@ -66,9 +65,10 @@ final class SwipeTyping {
     }
 
     var model: TypingDecoderModel { decoder.model }
+    private var isKhmer: Bool { model.language == KeyboardLanguage.khmer.rawValue }
 
-    /// How far a letter touch travels before it is a swipe: a key's width and gap.
-    var threshold: CGFloat { engine.layout.swipePitch }
+    /// Khmer also needs short strokes between adjacent keys.
+    var threshold: CGFloat { engine.layout.swipePitch * (isKhmer ? 0.65 : 1) }
 
     var isSwiping: Bool { active != nil }
 
@@ -103,10 +103,14 @@ final class SwipeTyping {
     /// touch's timestamp (now when nil).
     func began(id: Int, at point: CGPoint, time: TimeInterval? = nil) {
         guard engine.allowsSwipes, let touch = engine.touches[id], !touch.committed,
-              touch.key.character?.first?.isLetter == true else { return }
+              isSwipeKey(touch.key) else { return }
         var stroke = Stroke()
         stroke.add(point, at: time ?? clock())
         pending[id] = stroke
+    }
+
+    private func isSwipeKey(_ key: KeyboardKey) -> Bool {
+        TypingDecoder.Keys.swipeLetter(on: key, language: engine.layout.language) != nil
     }
 
     /// True when the touch is a swipe (now or already): the plane leaves it to this.
@@ -124,6 +128,11 @@ final class SwipeTyping {
         guard let first = stroke.points.first, hypot(point.x - first.x, point.y - first.y) > threshold,
               let touch = engine.touches[id], !touch.committed, engine.activeAccentMenu == nil,
               engine.allowsSwipes else { return false }
+        if isKhmer {
+            let layout = engine.layout
+            guard let next = layout.hitTest(point), isSwipeKey(next),
+                  next.kind != layout.hitTest(first)?.kind else { return false }
+        }
         pending[id] = nil
         syncWords()
         engine.beginSwipe(touchID: id)
@@ -162,6 +171,10 @@ final class SwipeTyping {
 
     func cancelAll() {
         pending.removeAll()
+        if isKhmer, engine.pendingKhmerSwipeChoices != nil {
+            engine.dismissKhmerSwipeChoices()
+            engine.refreshSuggestions()
+        }
         guard active != nil else { return }
         active = nil
         generation += 1
@@ -176,14 +189,17 @@ final class SwipeTyping {
         trail.fade()
         let started = clock()
         let layout = engine.layout
-        let candidates = decoder.decode(
+        let reading = decoder.read(
             stroke.points.map(layout.joinedForSwipe), times: stroke.times, keys: engine.swipeKeys,
             previous: engine.swipePreviousWord, limit: 8
         )
-        let words = engine.autocorrect.readingsOfferingOwnCapitals(ranked(candidates), capsLock: engine.shift.state == .locked, model: model)
+        let rankedWords = ranked(reading.candidates)
+        let words = isKhmer ? rankedWords : engine.autocorrect.readingsOfferingOwnCapitals(
+            rankedWords, capsLock: engine.shift.state == .locked, model: model
+        )
         let elapsed = clock() - started
         lastDecodeTime = elapsed
-        if let letter = slidTapLetter(stroke), let start = stroke.points.first,
+        if !isKhmer, let letter = slidTapLetter(stroke), let start = stroke.points.first,
            words.first.map({ !Self.word($0, startsAndEndsWith: letter) }) ?? true {
             // A tap that slid: its letter goes in as a tap's would, after the space a swiped
             // word before it keeps pending and with the capital shift gives it.
@@ -192,7 +208,7 @@ final class SwipeTyping {
             engine.touchEnded(id: id, at: start)
             return
         }
-        engine.endSwipe(typing: words, points: stroke.points.count, decodeTime: elapsed)
+        engine.endSwipe(typing: words, points: stroke.points.count, decodeTime: elapsed, requiresChoice: reading.requiresChoice)
     }
 
     /// How far (key pitches) a swipe may go from where it went down and still be a tap
@@ -223,6 +239,7 @@ final class SwipeTyping {
 
     /// The readings best first once a rare name or abbreviation costs `nameCost` more.
     func ranked(_ candidates: [SwipeDecoder.Candidate]) -> [String] {
+        if isKhmer { return candidates.map(\.text) }
         let model = decoder.model
         func rareName(_ text: String) -> Bool {
             guard engine.swipeReadsAsName(text) else { return false }

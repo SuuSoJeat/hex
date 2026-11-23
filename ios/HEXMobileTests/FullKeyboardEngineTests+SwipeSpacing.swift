@@ -418,6 +418,34 @@ extension FullKeyboardEngineTests {
         XCTAssertNil(withoutSpatial.plane.swipe, "Spatial autocorrect is off")
     }
 
+    func testKhmerSuggestionsFollowSpatialAutocorrectWithoutDisablingSwipe() {
+        let settings = FullKeyboardSettings()
+        let wasOn = settings.spatialAutocorrect
+        let wasAutocorrect = settings.autocorrect
+        defer {
+            settings.spatialAutocorrect = wasOn
+            settings.autocorrect = wasAutocorrect
+        }
+        settings.spatialAutocorrect = true
+        settings.autocorrect = true
+        let view = FullKeyboardView(model: KeyboardViewModel(), target: target)
+        view.swipeOverride = true
+        view.languageOverride = .khmer
+        XCTAssertTrue(view.engine.khmerSpatialSuggestions)
+        XCTAssertEqual(view.plane.swipe?.model.language, "km")
+
+        settings.spatialAutocorrect = false
+        view.syncSettings()
+        XCTAssertFalse(view.engine.khmerSpatialSuggestions)
+        XCTAssertEqual(view.plane.swipe?.model.language, "km")
+
+        settings.spatialAutocorrect = true
+        settings.autocorrect = false
+        view.syncSettings()
+        XCTAssertFalse(view.engine.khmerSpatialSuggestions)
+        XCTAssertEqual(view.plane.swipe?.model.language, "km")
+    }
+
     /// The input mode's language (`UIInputViewController.primaryLanguage`), which Apple
     /// documents as superseding the Info.plist's `mul`: the keyboard reports the language
     /// resolved before the controller attaches, and each space-bar switch.
@@ -459,12 +487,12 @@ extension FullKeyboardEngineTests {
         XCTAssertTrue(InputModeListTouch.passes(phase: .cancelled, onKey: true, leftKey: false, appleKeyboardSplits: true))
     }
 
-    func testOnlyTheEnglishAndSpanishLayoutsSwipe() {
+    func testSwipeOverridesUseTheSupportedLayouts() {
         let view = FullKeyboardView(model: KeyboardViewModel(), target: FixtureTextTarget())
         view.swipeOverride = true
         for language in KeyboardLanguage.allCases {
             view.languageOverride = language
-            XCTAssertEqual(view.plane.swipe != nil, language == .english || language == .spanish, language.rawValue)
+            XCTAssertEqual(view.plane.swipe != nil, FullKeyboardSettings().swipesIn(language), language.rawValue)
             if let swipe = view.plane.swipe {
                 XCTAssertEqual(swipe.model.language, language.rawValue)
             }

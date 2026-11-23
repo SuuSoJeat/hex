@@ -360,7 +360,12 @@ extension FullKeyboardEngineTests {
             // Russian and Ukrainian have no Latin letters: press their own а and hold their own
             // е (Ukrainian's ʼ, its only key with long-press options); Greek its α and ε; Korean
             // its ㅂ (Hangul holds nothing).
-            let first = language == .korean ? "ㅂ" : language == .greek ? "α" : language.isLatin ? "a" : "а"
+            let first: String = switch language {
+            case .khmer: "ហ"
+            case .korean: "ㅂ"
+            case .greek: "α"
+            default: language.isLatin ? "a" : "а"
+            }
             for (id, kind) in [KeyKind.character(first), .space, .delete].enumerated() {
                 let key = view.engine.layout.key(kind)!
                 let sample = TypingLogTouchSample(point: CGPoint(x: key.frame.midX, y: key.frame.midY), timestamp: 0)
@@ -377,16 +382,18 @@ extension FullKeyboardEngineTests {
             case .czech: "r"
             case .greek: "ε"
             case .korean: "ㅂ"
+            case .khmer: "ហ"
             default: "e"
             }
             view.debugHoldAccent(held, selectIndex: 1)
             counts[language] = asked
         }
         XCTAssertGreaterThanOrEqual(counts[.english] ?? 0, 4, "three keys and an accent step")
-        for language in KeyboardLanguage.allCases where language != .korean {
+        for language in KeyboardLanguage.allCases where language != .korean && language != .khmer {
             XCTAssertEqual(counts[language], counts[.english], "\(language.rawValue) haptics")
         }
         XCTAssertEqual(counts[.korean] ?? 0, 3, "three keys, and no held accents")
+        XCTAssertEqual(counts[.khmer] ?? 0, 3, "three keys, and no held accents")
     }
 
     /// TestFlight: "Cannot hear the iOS typing sound when using your keyboard." Every key asks
@@ -394,6 +401,7 @@ extension FullKeyboardEngineTests {
     /// whatever Haptics is set to.
     func testEveryKeyClicksOnTouchDown() {
         let view = FullKeyboardView(model: KeyboardViewModel(), target: FixtureTextTarget())
+        view.languageOverride = .english
         view.frame = CGRect(x: 0, y: 0, width: 393, height: 262)
         view.layoutIfNeeded()
         var clicks = 0

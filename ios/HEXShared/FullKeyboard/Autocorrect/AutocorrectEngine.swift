@@ -9,6 +9,11 @@ nonisolated struct KeyboardSuggestion: Equatable, Sendable {
         case primary(autoReplace: Bool)
         /// Right slot: runner-up completion or spelling guess.
         case secondary
+        /// A Khmer word whose remaining characters can be appended at the caret.
+        case khmerCompletion
+        /// The Khmer spelling as typed, and a replacement that may apply on a word boundary.
+        case khmerKeepLiteral
+        case khmerCorrection(autoReplace: Bool)
         /// A word that can follow the one just finished. Only an explicit pick inserts it.
         case nextWord
         /// An emoji for the word just finished (Settings › Keyboard › Emoji), offered after a space,
@@ -27,8 +32,10 @@ nonisolated struct KeyboardSuggestion: Equatable, Sendable {
     let kind: Kind
 
     var willAutoReplace: Bool {
-        if case .primary(let auto) = kind { return auto }
-        return false
+        switch kind {
+        case .primary(let auto), .khmerCorrection(let auto): auto
+        default: false
+        }
     }
 }
 
@@ -300,6 +307,26 @@ final class AutocorrectEngine {
         mayOffer(candidate, after: Self.previousWord(beforeInput ?? "", token: token))
     }
 
+    func khmerCompletions(using index: KhmerAutocomplete, beforeInput: String?) -> [KhmerAutocomplete.Candidate] {
+        index.suggestions(beforeInput: beforeInput, personalWords: lexiconTerms) { mayOffer($0) }
+    }
+
+    func khmerCorrection(
+        using index: KhmerAutocomplete, beforeInput: String?, substitutionGain: KhmerAutocomplete.SubstitutionGain? = nil
+    ) -> KhmerAutocomplete.Correction? {
+        guard isEnabled else { return nil }
+        return index.correction(
+            beforeInput: beforeInput, personalWords: lexiconTerms, learnedSpellings: learning.typos,
+            substitutionGain: substitutionGain,
+            canCorrect: { typed in
+                let key = typed.lowercased()
+                return !suppressedInSession.contains(key) && !learning.rejected.contains(key) && !learnedWords.contains(key)
+                    && !offensiveWords.blocks(typed, allowSwearing: allowsSwearing)
+            },
+            mayOffer: { mayOffer($0) }
+        )
+    }
+
     func loadLexicon(_ lexicon: UILexicon) {
         loadLexiconEntries(lexicon.entries.map { ($0.userInput, $0.documentText) })
     }
@@ -373,13 +400,18 @@ final class AutocorrectEngine {
         lastCorrection = nil
     }
 
-    func recordAppliedCorrection(original: String, corrected: String, anchor: String, changes: [AppliedCorrection.Change]) {
-        lastCorrection = AppliedCorrection(original: original, corrected: corrected, changes: changes, anchor: anchor)
+    func recordAppliedCorrection(
+        original: String, corrected: String, anchor: String, changes: [AppliedCorrection.Change], document: UUID? = nil
+    ) {
+        lastCorrection = AppliedCorrection(original: original, corrected: corrected, changes: changes, anchor: anchor, document: document)
     }
 
     /// The latest autocorrection when the cursor is right after it (`AppliedCorrection.isAtEnd`).
-    func revertibleCorrection(before: String?) -> AppliedCorrection? {
+    func revertibleCorrection(before: String?, document: UUID?) -> AppliedCorrection? {
         guard let lastCorrection, lastCorrection.isAtEnd(of: before) else { return nil }
+        if lastCorrection.changes.contains(where: { $0.language == .khmer }) {
+            guard let document, lastCorrection.document == document else { return nil }
+        }
         return lastCorrection
     }
 
@@ -567,7 +599,7 @@ final class AutocorrectEngine {
         case .ukrainian: ["я", "це", "ми"]
         case .greek: ["θα", "δεν", "το"]
         case .serbianLatin: ["ja", "to", "da"]
-        case .korean: []
+        case .korean, .khmer: []
         }
     }
 
@@ -592,7 +624,7 @@ final class AutocorrectEngine {
         case .ukrainian: ["і", "але", "що"]
         case .greek: ["και", "αλλά", "που"]
         case .serbianLatin: ["i", "ali", "da"]
-        case .korean: []
+        case .korean, .khmer: []
         }
     }
 
@@ -614,7 +646,7 @@ final class AutocorrectEngine {
         case .ukrainian: ["і", "в", "не", "на", "що", "я"]
         case .greek: ["και", "να", "το", "θα", "δεν", "η"]
         case .serbianLatin: ["i", "je", "da", "u", "se", "na"]
-        case .korean: []
+        case .korean, .khmer: []
         }
     }
 

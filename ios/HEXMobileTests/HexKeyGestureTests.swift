@@ -391,28 +391,53 @@ final class TranslationPasteSwitchTests: XCTestCase {
     /// word keeps its own touch area.
     @MainActor
     func testPasteTakesTheWholeBar() throws {
+        try checkPasteBar(language: .english)
+    }
+
+    func testKhmerismPasteLeavesTheStripGlobeAvailable() throws {
+        try checkPasteBar(language: .khmer)
+    }
+
+    private func checkPasteBar(language: KeyboardLanguage) throws {
         let view = FullKeyboardView(model: KeyboardViewModel(), target: FixtureTextTarget(text: ""))
+        view.languageOverride = language
+        if language == .khmer { view.letterLayoutOverride = .khmerism }
+        view.hexPlacementOverride = .stripTrailing
         view.frame = CGRect(x: 0, y: 0, width: 402, height: 262)
         view.layoutIfNeeded()
         let strip = view.stripView
         let hex = view.hexKey.frame
+        let globe = view.globeButton
+        let globeInStrip = view.engine.layout.key(.globe)?.row == -1
         XCTAssertTrue(view.hexKey.inStrip)
+        XCTAssertEqual(globeInStrip, language == .khmer)
         func show(_ clipboard: KeyboardClipboardOffer?, _ words: [KeyboardSuggestion] = []) {
             strip.update(suggestions: words, showsUndo: false, statusText: nil, clipboard: clipboard)
             strip.layoutIfNeeded()
+            if globeInStrip {
+                let center = CGPoint(x: globe.frame.midX, y: strip.frame.midY)
+                XCTAssertTrue(view.hitTest(center, with: nil) === globe)
+            }
         }
         func chip(_ title: String) throws -> UIButton {
             try XCTUnwrap(visibleControls(in: strip).first { $0.configuration?.title == title }, title)
         }
-        // Every point of the bar the keys' own reach above row 1 doesn't take.
+        // The bar up to the Hex key, excluding the keys' reach above row 1 and any strip globe.
         let barPoints = stride(from: 0.5, to: hex.minX, by: 6).flatMap { x in
             stride(from: 0.5, to: strip.frame.maxY, by: 4).map { CGPoint(x: x, y: $0) }
-        }.filter { !view.plane.point(inside: view.convert($0, to: view.plane), with: nil) }
+        }.filter { point in
+            !view.plane.point(inside: view.convert(point, to: view.plane), with: nil)
+                && !(globeInStrip && globe.frame.contains(point))
+        }
         XCTAssertGreaterThan(barPoints.count, 200)
 
         show(.paste)
         let paste = try chip("Paste")
         for point in barPoints { XCTAssertTrue(view.hitTest(point, with: nil) === paste, "\(point)") }
+        if globeInStrip {
+            let besideGlobe = CGPoint(x: globe.frame.maxX + 0.5, y: strip.frame.midY)
+            XCTAssertTrue(view.hitTest(besideGlobe, with: nil) === paste)
+        }
         XCTAssertTrue(view.hitTest(CGPoint(x: hex.minX - 0.5, y: strip.frame.midY), with: nil) === paste)
         XCTAssertTrue(view.hitTest(CGPoint(x: hex.minX + 0.5, y: strip.frame.midY), with: nil) === view.hexKey)
         XCTAssertTrue(view.hitTest(CGPoint(x: hex.midX, y: strip.frame.midY), with: nil) === view.hexKey)

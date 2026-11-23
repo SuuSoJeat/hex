@@ -4,13 +4,19 @@ import UIKit
 /// `FullKeyboardEngine.swift` stays readable.
 @MainActor
 extension FullKeyboardEngine {
-    func didEdit() {
+    enum EditKind {
+        case normal
+        case resolvingObscuredSwipe
+    }
+
+    func didEdit(_ kind: EditKind = .normal) {
+        dismissKhmerSwipeChoices()
         suggestionSpaceBefore = nil
         swipeRetries.edited()
         // A key's own edit means a pending Dictate no longer has the field it picked.
         trackpadSelectionState.pendingDictation = nil
         refreshAutoCapitalization()
         refreshSuggestions()
-        onEdit?()
+        onEdit?(kind)
     }
 }

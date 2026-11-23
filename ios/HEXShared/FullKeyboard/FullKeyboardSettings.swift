@@ -80,6 +80,11 @@ struct FullKeyboardSettings {
         static let spatialAutocorrect = "experiments.spatialAutocorrect"
         static let germanSpatialAutocorrect = "experiments.germanSpatialAutocorrect"
         static let koreanKeyboard = KoreanKeyboardExperiment.key
+        static let khmerismNoColors = "experiments.khmerismNoColors"
+        static let khmerismNoSuperscripts = "experiments.khmerismNoSuperscripts"
+        // Keep the saved choices when upgrading from the experiments page.
+        static let khmerismSmartMode = "experiments.khmerismSmartMode"
+        static let khmerismSwipeTyping = "experiments.khmerismSwipeTyping"
         static let keyPopups = "settings.keyboardKeyPopups"
         static let haptics = "settings.keyboardHaptics"
         static let hapticStrength = "settings.keyboardHapticStrength"
@@ -142,6 +147,7 @@ struct FullKeyboardSettings {
     /// Spanish and French (France). On by default. Stored as `experiments.spatialAutocorrect`, from when it was an
     /// experiment (off by default) that only its switch ever wrote: unset or true is on and
     /// false off, so testers who never touched it get it and those who turned it off keep it off.
+    /// Khmer uses tap positions to rank spelling suggestions.
     var spatialAutocorrect: Bool {
         get { defaults?.object(forKey: Key.spatialAutocorrect) as? Bool ?? true }
         nonmutating set { defaults?.set(newValue, forKey: Key.spatialAutocorrect) }
@@ -166,6 +172,39 @@ struct FullKeyboardSettings {
         nonmutating set { defaults?.set(newValue, forKey: Key.koreanKeyboard) }
     }
 
+    /// Settings › Experiments › Khmerism › No colors: use the keyboard theme for every keycap.
+    var khmerismNoColors: Bool {
+        get { defaults?.object(forKey: Key.khmerismNoColors) as? Bool ?? false }
+        nonmutating set { defaults?.set(newValue, forKey: Key.khmerismNoColors) }
+    }
+
+    /// Settings › Experiments › Khmerism › No superscripts: hide the corner labels on the keys.
+    var khmerismNoSuperscripts: Bool {
+        get { defaults?.object(forKey: Key.khmerismNoSuperscripts) as? Bool ?? false }
+        nonmutating set { defaults?.set(newValue, forKey: Key.khmerismNoSuperscripts) }
+    }
+
+    /// Settings › Keyboard › Khmer › Smart Mode. Shared by both layouts, on by default.
+    var khmerismSmartMode: Bool {
+        get { defaults?.object(forKey: Key.khmerismSmartMode) as? Bool ?? true }
+        nonmutating set { defaults?.set(newValue, forKey: Key.khmerismSmartMode) }
+    }
+
+    /// Settings › Keyboard › Khmer › Swipe typing. Shared by both layouts, on by default.
+    var khmerismSwipeTyping: Bool {
+        get { defaults?.object(forKey: Key.khmerismSwipeTyping) as? Bool ?? true }
+        nonmutating set { defaults?.set(newValue, forKey: Key.khmerismSwipeTyping) }
+    }
+
+    func swipeTypingModel(for language: KeyboardLanguage, override: Bool? = nil) -> TypingDecoderModel? {
+        guard override ?? swipeTyping else { return nil }
+        if language == .khmer {
+            return (override ?? swipesIn(language)) ? TypingDecoderModel.bundled(language.rawValue) : nil
+        }
+        guard swipesIn(language) else { return nil }
+        return typingModel(for: language)
+    }
+
     /// The typing model the keyboard may read `language`'s taps with: its bundled model, with
     /// German's only while both Spatial autocorrect and the German experiment are on. English,
     /// Spanish and French never wait on the experiment; Canada's and Switzerland's French
@@ -173,16 +212,17 @@ struct FullKeyboardSettings {
     /// decoder and a bilingual partner, so one gate keeps a German model out of everything
     /// until it is chosen; `TypingDecoderModel.bundled` still loads any bundled file for tests.
     func typingModel(for language: KeyboardLanguage) -> TypingDecoderModel? {
+        if language == .khmer { return nil } // Khmer's unigram model is for swipes only.
         if language == .german, !(spatialAutocorrect && germanSpatialAutocorrect) { return nil }
         return TypingDecoderModel.bundled(language.rawValue)
     }
 
-    /// Whether a swipe reads `language`'s layout: English and Spanish as ever, and with
-    /// Settings › Experiments › Swipe typing in more languages on every language
-    /// `typingModel(for:)` has a model for (French (France), Polish, and German while its model
-    /// is chosen). Elsewhere a drag stays a slide to another key.
+    /// Swipes read English, Spanish, and Khmer when its own switch is on. The
+    /// Swipe typing in more languages experiment adds French (France), Polish, and German
+    /// while its model is chosen. Elsewhere a drag stays a slide to another key.
     func swipesIn(_ language: KeyboardLanguage) -> Bool {
-        swipeMoreLanguages ? typingModel(for: language) != nil : language.supportsSwipeTyping
+        if language == .khmer { return khmerismSwipeTyping }
+        return swipeMoreLanguages ? typingModel(for: language) != nil : language.supportsSwipeTyping
     }
 
     /// Suggestions and autocorrect may offer swear words (`OffensiveWords`); slurs never.
@@ -278,7 +318,8 @@ struct FullKeyboardSettings {
     }
 
     /// Settings › Keyboard › Swipe typing: slide through a word's letters to type it, on the
-    /// English and Spanish layouts (`SwipeTyping`), and with Swipe typing in more languages on
+    /// English and Spanish layouts (`SwipeTyping`), Khmer when enabled in its controls,
+    /// and with Swipe typing in more languages on
     /// also every layout with a typing model (`swipesIn(_:)`). On by default. Stored as
     /// `experiments.swipeTyping`, from when it was an experiment (off by default): unset or
     /// true is on and false off, so testers who turned it off keep it off.
@@ -287,10 +328,8 @@ struct FullKeyboardSettings {
         nonmutating set { defaults?.set(newValue, forKey: Key.swipeTyping) }
     }
 
-    /// Settings › Experiments › Swipe typing in more languages: a swipe reads the layout
-    /// language's own word list wherever one is bundled, not only on English and Spanish (see
-    /// `swipesIn(_:)`). Off by default, like every experiment. Stored as
-    /// `experiments.swipeMoreLanguages`; off, only English and Spanish swipe as before.
+    /// Settings › Experiments › Swipe typing in more languages adds languages whose models
+    /// are ready (see `swipesIn(_:)`). Off by default. Khmer has its own switch.
     var swipeMoreLanguages: Bool {
         get { defaults?.object(forKey: Key.swipeMoreLanguages) as? Bool ?? false }
         nonmutating set { defaults?.set(newValue, forKey: Key.swipeMoreLanguages) }

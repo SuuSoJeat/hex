@@ -167,3 +167,53 @@ final class DictationLanguageTests: XCTestCase {
         )
     }
 }
+
+final class KhmerKeyboardLanguageTests: XCTestCase {
+    func testKhmerUsesTheNormalLanguageCatalogAndAutomaticSelection() {
+        XCTAssertTrue(KeyboardLanguage.selectable(koreanEnabled: false).contains(.khmer))
+        XCTAssertEqual(KeyboardLanguage.matching("km_KH", koreanEnabled: false), .khmer)
+        XCTAssertEqual(KeyboardLanguage.khmer.inputModeLanguage, "km-KH")
+        XCTAssertEqual(
+            KeyboardLanguage.automatic(dictationLanguage: nil, inputModes: ["km-KH"], preferredLanguages: ["en"]),
+            .khmer
+        )
+    }
+
+    func testKhmerismIsTheNamedLayoutAndPersistsWithTheLanguage() throws {
+        let suite = "KhmerKeyboardLanguageTests-\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let settings = LanguageSettings(defaults: defaults)
+        settings.keyboardLanguages = [.english, .khmer]
+        settings.currentKeyboardLanguage = .khmer
+
+        XCTAssertEqual(settings.keyboardLanguages, [.english, .khmer])
+        XCTAssertEqual(settings.currentKeyboardLanguage, .khmer)
+        let languages = KeyboardLanguageList.resolve(
+            chosen: settings.keyboardLanguages, stored: settings.currentKeyboardLanguage, automatic: .english
+        )
+        XCTAssertEqual(languages.layout, .khmer)
+        XCTAssertEqual(languages.spaceLabel, "ខ្មែរ")
+        XCTAssertEqual(languages.switched(by: 1), .english)
+        XCTAssertEqual(KeyboardLanguage.khmer.letterLayouts, [.khmer, .khmerism])
+        XCTAssertEqual(KeyboardLanguage.khmer.layoutName(.khmerism), "Khmerism")
+        XCTAssertEqual(KeyboardLanguage.khmer.layoutName(.khmer), "Khmer")
+        XCTAssertEqual(settings.letterLayout(for: .khmer), .khmer)
+        settings.setLetterLayout(.khmerism, for: .khmer)
+        XCTAssertEqual(settings.letterLayouts["km"], "khmerism")
+        XCTAssertEqual(LanguageSettings(defaults: defaults).letterLayout(for: .khmer), .khmerism)
+        settings.setLetterLayout(.khmer, for: .khmer)
+        XCTAssertEqual(settings.letterLayouts["km"], "khmer")
+        XCTAssertEqual(LanguageSettings(defaults: defaults).letterLayout(for: .khmer), .khmer)
+    }
+
+    func testKhmerTypingDoesNotAssumeDictionaryOrSpeechSupport() {
+        let language = KeyboardLanguage.khmer
+        XCTAssertNil(language.spellCheckLanguage(available: ["en_US"]))
+        XCTAssertFalse(language.isLatin)
+        XCTAssertFalse(language.supportsAutoCapitalization)
+        XCTAssertNil(language.dictationLanguage(supported: [], preferred: ["km-KH"]))
+        XCTAssertNil(language.dictationLanguage(supported: ["en-US"], preferred: ["km-KH"]))
+        XCTAssertEqual(language.dictationLanguage(supported: ["km_KH"], preferred: []), "km_KH")
+    }
+}

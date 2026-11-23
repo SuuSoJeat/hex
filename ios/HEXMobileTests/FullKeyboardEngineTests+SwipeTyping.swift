@@ -3,6 +3,216 @@ import XCTest
 @testable import HEX
 
 extension FullKeyboardEngineTests {
+    func testKhmerSwipesJoinAndUndoStopsAtTheLastWordsBoundary() throws {
+        let field = KhmerScalarDeletingTarget(text: "")
+        field.laggingReadsAfterDeleting = 2
+        let (_, plane) = try swipeKeyboard(language: .khmer, target: field, letters: .khmerism)
+        swipe("បាន", on: plane)
+        swipe("ខ្ញុំ", on: plane)
+        XCTAssertEqual(field.text, "បានខ្ញុំ")
+        plane.engine.deleteBackward()
+        XCTAssertEqual(field.text, "បាន")
+        tap(.space, on: plane)
+        XCTAssertEqual(field.text, "បាន ")
+    }
+
+    func testRegularKhmerSwipesJoinAndUndoAfterSwitchingLayouts() throws {
+        let field = KhmerScalarDeletingTarget(text: "")
+        field.laggingReadsAfterDeleting = 2
+        let (_, plane) = try swipeKeyboard(language: .khmer, target: field, letters: .khmerism)
+        swipe("បាន", on: plane)
+        plane.engine.letterLayout = .khmer
+        swipe("ខ្ញុំ", on: plane)
+        XCTAssertEqual(field.text, "បានខ្ញុំ")
+        plane.engine.deleteBackward()
+        XCTAssertEqual(field.text, "បាន")
+    }
+
+    func testAmbiguousKhmerSwipeWaitsForPickAndCanReplaceIt() throws {
+        let field = KhmerScalarDeletingTarget(text: "បាន")
+        let (_, plane) = try swipeKeyboard(language: .khmer, target: field, letters: .khmerism)
+        swipe("ដៃ", on: plane)
+        XCTAssertEqual(field.text, "បាន")
+        let first = try XCTUnwrap(plane.engine.suggestions.first { $0.replacement == "ដៃ" })
+        plane.engine.acceptSuggestion(first)
+        XCTAssertEqual(field.text, "បានដៃ")
+        let alternate = try XCTUnwrap(plane.engine.suggestions.first { $0.replacement == "ដ៏" })
+        plane.engine.acceptSuggestion(alternate)
+        XCTAssertEqual(field.text, "បានដ៏")
+        tap(.space, on: plane)
+        XCTAssertEqual(field.text, "បានដ៏ ")
+    }
+
+    func testAmbiguousKhmerSwipeDoesNotInsertAfterHostTextChanges() throws {
+        let (field, plane) = try swipeKeyboard("បាន", language: .khmer, letters: .khmerism)
+        swipe("ដៃ", on: plane)
+        let reading = try XCTUnwrap(plane.engine.suggestions.first { $0.replacement == "ដៃ" })
+        field.insertText("ទៅ")
+        plane.engine.textDidChange()
+        plane.engine.acceptSuggestion(reading)
+        XCTAssertEqual(field.text, "បានទៅ")
+    }
+
+    func testAmbiguousKhmerSwipeInsertsBestReadingWhenSuggestionsAreHidden() throws {
+        let (field, plane) = try swipeKeyboard(language: .khmer, letters: .khmerism)
+        plane.engine.khmerSwipeOffersChoices = false
+        swipe("ដៃ", on: plane)
+        XCTAssertEqual(field.text, "ដ៏")
+    }
+
+    func testAmbiguousKhmerSwipeInsertsBestReadingBehindDictationUndo() {
+        let field = FixtureTextTarget(text: "បាន")
+        let view = FullKeyboardView(model: KeyboardViewModel(), target: field)
+        view.frame = CGRect(x: 0, y: 0, width: 390, height: 300)
+        view.languageOverride = .khmer
+        view.letterLayoutOverride = .khmerism
+        view.swipeOverride = true
+        view.layoutIfNeeded()
+        view.didInsertDictation("បាន")
+
+        swipe("ដៃ", on: view.plane)
+
+        XCTAssertEqual(field.text, "បានដ៏")
+        XCTAssertNil(view.engine.pendingKhmerSwipeChoices)
+    }
+
+    func testPendingKhmerSwipeInsertsBestReadingWhenANoticeTakesTheStrip() {
+        let field = FixtureTextTarget(text: "បាន")
+        let view = FullKeyboardView(model: KeyboardViewModel(), target: field)
+        view.frame = CGRect(x: 0, y: 0, width: 390, height: 300)
+        view.languageOverride = .khmer
+        view.letterLayoutOverride = .khmerism
+        view.swipeOverride = true
+        view.layoutIfNeeded()
+
+        swipe("ដៃ", on: view.plane)
+        XCTAssertNotNil(view.engine.pendingKhmerSwipeChoices)
+        view.showAllowPasteHint()
+        XCTAssertEqual(field.text, "បានដ៏")
+        XCTAssertNil(view.engine.pendingKhmerSwipeChoices)
+        XCTAssertTrue(view.showsAllowPasteHint)
+    }
+
+    func testPendingKhmerSwipePreservesTheFullAccessHintAndOpenHexAction() throws {
+        let field = FixtureTextTarget(text: "បាន")
+        let model = KeyboardViewModel()
+        model.hasFullAccess = false
+        var opened: URL?
+        model.onOpenURL = { opened = $0 }
+        let view = FullKeyboardView(model: model, target: field)
+        view.frame = CGRect(x: 0, y: 0, width: 390, height: 300)
+        view.languageOverride = .khmer
+        view.letterLayoutOverride = .khmerism
+        view.swipeOverride = true
+        view.layoutIfNeeded()
+
+        swipe("ដៃ", on: view.plane)
+        XCTAssertNotNil(view.engine.pendingKhmerSwipeChoices)
+        view.showFullAccessHint()
+        XCTAssertEqual(field.text, "បានដ៏")
+        XCTAssertNil(view.engine.pendingKhmerSwipeChoices)
+
+        let hint = try XCTUnwrap(view.stripView.subviews.first { $0 is FullAccessHintView })
+        XCTAssertFalse(hint.isHidden)
+        let openHex = try XCTUnwrap(hint.subviews.compactMap { $0 as? UIButton }.first)
+        openHex.sendActions(for: .touchUpInside)
+        XCTAssertEqual(opened, KeyboardLaunchRequest.setup.url)
+    }
+
+    func testAmbiguousKhmerSwipeInsertsBestReadingBehindEmojiShortcodes() throws {
+        let store = try XCTUnwrap(UserDefaults(suiteName: KeyboardBridge.appGroup))
+        let key = "experiments.emojiShortcodes"
+        let previous = store.object(forKey: key)
+        defer { store.set(previous, forKey: key) }
+        FullKeyboardSettings(defaults: store).emojiShortcodes = true
+
+        let field = FixtureTextTarget(text: ":pizza")
+        let view = FullKeyboardView(model: KeyboardViewModel(), target: field)
+        view.frame = CGRect(x: 0, y: 0, width: 390, height: 300)
+        view.languageOverride = .khmer
+        view.letterLayoutOverride = .khmerism
+        view.emojiOverride = true
+        view.swipeOverride = true
+        view.layoutIfNeeded()
+        XCTAssertTrue(view.emojiShortcodeSuggestions()?.contains { $0.replacement == "🍕" } == true)
+
+        swipe("ដៃ", on: view.plane)
+
+        XCTAssertEqual(field.text, ":pizzaដ៏")
+        XCTAssertNil(view.engine.pendingKhmerSwipeChoices)
+    }
+
+    func testKhmerSwipeBackspaceFallsBackToOneDeleteBeforeExistingText() throws {
+        let field = FixtureTextTarget(text: "hello")
+        field.adjustTextPosition(byCharacterOffset: -5)
+        let (_, plane) = try swipeKeyboard(language: .khmer, target: field)
+
+        swipe("បាន", on: plane)
+        XCTAssertEqual(field.text, "បានhello")
+        plane.engine.deleteBackward()
+
+        XCTAssertEqual(field.text, String("បាន".dropLast()) + "hello")
+    }
+
+    func testSwitchingAwayFromKhmerClearsSwipeAlternatives() throws {
+        let (field, plane) = try swipeKeyboard("បាន", language: .khmer, letters: .khmerism)
+        swipe("ដៃ", on: plane)
+        let pick = try XCTUnwrap(plane.engine.suggestions.first { $0.replacement == "ដៃ" })
+        plane.engine.acceptSuggestion(pick)
+        let alternate = try XCTUnwrap(plane.engine.suggestions.first { $0.replacement == "ដ៏" })
+
+        plane.engine.language = .english
+        XCTAssertNil(plane.engine.swipedWord)
+        plane.engine.acceptSuggestion(alternate)
+        XCTAssertEqual(field.text, "បានដៃ")
+    }
+
+    func testKhmerSwipeTypesAVocabularyWordOutsideTheBundledModel() throws {
+        let word = "សុវណ្ណបញ្ញា"
+        let (field, plane) = try swipeKeyboard(language: .khmer)
+        let model = try XCTUnwrap(plane.swipe?.model)
+        XCTAssertNotNil(model.encode(word))
+        XCTAssertNil(model.index(of: word))
+        plane.engine.autocorrect.setVocabulary([word])
+        swipe(word, on: plane)
+        XCTAssertEqual(field.text, word)
+    }
+
+    func testKhmerSwipeOffersTextReplacementWithoutInsertingSpaces() throws {
+        let field = KhmerScalarDeletingTarget(text: "ខ្ញុំ")
+        let (_, plane) = try swipeKeyboard(language: .khmer, target: field)
+        plane.engine.autocorrect.loadLexiconEntries([("បាន", "យល់ព្រម")])
+        swipe("បាន", on: plane)
+        XCTAssertEqual(field.text, "ខ្ញុំបាន")
+
+        let offer = try XCTUnwrap(plane.engine.suggestions.first { $0.replacement == "យល់ព្រម" })
+        plane.engine.acceptSuggestion(offer)
+        XCTAssertEqual(field.text, "ខ្ញុំយល់ព្រម")
+        tap(.delete, on: plane)
+        XCTAssertEqual(field.text, "ខ្ញុំ")
+    }
+
+    func testEnglishSwipeReplacementCurlsQuotesAgainstTheResultingContext() throws {
+        let (field, plane) = try swipeKeyboard("I'm")
+        field.smartQuotesType = .yes
+        plane.engine.autocorrect.loadLexiconEntries([("home", "\"at my house\"")])
+        swipe("home", on: plane)
+        let replacement = try XCTUnwrap(plane.engine.suggestions.first { $0.replacement == "\"at my house\"" })
+        plane.engine.acceptSuggestion(replacement)
+        XCTAssertEqual(field.text, "I'm “at my house”")
+    }
+
+    func testKhmerSwipeLeavesTapsAndCornerHoldsAvailable() throws {
+        let (field, plane) = try swipeKeyboard(language: .khmer, letters: .khmerism)
+        tap(.character("ប"), on: plane)
+        let key = try XCTUnwrap(plane.engine.layout.key(.character("ិ")))
+        let centre = CGPoint(x: key.frame.midX, y: key.frame.midY)
+        plane.began(id: 52, sample: sample(centre))
+        XCTAssertTrue(plane.engine.handleCharacterHold(forTouch: 52))
+        plane.ended(id: 52, sample: sample(centre))
+        XCTAssertEqual(field.text, "បខ")
+    }
+
     /// Hex's vocabulary list reaches Swipe typing: a word no dictionary or model has
     /// ("kubectl") is swiped once it's in the list.
     func testSwipeTypesYourVocabularyWords() throws {
@@ -229,6 +439,18 @@ extension FullKeyboardEngineTests {
             swipe("test", on: plane)
             XCTAssertEqual(field.text, "This is a test", "\(lag)")
         }
+    }
+
+    func testEnglishSwipeContextSurvivesTheHostReportingItsDocumentIdentifier() throws {
+        let field = LaggingField()
+        let (_, plane) = try swipeKeyboard(target: field)
+        swipe("this", on: plane)
+        field.documentIdentifier = UUID()
+        plane.engine.textDidChange()
+        XCTAssertEqual(plane.engine.typingContext, "this")
+        field.documentIdentifier = UUID()
+        plane.engine.textDidChange()
+        XCTAssertEqual(plane.engine.typingContext, field.documentContextBeforeInput)
     }
 
     /// A host that stays behind longer than the keys believe one (`typingContextLifetime`)
