@@ -304,7 +304,17 @@ final class KeyboardKeyPlaneView: UIView {
                 let title = layout.layer == .letters ? label : Self.keycapLabel(label == "•" ? "⦁" : label)
                 let cornerLabel = isKhmerism && showsKhmerismSuperscripts
                     ? engine.khmerismAlternate(for: key, onKeycap: true) : nil
-                drawKhmerismCharacter(title, alternate: cornerLabel, in: frame, ink: ink)
+                let width = min(440, layout.width - 2 * layout.horizontalInset)
+                let size = min(max(12, width * 0.053), frame.height * 0.62)
+                if isKhmerism {
+                    let labels = KhmerismAppearance.legends(
+                        main: title, alternate: cornerLabel, in: frame, mainSize: min(21, size), ink: ink
+                    )
+                    labels.main?.draw(in: context)
+                    labels.alternate?.draw(in: context)
+                } else {
+                    drawText(title, in: frame, font: KhmerismAppearance.font(for: title, size: size), color: ink)
+                }
             case .shift:
                 drawSymbol(shiftSymbol, in: frame, color: ink, pointSize: iconSize, yOffset: 0.67)
             case .delete:
@@ -333,34 +343,6 @@ final class KeyboardKeyPlaneView: UIView {
         case .character, .layerSwitch: palette.keyHeldFill
         default: palette.functionHeldFill
         }
-    }
-
-    private func drawKhmerismCharacter(_ title: String, alternate: String?, in frame: CGRect, ink: UIColor) {
-        let layout = engine.layout
-        // The saved designer draws its 440 pt phone in a 327 px viewport.
-        let width = min(440, layout.width - 2 * layout.horizontalInset)
-        let scale = width / 327
-        let size = min(max(12, width * 0.053), frame.height * 0.62)
-        let font = KhmerismAppearance.font(for: title, size: size)
-        guard let alternate else {
-            drawText(title, in: frame, font: font, color: ink)
-            return
-        }
-        let attributes: [NSAttributedString.Key: Any] = [.font: font, .foregroundColor: ink]
-        let text = title as NSString
-        let advance = text.size(withAttributes: attributes)
-        text.draw(at: CGPoint(
-            x: frame.minX + width * 0.0042 + scale, y: frame.midY - advance.height / 2 + 2 * scale
-        ), withAttributes: attributes)
-
-        let cornerFont = KhmerismAppearance.font(for: alternate, size: min(8 * scale, frame.height * 0.25))
-        let cornerAttributes: [NSAttributedString.Key: Any] = [.font: cornerFont, .foregroundColor: ink.withAlphaComponent(0.8)]
-        let corner = alternate as NSString
-        let cornerAdvance = corner.size(withAttributes: cornerAttributes)
-        corner.draw(at: CGPoint(
-            x: frame.maxX - width * 0.008 - scale - cornerAdvance.width,
-            y: frame.minY + width * 0.0017 + scale
-        ), withAttributes: cornerAttributes)
     }
 
     /// `rect` with its edges on this screen's pixel grid.
