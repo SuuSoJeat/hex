@@ -1101,7 +1101,7 @@ nonisolated struct KeyboardLayout: Equatable, Sendable {
             )
             addCharacters(rows[1], row: 1, startX: left, keyWidth: referenceW)
 
-            let middle = Array(rows[2].dropLast(2))
+            let middle = Array(rows[2].dropFirst().dropLast())
             let middleWidth = (right - left - 2 * modW - CGFloat(middle.count + 1) * m.gap) / CGFloat(middle.count)
             add(.shift, row: 2, x: left, w: modW, label: "shift")
             addCharacters(middle, row: 2, startX: left + modW + m.gap, keyWidth: middleWidth)
@@ -1188,8 +1188,8 @@ nonisolated struct KeyboardLayout: Equatable, Sendable {
 
         if punctuationRow {
             // Distribute the full row so the space bar and optional globe, emoji and Hex keys
-            // still fit alongside the semicolon, V and Z on the narrowest keyboards.
-            let letterCount = 3 // Semicolon, V, Z.
+            // still fit alongside Q and Z on the narrowest keyboards.
+            let letterCount = 2 // Q and Z.
             let keyCount = leading.count + trailing.count + letterCount + 1 // Space.
             let spaceUnits: CGFloat = 3.15
             let returnUnits: CGFloat = 1.65
@@ -1200,13 +1200,12 @@ nonisolated struct KeyboardLayout: Equatable, Sendable {
                 add(kind, row: 3, x: x, w: unitWidth, label: label)
                 x += unitWidth + m.gap
             }
-            add(.character(";"), row: 3, x: x, w: unitWidth, label: ";", shifted: ":")
+            add(.character("q"), row: 3, x: x, w: unitWidth, label: "q")
             x += unitWidth + m.gap
             add(.space, row: 3, x: x, w: spaceUnits * unitWidth, label: "space")
             x += spaceUnits * unitWidth + m.gap
-            let lastLetters = Array(rows[2].suffix(2))
-            addCharacters(lastLetters, row: 3, startX: x, keyWidth: unitWidth)
-            x += CGFloat(lastLetters.count) * (unitWidth + m.gap)
+            add(.character("z"), row: 3, x: x, w: unitWidth, label: "z")
+            x += unitWidth + m.gap
             for (kind, _, label) in trailing {
                 let w = kind == .returnKey ? returnUnits * unitWidth : unitWidth
                 add(kind, row: 3, x: x, w: w, label: label)

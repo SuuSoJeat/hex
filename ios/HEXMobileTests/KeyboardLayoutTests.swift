@@ -1392,16 +1392,16 @@ final class KeyboardLayoutTests: XCTestCase {
             }
             XCTAssertEqual(letters(layout, row: 0).joined(), "',.pyfgcrl", label)
             XCTAssertEqual(letters(layout, row: 1).joined(), "aoeuidhtns", label)
-            XCTAssertEqual(kinds(2), [.shift] + "qjkxbmw".map { .character(String($0)) } + [.delete], label)
+            XCTAssertEqual(kinds(2), [.shift] + "jkxbmwv".map { .character(String($0)) } + [.delete], label)
             XCTAssertEqual(
                 kinds(3),
-                [.layerSwitch(.numbers), .emoji, .character(";"), .space, .character("v"), .character("z"), .returnKey],
+                [.layerSwitch(.numbers), .emoji, .character("q"), .space, .character("z"), .returnKey],
                 label
             )
             XCTAssertEqual(layout.key(.character("'"))?.shifted, "\"", label)
             XCTAssertEqual(layout.key(.character(","))?.shifted, "<", label)
             XCTAssertEqual(layout.key(.character("."))?.shifted, ">", label)
-            XCTAssertEqual(layout.key(.character(";"))?.shifted, ":", label)
+            XCTAssertNil(layout.key(.character(";")), label)
             for row in 0..<4 {
                 let keys = layout.keys.filter { $0.row == row }
                 let edge = layout.horizontalInset + layout.metrics.side
@@ -1454,11 +1454,8 @@ final class KeyboardLayoutTests: XCTestCase {
         XCTAssertEqual(semicolon.shifted, ":")
     }
 
-    /// The semicolon reaches every bottom row the experiment builds: iPhone portrait and turned,
-    /// the Duo folded, unfolded, joined and split, a floating iPad and every field. It sits just
-    /// left of space. The split and URL/email layouts take it from space where there is room.
-    /// Every key fits inside the keyboard and its midpoint hits itself.
-    func testDvorakPunctuationFitsTheSemicolonIntoEveryBottomRow() throws {
+    /// Check bottom-row neighbors and hit targets across keyboard shapes and field types.
+    func testDvorakPunctuationBottomRowsFitEveryShape() throws {
         let shapes: [(CGFloat, KeyboardOrientation, KeyboardPosture, CGFloat, KeyboardPhoneSize, KeyboardPadPlacement?, Bool)] = [
             (320, .portrait, .phone, 0, .regular, nil, false),
             (375, .portrait, .phone, 0, .homeButton, nil, false),
@@ -1497,22 +1494,20 @@ final class KeyboardLayoutTests: XCTestCase {
             let offSpace = try XCTUnwrap(off.keys.first { $0.row == 3 && $0.kind == .space })
             let wideEnough = offSpace.frame.width >= 2 * letterWidth + gap
             let revised = !on.isSplit && on.field == .text
-            XCTAssertEqual(on.key(.character(";")) != nil, revised || wideEnough, label)
-            if let semicolon = on.key(.character(";")) {
-                let space = try XCTUnwrap(on.key(.space))
+            XCTAssertEqual(on.key(.character(";")) != nil, !revised && wideEnough, label)
+            let space = try XCTUnwrap(on.key(.space))
+            if revised {
+                let q = try XCTUnwrap(on.key(.character("q")))
+                let z = try XCTUnwrap(on.key(.character("z")))
+                XCTAssertEqual(q.row, 3, label)
+                XCTAssertEqual(z.row, 3, label)
+                XCTAssertEqual(q.frame.maxX + gap, space.frame.minX, accuracy: 0.001, label)
+                XCTAssertEqual(space.frame.maxX + gap, z.frame.minX, accuracy: 0.001, label)
+                XCTAssertGreaterThan(space.frame.width, 3 * q.frame.width, label)
+            } else if let semicolon = on.key(.character(";")) {
                 XCTAssertEqual(semicolon.frame.maxX + gap, space.frame.minX, accuracy: 0.001, "\(label): just left of space")
-                if revised {
-                    let v = try XCTUnwrap(on.key(.character("v")))
-                    let z = try XCTUnwrap(on.key(.character("z")))
-                    XCTAssertEqual(v.row, 3, label)
-                    XCTAssertEqual(z.row, 3, label)
-                    XCTAssertEqual(space.frame.maxX + gap, v.frame.minX, accuracy: 0.001, label)
-                    XCTAssertEqual(v.frame.maxX + gap, z.frame.minX, accuracy: 0.001, label)
-                    XCTAssertGreaterThan(space.frame.width, v.frame.width, label)
-                } else {
-                    XCTAssertEqual(space.frame.maxX, offSpace.frame.maxX, accuracy: 0.001, label)
-                    XCTAssertEqual(semicolon.frame.width, letterWidth, accuracy: 0.001, label)
-                }
+                XCTAssertEqual(space.frame.maxX, offSpace.frame.maxX, accuracy: 0.001, label)
+                XCTAssertEqual(semicolon.frame.width, letterWidth, accuracy: 0.001, label)
                 XCTAssertEqual(semicolon.frame.height, space.frame.height, accuracy: 0.001, label)
                 XCTAssertEqual(semicolon.shifted, ":", label)
             }
@@ -1607,8 +1602,7 @@ final class KeyboardLayoutTests: XCTestCase {
         let khmerWithOption = KeyboardLayout(width: 402, language: .khmer, letters: .khmerism, commaPeriodKeys: true)
         XCTAssertEqual(khmerWithOption, khmer)
 
-        // Dvorak punctuation already puts comma and period on row 1, so they aren't added again
-        // and the semicolon stays exactly where it was.
+        // Dvorak punctuation already puts comma and period on row 1.
         let dvorakOff = KeyboardLayout(width: 402, language: .english, letters: .dvorak, dvorakPunctuation: true)
         let dvorakOn = KeyboardLayout(
             width: 402, language: .english, letters: .dvorak,
@@ -1621,7 +1615,7 @@ final class KeyboardLayoutTests: XCTestCase {
         XCTAssertEqual(search.keys.filter { $0.kind == .character(".") }.count, 1)
         XCTAssertNil(search.key(.character(",")))
         XCTAssertEqual(dvorakOn.key(.character(","))?.row, 0, "row 1's, not the bottom row's")
-        XCTAssertEqual(dvorakOn.key(.character(";"))?.row, 3, "the semicolon stays")
+        XCTAssertNil(dvorakOn.key(.character(";")))
     }
 
     /// Settings › Experiments › Comma and period keys, on: a comma sits just left of the space
@@ -1707,7 +1701,7 @@ final class KeyboardLayoutTests: XCTestCase {
         let right = try bar(on, left: false)
         let comma = try XCTUnwrap(on.key(.character(",")))
         let period = try XCTUnwrap(on.key(.character(".")))
-        XCTAssertNil(on.key(.character(";")), "the semicolon is Dvorak punctuation's")
+        XCTAssertNil(on.key(.character(";")), "comma and period adds only those two marks")
         XCTAssertEqual(comma.frame.minX, offLeft.frame.minX, accuracy: 0.01, "at the left bar's left end")
         XCTAssertEqual(comma.frame.maxX + SplitGeometry.gap, left.frame.minX, accuracy: 0.01, "just left of space")
         XCTAssertEqual(left.frame.maxX, offLeft.frame.maxX, accuracy: 0.01, "the left bar ends where it did")

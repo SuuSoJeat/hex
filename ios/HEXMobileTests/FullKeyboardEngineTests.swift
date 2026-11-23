@@ -1441,8 +1441,8 @@ final class FullKeyboardEngineTests: XCTestCase {
         XCTAssertEqual(engine.shift.state, .locked)
     }
 
-    /// Settings › Experiments › Dvorak punctuation keys: on English's Dvorak letters the four
-    /// keys type a quotation mark, `<`, `>` and `:` while shift is on, their keycaps and pop-ups read so, one-shot
+    /// Settings › Experiments › Dvorak punctuation keys: on English's Dvorak letters the three
+    /// keys type a quotation mark, `<` and `>` while shift is on. Their keycaps and pop-ups read so, one-shot
     /// shift turns off after one as it does for a letter, and caps lock keeps them shifted.
     func testDvorakPunctuationTypesShiftedSymbols() throws {
         engine.width = 402
@@ -1453,49 +1453,41 @@ final class FullKeyboardEngineTests: XCTestCase {
         let apostrophe = try XCTUnwrap(engine.layout.key(.character("'")))
         let comma = try XCTUnwrap(engine.layout.key(.character(",")))
         let period = try XCTUnwrap(engine.layout.key(.character(".")))
-        let semicolon = try XCTUnwrap(engine.layout.key(.character(";")))
         XCTAssertEqual(apostrophe.shifted, "\"")
         XCTAssertEqual(comma.shifted, "<")
         XCTAssertEqual(period.shifted, ">")
-        XCTAssertEqual(semicolon.shifted, ":")
         XCTAssertEqual(comma.row, 0)
         XCTAssertEqual(period.row, 0)
-        XCTAssertEqual(semicolon.row, 3)
         XCTAssertEqual(engine.keycapLabel(for: comma), ",")
         XCTAssertEqual(engine.displayLabel(for: comma), ",")
-        XCTAssertEqual(engine.keycapLabel(for: semicolon), ";")
         tap(.shift)
         XCTAssertEqual(engine.keycapLabel(for: comma), "<")
         XCTAssertEqual(engine.displayLabel(for: comma), "<")
         XCTAssertEqual(engine.keycapLabel(for: apostrophe), "\"")
         XCTAssertEqual(engine.keycapLabel(for: period), ">")
         XCTAssertEqual(engine.displayLabel(for: period), ">")
-        XCTAssertEqual(engine.keycapLabel(for: semicolon), ":")
-        XCTAssertEqual(engine.displayLabel(for: semicolon), ":")
         tap(.character(","))
         XCTAssertEqual(target.text, "<")
         XCTAssertEqual(engine.shift.state, .off, "one-shot, as after a letter")
         XCTAssertEqual(engine.keycapLabel(for: comma), ",")
         tap(.character("."))
-        tap(.character(";"))
-        XCTAssertEqual(target.text, "<.;")
+        XCTAssertEqual(target.text, "<.")
         tap(.shift)
         now += 0.1
         tap(.shift)
         XCTAssertEqual(engine.shift.state, .locked)
         tap(.character(","))
         tap(.character("."))
-        tap(.character(";"))
-        XCTAssertEqual(target.text, "<.;<>:")
+        XCTAssertEqual(target.text, "<.<>")
         XCTAssertEqual(engine.shift.state, .locked, "caps lock stays on")
-        XCTAssertEqual(engine.keycapLabel(for: semicolon), ":")
         tap(.character("'"))
-        XCTAssertEqual(target.text, "<.;<>:\"")
+        XCTAssertEqual(target.text, "<.<>\"")
+        tap(.character("q"))
         tap(.space)
         tap(.character("v"))
         tap(.character("z"))
         tap(.delete)
-        XCTAssertEqual(target.text, "<.;<>:\" V")
+        XCTAssertEqual(target.text, "<.<>\"Q V")
         // The revised rows use their own key plane for Adaptive touch: what it learns stays there.
         let punctuation = try XCTUnwrap(AdaptiveTouchGeometry(layout: engine.layout)).key
         engine.dvorakPunctuation = false
@@ -1523,7 +1515,7 @@ final class FullKeyboardEngineTests: XCTestCase {
 
     /// Settings › Experiments › Dvorak punctuation keys: auto-capitalization's shift types no
     /// symbols — a comma at a sentence's start stays a comma, and its keycap reads so — while a
-    /// shift you press, or caps lock, types `<`, and the semicolon `:`.
+    /// shift you press, or caps lock, types `<`.
     func testDvorakPunctuationFollowsAUserShiftNotAutoCapitalization() throws {
         engine.width = 402
         engine.letterLayout = .dvorak
@@ -1559,8 +1551,8 @@ final class FullKeyboardEngineTests: XCTestCase {
         XCTAssertEqual(engine.shift.state, .locked)
         XCTAssertTrue(engine.shift.isUserShift)
         XCTAssertEqual(engine.keycapLabel(for: comma), "<")
-        tap(.character(";"))
-        XCTAssertEqual(target.text, ",ok. ,<:")
+        tap(.character("."))
+        XCTAssertEqual(target.text, ",ok. ,<>")
     }
 
     /// Settings › Experiments › Comma and period keys: the flag rebuilds the layout with a comma
@@ -1622,7 +1614,9 @@ final class FullKeyboardEngineTests: XCTestCase {
         engine.dvorakPunctuation = true
         XCTAssertFalse(engine.layout.commaPeriodKeys, "Dvorak punctuation already has both on row 1")
         XCTAssertEqual(engine.layout.key(.character(","))?.row, 0)
-        XCTAssertEqual(engine.layout.key(.character(";"))?.row, 3)
+        XCTAssertNil(engine.layout.key(.character(";")))
+        tap(.layerSwitch(.numbers))
+        XCTAssertEqual(engine.layout.key(.character(";"))?.row, 1)
     }
 
     func testHoldNumbersSlideToADigitAndLetGo() {

@@ -373,9 +373,8 @@ struct FullKeyboardSettings {
         nonmutating set { defaults?.set(newValue, forKey: Key.joinKeyboardWhenUnfolded) }
     }
 
-    /// Settings › Experiments › Dvorak punctuation keys (off by default): English's Dvorak
-    /// letters gain comma and period on row 1, ahead of P, and a semicolon left of the space
-    /// bar, which type `<`, `>` and `:` with shift. Stored as `experiments.dvorakPunctuation`.
+    /// Settings › Experiments › Dvorak punctuation keys (off by default). In joined text
+    /// fields, adds apostrophe, comma and period and puts Q and Z around the space bar.
     var dvorakPunctuation: Bool {
         get { defaults?.bool(forKey: Key.dvorakPunctuation) ?? false }
         nonmutating set { defaults?.set(newValue, forKey: Key.dvorakPunctuation) }
