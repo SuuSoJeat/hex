@@ -150,6 +150,7 @@ Both layouts use the existing **Autocorrect** and **Swipe typing** switches in
 | Tap **ញ + ◌ំ** in an ordinary text field with the default settings. Repeat with Autocorrect off. | **ខ្ញុំ** first, then literal **ញំ**. |
 | With Autocorrect off, type **កម្** and choose **កម្ពុជា**. | The keyboard appends **ពុជា** once, preserving the coeng in the prefix. |
 | With Autocorrect on, type **សាលារ**. Continue with **ៀន**, or press Space at the prefix. | Continuing gives **សាលារៀន**. Space keeps the final **រ** and inserts a space. |
+| With Autocorrect on and no learned corrections, type **ចំនុច**. | Tap **ចំណុច** to accept the spelling suggestion. Pressing Space instead keeps **ចំនុច** and inserts a space. |
 | Swipe Backspace left one word at the end of **ខ្ញុំទៅសាលា។** followed by a space. Slide back before lifting. | The field first reads **ខ្ញុំទៅ**, then recovers the exact original text, including punctuation and space. |
 | With swipe enabled, trace **បាន** then **ខ្ញុំ**. With whole-word swipe deletion enabled, press Backspace. | **បានខ្ញុំ** becomes **បាន**. A preceding word survives. |
 

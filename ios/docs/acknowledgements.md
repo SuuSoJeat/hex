@@ -53,9 +53,6 @@ The app shows these under Settings › Acknowledgements (`HEXMobile/Acknowledgem
   `python3 scripts/build-typing-model.py km HEXKeyboard/TypingModel/km-autocomplete.tsv HEXKeyboard/TypingModel/km.hextm`.
   Copyright © 2024 SIL International.
   The keyboard includes the [MIT licence notice](../HEXKeyboard/TypingModel/km-autocomplete-license.txt).
-  The curated spelling examples also draw on [Kong et al., Table 5](https://arxiv.org/pdf/2511.09812#page=6)
-  and Chuon Nath dictionary discussions of [ចំណុច](https://www.thmeythmey.com/index.php/detail/38623)
-  and [សមត្ថភាព](https://www.thmeythmey.com/detail/80744).
 - **Khmerism keyboard layout.** Hex's Khmerism layout builds on the original
   [Khmerism Keyboard Project by Lyheng Phuoy](https://solve.mit.edu/solutions/2452).
   See the [key maps](khmer-keyboards.md#key-maps) for the Hex adaptation.

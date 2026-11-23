@@ -71,50 +71,50 @@ extension FullKeyboardEngineTests {
         target.documentIdentifier = UUID()
         engine.language = .khmer
         await engine.khmerAutocompleteLoad?.value
-        target.insertText("ចំនុច")
+        target.insertText("កមពុជា")
         engine.textDidChange()
-        XCTAssertEqual(engine.suggestions.map(\.displayText), ["“ចំនុច”", "ចំណុច"])
+        XCTAssertEqual(engine.suggestions.map(\.displayText), ["“កមពុជា”", "កម្ពុជា"])
         XCTAssertEqual(engine.suggestions.map(\.willAutoReplace), [false, true])
 
         tap(.space)
-        XCTAssertEqual(target.text, "ចំណុច")
+        XCTAssertEqual(target.text, "កម្ពុជា")
         let revert = try XCTUnwrap(engine.suggestions.first)
         XCTAssertEqual(revert.kind, .revert)
         engine.acceptSuggestion(revert)
-        XCTAssertEqual(target.text, "ចំនុច")
+        XCTAssertEqual(target.text, "កមពុជា")
         tap(.space)
-        XCTAssertEqual(target.text, "ចំនុច ")
+        XCTAssertEqual(target.text, "កមពុជា ")
     }
 
     func testKhmerCorrectionReadsThroughTransientStaleAndUnavailableContext() async throws {
-        let textTarget = KhmerScalarDeletingTarget(text: "ខ្ញុំចំនុច")
+        let textTarget = KhmerScalarDeletingTarget(text: "ខ្ញុំកមពុជា")
         textTarget.laggingReadsAfterDeleting = 2
         target = textTarget
         target.documentIdentifier = UUID()
         await loadKhmerKeyboard(for: target)
 
         tap(.space)
-        XCTAssertEqual(target.text, "ខ្ញុំចំណុច")
+        XCTAssertEqual(target.text, "ខ្ញុំកម្ពុជា")
         let revert = try XCTUnwrap(engine.suggestions.first)
         XCTAssertEqual(revert.kind, .revert)
         engine.acceptSuggestion(revert)
-        XCTAssertEqual(target.text, "ខ្ញុំចំនុច")
+        XCTAssertEqual(target.text, "ខ្ញុំកមពុជា")
     }
 
     func testKhmerCorrectionWaitsForTheHostToConfirmTheDeleteBeforeRestoring() async {
-        let textTarget = KhmerScalarDeletingTarget(text: "ខ្ញុំចំនុច")
+        let textTarget = KhmerScalarDeletingTarget(text: "ខ្ញុំកមពុជា")
         textTarget.laggingReadsAfterDeleting = 6
         textTarget.hidesAfterText = true
         target = textTarget
         target.documentIdentifier = UUID()
         await loadKhmerKeyboard(for: target)
 
-        XCTAssertEqual(engine.suggestions.first(where: \.willAutoReplace)?.replacement, "ចំណុច")
+        XCTAssertEqual(engine.suggestions.first(where: \.willAutoReplace)?.replacement, "កម្ពុជា")
         tap(.space)
         XCTAssertNotNil(engine.khmerDeleteRecovery)
         await engine.khmerDeleteRecovery?.task.value
 
-        XCTAssertEqual(target.text, "ខ្ញុំចំនុច ")
+        XCTAssertEqual(target.text, "ខ្ញុំកមពុជា ")
         XCTAssertFalse(engine.suggestions.contains { $0.kind == .revert })
     }
 
@@ -154,7 +154,7 @@ extension FullKeyboardEngineTests {
     }
 
     func testKhmerDeleteRecoveryDoesNotWriteAfterTheFieldChanges() async throws {
-        let textTarget = KhmerScalarDeletingTarget(text: "ខ្ញុំចំនុច")
+        let textTarget = KhmerScalarDeletingTarget(text: "ខ្ញុំកមពុជា")
         textTarget.laggingReadsAfterDeleting = 6
         target = textTarget
         target.documentIdentifier = UUID()
@@ -171,7 +171,7 @@ extension FullKeyboardEngineTests {
     }
 
     func testFreshKeyInAnotherFieldIsIndependentOfPendingKhmerDeleteRecovery() async throws {
-        let textTarget = KhmerScalarDeletingTarget(text: "ខ្ញុំចំនុច")
+        let textTarget = KhmerScalarDeletingTarget(text: "ខ្ញុំកមពុជា")
         textTarget.laggingReadsAfterDeleting = 6
         target = textTarget
         target.documentIdentifier = UUID()
@@ -191,7 +191,7 @@ extension FullKeyboardEngineTests {
 
     func testKhmerDeleteRecoveryDoesNotWriteAfterRoutingThroughEmojiSearch() async throws {
         for leavesSearchOpen in [true, false] {
-            let textTarget = KhmerScalarDeletingTarget(text: "ខ្ញុំចំនុច")
+            let textTarget = KhmerScalarDeletingTarget(text: "ខ្ញុំកមពុជា")
             textTarget.laggingReadsAfterDeleting = 6
             textTarget.documentIdentifier = UUID()
             textTarget.hidesAfterText = true
@@ -316,33 +316,33 @@ extension FullKeyboardEngineTests {
     }
 
     func testKhmerCorrectionUndoStaysInItsOwnDocument() async throws {
-        target = FixtureTextTarget(text: "ចំនុច")
+        target = FixtureTextTarget(text: "កមពុជា")
         let originalDocument = UUID()
         target.documentIdentifier = originalDocument
         await loadKhmerKeyboard(for: target)
 
         tap(.space)
-        XCTAssertEqual(target.text, "ចំណុច")
+        XCTAssertEqual(target.text, "កម្ពុជា")
         let undo = try XCTUnwrap(engine.suggestions.first { $0.kind == .revert })
         target.documentIdentifier = UUID()
         engine.acceptSuggestion(undo)
-        XCTAssertEqual(target.text, "ចំណុច")
+        XCTAssertEqual(target.text, "កម្ពុជា")
         engine.textDidChange()
         XCTAssertFalse(engine.suggestions.contains { $0.kind == .revert })
 
         target.documentIdentifier = originalDocument
         engine.textDidChange()
         engine.acceptSuggestion(try XCTUnwrap(engine.suggestions.first { $0.kind == .revert }))
-        XCTAssertEqual(target.text, "ចំនុច")
+        XCTAssertEqual(target.text, "កមពុជា")
     }
 
     func testKhmerCorrectionDoesNotRewriteOrOfferUndoWithoutADocumentIdentifier() async {
-        target.insertText("ចំនុច")
+        target.insertText("កមពុជា")
         engine.language = .khmer
         await engine.khmerAutocompleteLoad?.value
 
         tap(.space)
-        XCTAssertEqual(target.text, "ចំនុច ")
+        XCTAssertEqual(target.text, "កមពុជា ")
         XCTAssertNil(engine.khmerDeleteRecovery)
         XCTAssertFalse(engine.suggestions.contains { $0.kind == .revert })
     }
@@ -362,25 +362,25 @@ extension FullKeyboardEngineTests {
     }
 
     func testKhmerCorrectionRestoresExactTextWhenHostDeletesAcrossTheBoundary() async {
-        target = KhmerOverDeletingTarget(text: "“ ចំនុច")
+        target = KhmerOverDeletingTarget(text: "“ កមពុជា")
         target.documentIdentifier = UUID()
         await loadKhmerKeyboard(for: target)
 
-        XCTAssertEqual(engine.suggestions.first(where: \.willAutoReplace)?.replacement, "ចំណុច")
+        XCTAssertEqual(engine.suggestions.first(where: \.willAutoReplace)?.replacement, "កម្ពុជា")
         tap(.space)
-        XCTAssertEqual(target.text, "“ ចំនុច ")
+        XCTAssertEqual(target.text, "“ កមពុជា ")
         XCTAssertFalse(engine.suggestions.contains { $0.kind == .revert })
     }
 
     func testKhmerCorrectionRestoresConfirmedDeletesWhenTheHostStopsDeleting() async {
-        target = KhmerStopsDeletingTarget(text: "ខ្ញុំចំនុច")
+        target = KhmerStopsDeletingTarget(text: "ខ្ញុំកមពុជា")
         target.documentIdentifier = UUID()
         await loadKhmerKeyboard(for: target)
 
-        XCTAssertEqual(engine.suggestions.first(where: \.willAutoReplace)?.replacement, "ចំណុច")
+        XCTAssertEqual(engine.suggestions.first(where: \.willAutoReplace)?.replacement, "កម្ពុជា")
         tap(.space)
         await engine.khmerDeleteRecovery?.task.value
-        XCTAssertEqual(target.text, "ខ្ញុំចំនុច ")
+        XCTAssertEqual(target.text, "ខ្ញុំកមពុជា ")
         XCTAssertFalse(engine.suggestions.contains { $0.kind == .revert })
     }
 
@@ -405,18 +405,18 @@ extension FullKeyboardEngineTests {
         engine.language = .khmer
         target.documentIdentifier = UUID()
         await engine.khmerAutocompleteLoad?.value
-        target.insertText("សួស្ដី")
+        target.insertText("ចំនុច")
         engine.textDidChange()
         let suggestion = try XCTUnwrap(engine.suggestions.first { $0.kind == .khmerCorrection(autoReplace: false) })
-        XCTAssertEqual(suggestion.displayText, "សួស្តី")
+        XCTAssertEqual(suggestion.displayText, "ចំណុច")
         XCTAssertFalse(suggestion.willAutoReplace)
 
         tap(.space)
         engine.acceptSuggestion(suggestion)
-        XCTAssertEqual(target.text, "សួស្ដី ")
+        XCTAssertEqual(target.text, "ចំនុច ")
         engine.deleteBackward()
         engine.acceptSuggestion(suggestion)
-        XCTAssertEqual(target.text, "សួស្តី")
+        XCTAssertEqual(target.text, "ចំណុច")
     }
 
     func testKhmerSpatialSuggestionsRankRealTapsOnBothLayouts() async throws {
@@ -512,17 +512,17 @@ extension FullKeyboardEngineTests {
     func testKhmerAutocorrectOnPunctuationAndExplicitPick() async throws {
         useKhmerism()
         await engine.khmerAutocompleteLoad?.value
-        target.insertText("ចំនុច")
+        target.insertText("កមពុជា")
         engine.textDidChange()
         tap(.shift)
         tap(.character("ំ"))
-        XCTAssertEqual(target.text, "ចំណុច។")
+        XCTAssertEqual(target.text, "កម្ពុជា។")
 
-        target.insertText("ចំនុច")
+        target.insertText("កមពុជា")
         engine.textDidChange()
         let correction = try XCTUnwrap(engine.suggestions.first(where: \.willAutoReplace))
         engine.acceptSuggestion(correction)
-        XCTAssertEqual(target.text, "ចំណុច។ចំណុច")
+        XCTAssertEqual(target.text, "កម្ពុជា។កម្ពុជា")
     }
 
     func testKhmerAutocorrectHonorsKeepAndTheAutocorrectSwitch() async throws {
@@ -530,22 +530,22 @@ extension FullKeyboardEngineTests {
         target.documentIdentifier = UUID()
         await engine.khmerAutocompleteLoad?.value
         engine.autocorrect.isEnabled = false
-        target.insertText("ចំនុច")
+        target.insertText("កមពុជា")
         engine.textDidChange()
         XCTAssertFalse(engine.suggestions.contains(where: \.willAutoReplace))
         tap(.space)
-        XCTAssertEqual(target.text, "ចំនុច ")
+        XCTAssertEqual(target.text, "កមពុជា ")
 
         engine.autocorrect.isEnabled = true
-        target.insertText("ចំនុច")
+        target.insertText("កមពុជា")
         engine.textDidChange()
         let keep = try XCTUnwrap(engine.suggestions.first)
         XCTAssertEqual(keep.kind, .khmerKeepLiteral)
         engine.acceptSuggestion(keep)
-        XCTAssertEqual(target.text, "ចំនុច ចំនុច")
+        XCTAssertEqual(target.text, "កមពុជា កមពុជា")
         XCTAssertFalse(engine.suggestions.contains(where: \.willAutoReplace))
         tap(.space)
-        XCTAssertEqual(target.text, "ចំនុច ចំនុច ")
+        XCTAssertEqual(target.text, "កមពុជា កមពុជា ")
     }
 }
 
@@ -604,7 +604,7 @@ private final class KhmerRestoreReportingTarget: FixtureTextTarget {
 private final class KhmerOverDeletingTarget: FixtureTextTarget {
     override func deleteBackward() {
         super.deleteBackward()
-        if super.documentContextBeforeInput == "“ ចំ" {
+        if super.documentContextBeforeInput == "“ ក" {
             super.deleteBackward()
             super.deleteBackward()
         }
