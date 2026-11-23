@@ -3064,19 +3064,16 @@ iOS prototype (`HEXMobile`) -> Record/transcribe/copy and keyboard handoff
 │   when the globe shows, space after them, return from m). Apple's Split Keyboard
 │   preference can't be read by a keyboard extension. Off, the split keyboard is unchanged.
 │   Unit tests only: no CI compiles the iOS targets, and no physical iPhone run checks it
-├── Dvorak punctuation keys (off by default, `experiments.dvorakPunctuation`): English's Dvorak
-│   letters gain comma and period ahead of P on row 1, whose nine keys narrow to start at the
-│   left margin and end at the same delete key, and a semicolon just left of the space bar,
-│   a letter wide (`referenceW`), only where the bar still holds a letter-wide space; on the
-│   Duo's split keyboard only the left half takes the two punctuation keys, on a pitch narrowed
-│   so the half keeps its right edge (its top-row keys are narrower than the right half's), and
-│   the semicolon takes from the left space bar, which keeps ending where it did. They type
-│   < > : with a shift you press or caps lock; auto-capitalization leaves the comma. A URL or
-│   email field keeps its own `.` key rather than a second key of the same kind. With the
-│   experiment off, every layout is key for key the one it was; a docked iPad keeps Apple's own
-│   rows. Adaptive touch learns the narrower key plane apart from Apple's Dvorak.
-│   Unit tests only (`KeyboardLayoutTests`, `FullKeyboardEngineTests`): no CI compiles the iOS
-│   targets, and no physical iPhone run checks it
+├── Dvorak punctuation keys (off by default, `experiments.dvorakPunctuation`): English Dvorak
+│   in a plain text field on the joined keyboard (including a floating iPad) starts row 1 with
+│   apostrophe, comma and period. Delete ends row 3. The bottom row puts semicolon before
+│   space and V, Z immediately after it. Manual shift or caps lock types the double quote,
+│   <, > and : from their punctuation keys. Auto-capitalization leaves punctuation alone.
+│   On the split Duo, comma and period join the left half's top row and semicolon fits beside
+│   the left space bar. URL and email fields keep their own period and add semicolon where it
+│   fits. Docked iPads keep the system layout. Adaptive touch learns the alternate key positions
+│   separately. `KeyboardLayoutTests` check rows, bounds and hit targets across keyboard shapes.
+│   `FullKeyboardEngineTests` check typing and shift. Physical iPhone coverage is pending.
 ├── Comma and period keys (off by default, `experiments.commaPeriodKeys`): a comma just left
 │   of the space bar and a period just right of it, both a letter wide, on an iPhone's letters
 │   page in a plain text field. On the joined keyboard the comma starts where the bar used to

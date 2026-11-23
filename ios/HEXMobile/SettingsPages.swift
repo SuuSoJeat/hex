@@ -928,7 +928,7 @@ struct ExperimentsSettingsPage: View {
         // Off by default: English's Dvorak keeps Apple's keys until this is on.
         SettingsToggleRow(
             title: String(localized: "Dvorak punctuation keys"),
-            detail: String(localized: "Adds comma, period and semicolon keys to the English Dvorak keyboard."),
+            detail: String(localized: "Adds punctuation to English Dvorak and rearranges keys on the joined keyboard."),
             isOn: $dvorakPunctuation
         )
 

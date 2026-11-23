@@ -63,7 +63,7 @@ extension FullKeyboardEngine {
     }
 
     /// A key's label as the keys read it: upper case on the letters page with shift on, and the
-    /// Dvorak punctuation keys' `<`, `>` and `:` with a shift you pressed (the docked iPad draws
+    /// Dvorak punctuation keys' shifted symbols with a shift you pressed (the docked iPad draws
     /// Apple's own pairs).
     func displayLabel(for key: KeyboardKey) -> String {
         guard let character = key.character else { return key.label }

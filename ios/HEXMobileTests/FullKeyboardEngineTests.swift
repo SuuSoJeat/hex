@@ -754,8 +754,8 @@ final class FullKeyboardEngineTests: XCTestCase {
         XCTAssertEqual(engine.shift.state, .locked)
     }
 
-    /// Settings › Experiments › Dvorak punctuation keys: on English's Dvorak letters the three
-    /// keys type `<`, `>` and `:` while shift is on, their keycaps and pop-ups read so, one-shot
+    /// Settings › Experiments › Dvorak punctuation keys: on English's Dvorak letters the four
+    /// keys type a quotation mark, `<`, `>` and `:` while shift is on, their keycaps and pop-ups read so, one-shot
     /// shift turns off after one as it does for a letter, and caps lock keeps them shifted.
     func testDvorakPunctuationTypesShiftedSymbols() throws {
         engine.width = 402
@@ -763,9 +763,11 @@ final class FullKeyboardEngineTests: XCTestCase {
         XCTAssertNil(engine.layout.key(.character(",")), "off: Apple's seven-letter row 1")
         engine.dvorakPunctuation = true
         XCTAssertEqual(engine.layout.letters, .dvorak)
+        let apostrophe = try XCTUnwrap(engine.layout.key(.character("'")))
         let comma = try XCTUnwrap(engine.layout.key(.character(",")))
         let period = try XCTUnwrap(engine.layout.key(.character(".")))
         let semicolon = try XCTUnwrap(engine.layout.key(.character(";")))
+        XCTAssertEqual(apostrophe.shifted, "\"")
         XCTAssertEqual(comma.shifted, "<")
         XCTAssertEqual(period.shifted, ">")
         XCTAssertEqual(semicolon.shifted, ":")
@@ -778,6 +780,7 @@ final class FullKeyboardEngineTests: XCTestCase {
         tap(.shift)
         XCTAssertEqual(engine.keycapLabel(for: comma), "<")
         XCTAssertEqual(engine.displayLabel(for: comma), "<")
+        XCTAssertEqual(engine.keycapLabel(for: apostrophe), "\"")
         XCTAssertEqual(engine.keycapLabel(for: period), ">")
         XCTAssertEqual(engine.displayLabel(for: period), ">")
         XCTAssertEqual(engine.keycapLabel(for: semicolon), ":")
@@ -799,7 +802,14 @@ final class FullKeyboardEngineTests: XCTestCase {
         XCTAssertEqual(target.text, "<.;<>:")
         XCTAssertEqual(engine.shift.state, .locked, "caps lock stays on")
         XCTAssertEqual(engine.keycapLabel(for: semicolon), ":")
-        // The narrower row 1 is its own key plane for Adaptive touch: what it learns stays there.
+        tap(.character("'"))
+        XCTAssertEqual(target.text, "<.;<>:\"")
+        tap(.space)
+        tap(.character("v"))
+        tap(.character("z"))
+        tap(.delete)
+        XCTAssertEqual(target.text, "<.;<>:\" V")
+        // The revised rows use their own key plane for Adaptive touch: what it learns stays there.
         let punctuation = try XCTUnwrap(AdaptiveTouchGeometry(layout: engine.layout)).key
         engine.dvorakPunctuation = false
         XCTAssertNotEqual(try XCTUnwrap(AdaptiveTouchGeometry(layout: engine.layout)).key, punctuation)
