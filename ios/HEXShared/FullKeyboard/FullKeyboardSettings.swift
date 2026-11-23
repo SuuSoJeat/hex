@@ -82,7 +82,7 @@ struct FullKeyboardSettings {
         static let koreanKeyboard = KoreanKeyboardExperiment.key
         static let khmerismNoColors = "experiments.khmerismNoColors"
         static let khmerismNoSuperscripts = "experiments.khmerismNoSuperscripts"
-        // Keep the saved choices when upgrading from the experiments page.
+        // Keep the choices saved by earlier Khmer builds.
         static let khmerismSmartMode = "experiments.khmerismSmartMode"
         static let khmerismSwipeTyping = "experiments.khmerismSwipeTyping"
         static let keyPopups = "settings.keyboardKeyPopups"
@@ -184,15 +184,15 @@ struct FullKeyboardSettings {
         nonmutating set { defaults?.set(newValue, forKey: Key.khmerismNoSuperscripts) }
     }
 
-    /// Settings › Keyboard › Khmer › Smart Mode. Shared by both layouts, on by default.
+    /// Settings › Experiments › Khmer › Smart Mode. Off by default, shared by both layouts.
     var khmerismSmartMode: Bool {
-        get { defaults?.object(forKey: Key.khmerismSmartMode) as? Bool ?? true }
+        get { defaults?.object(forKey: Key.khmerismSmartMode) as? Bool ?? false }
         nonmutating set { defaults?.set(newValue, forKey: Key.khmerismSmartMode) }
     }
 
-    /// Settings › Keyboard › Khmer › Swipe typing. Shared by both layouts, on by default.
+    /// Settings › Experiments › Khmer › Khmer swipe typing. Off by default, shared by both layouts.
     var khmerismSwipeTyping: Bool {
-        get { defaults?.object(forKey: Key.khmerismSwipeTyping) as? Bool ?? true }
+        get { defaults?.object(forKey: Key.khmerismSwipeTyping) as? Bool ?? false }
         nonmutating set { defaults?.set(newValue, forKey: Key.khmerismSwipeTyping) }
     }
 
@@ -318,7 +318,7 @@ struct FullKeyboardSettings {
     }
 
     /// Settings › Keyboard › Swipe typing: slide through a word's letters to type it, on the
-    /// English and Spanish layouts (`SwipeTyping`), Khmer when enabled in its controls,
+    /// English and Spanish layouts (`SwipeTyping`), Khmer when its experiment is enabled,
     /// and with Swipe typing in more languages on
     /// also every layout with a typing model (`swipesIn(_:)`). On by default. Stored as
     /// `experiments.swipeTyping`, from when it was an experiment (off by default): unset or

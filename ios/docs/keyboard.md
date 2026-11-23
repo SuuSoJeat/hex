@@ -339,11 +339,11 @@ alone. A word it may not offer, typed in full, is never corrected (as on Android
 
 On by default (stored as
 `experiments.swipeTyping` from when it was an experiment off by default: unset or true
-is on, false off, so testers who turned it off keep it off), for the
-English, Spanish, and enabled Khmer layouts, and with Settings › Experiments ›
-Swipe typing in more languages on
-(`experiments.swipeMoreLanguages`, off by default) for every language with a typing
-model too: French (France), Polish, and German while Spatial autocorrect and German
+is on, false off, so testers who turned it off keep it off), for English and Spanish.
+Khmer uses its own off-by-default experiment and also needs the main switch on.
+Settings › Experiments › Swipe typing in more languages
+(`experiments.swipeMoreLanguages`, off by default) also enables the other languages with a
+typing model: French (France), Polish, and German while Spatial autocorrect and German
 spatial autocorrect are on. Off under VoiceOver. A touch that goes down on a letter and
 travels more than a key's pitch (width plus gap) is a swipe (`SwipeTyping`): its key
 no longer types, a light trail (a shape layer, the last 0.45 s of the path) follows the finger,
@@ -654,7 +654,8 @@ the shared shortcut behavior. Closing
 punctuation applies the correction and types the punctuation. Tap other dictionary
 guesses to use them. Tap the quoted spelling to keep it or tap the undo suggestion
 to restore it when iOS identifies the field. After a correction with punctuation,
-Backspace reveals that option.
+Backspace reveals that option. If iOS cannot identify the field, Khmer autocorrect
+leaves the original text intact when the correction would require a delete.
 
 **Settings › Keyboard › Spatial autocorrect** uses recent near-edge taps to rank
 single-character spelling guesses in either Khmer layout. It's on by default
@@ -664,13 +665,13 @@ readings.
 
 Hold Backspace or swipe it left to delete a whole word at a known Khmer word
 boundary. When the boundary is uncertain or a word cannot be safely removed, the
-hold uses regular Backspace. A swipe needs an identified field and stops if the
+hold uses regular Backspace. A Backspace swipe needs an identified field and stops if the
 field, caret or input route changes. Sliding back restores words at the same
 caret. A delayed delete is restored only when the host confirms the edit there.
 
-**Settings › Keyboard › Khmer** appears when Khmer is configured. Both options
-work in either layout and are on by default. Turning off the main **Swipe typing**
-switch also turns off Khmer swipe typing. Saved choices are kept.
+**Settings › Experiments › Khmer** appears when Full is chosen and Khmer is configured.
+Both options work in either layout and are off by default. The main **Swipe typing**
+switch also controls whether Khmer can swipe. Saved choices are kept.
 
 - **Smart Mode** adds shortcuts such as **ញ** + **ំ** → **ខ្ញុំ**, adapts the
   diacritic key (**៉** in Khmerism, **៊** in Khmer) after common consonants,
@@ -678,12 +679,12 @@ switch also turns off Khmer swipe typing. Saved choices are kept.
   fields that accept word corrections. Address and credential fields keep literal keys.
 - **Khmer swipe typing** reads one word from the positions of its characters on your
   layout, including shifted glyphs, coeng and vowel signs. Trace the keys in
-  typing order and lift to insert the word. Near-tied spellings wait for a tap in the suggestion
-  strip when suggestions are visible. When a chip or notice covers them, the
-  best reading goes in directly. Swipe can read saved words whose characters
+  typing order and lift to insert the word. Near-tied spellings wait for a tap when iOS
+  identifies the field and the suggestion strip can show the choices. Otherwise, the best
+  reading goes in directly. Swipe can read saved words whose characters
   are in the model and offer iOS Text Replacement shortcuts in the strip. Consecutive
-  swipes join without spaces, and Backspace takes back the last swiped word unless letter-by-letter deletion
-  is enabled.
+  swipes join without spaces. Backspace takes back the last swiped word when the field is
+  identified and letter-by-letter deletion is off.
 
 With the Khmerism layout selected, **Settings › Experiments › Khmerism** offers
 **No colors** to use the keyboard theme for every key and **No superscripts** to

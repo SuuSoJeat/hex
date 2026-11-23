@@ -39,9 +39,8 @@ struct AcknowledgementsView: View {
         let body: String
     }
 
-    /// Spatial autocorrect's word lists (`scripts/build-typing-model.py`), the keyboard's
-    /// never-suggest list (`OffensiveWords`), and the speech models Hex downloads (Parakeet V2,
-    /// and Parakeet Ultra for Experiments › Multilingual model); keep in step with ios/README.md.
+    /// Typing data, keyboard layout credits and downloaded speech models. Keep in step with
+    /// ios/docs/acknowledgements.md.
     static let entries: [Entry] = [
         Entry(
             title: "Google Books Ngram data",
@@ -125,6 +124,22 @@ struct AcknowledgementsView: View {
             Spanish words are checked against RLA-ES, the Spanish spelling dictionaries for \
             LibreOffice by Santiago Bosio and contributors (Spain and Mexico), used under the \
             Mozilla Public License 1.1 (github.com/sbosio/rla-es).
+            """
+        ),
+        Entry(
+            title: "SIL/Keyman Khmer lexical model",
+            body: """
+            Khmer completions and spelling suggestions use the unchanged word frequency list \
+            from SIL International's sil.km.ggc model (github.com/keymanapp/lexical-models, \
+            revision e3918e6963c6). Hex also builds its Khmer swipe model from that list. \
+            Copyright © 2024 SIL International. The keyboard includes the MIT licence notice.
+            """
+        ),
+        Entry(
+            title: "Khmerism keyboard layout",
+            body: """
+            Hex's Khmerism layout builds on the original Khmerism Keyboard Project by \
+            Lyheng Phuoy (solve.mit.edu/solutions/2452).
             """
         ),
     ]
