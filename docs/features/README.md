@@ -2947,7 +2947,9 @@ iOS prototype (`HEXMobile`) -> Record/transcribe/copy and keyboard handoff
 │   bilingual partner through the Latin-script rule, and no typing (spatial) model
 ├── Khmer (ភាសាខ្មែរ) → Layout → Khmer (iPhone-style, default) or Khmerism
 │   ├── Start a sentence → three suggested words; type a first letter → offline completions
-│   ├── Choose ខ្ញុំ then ចង់ → ខ្ញុំចង់; joined text also supports spelling suggestions and word deletion
+│   ├── Choose សូម → អរគុណ → ច្រើន to write សូមអរគុណច្រើន without inserting spaces.
+│   │   The offline word-pair model also ranks completions after a space or zero-width space.
+│   ├── Khmer-script Pali and Sanskrit terms complete from a prefix and stay as typed
 │   ├── Khmerism → hold for corner characters; coeng brings subscript consonants onto the keys
 │   ├── Autocorrect → smart typing; Swipe typing → trace a word (both on by default)
 │   ├── Swipe in emoji search → only the query changes; Backspace on an uncommitted

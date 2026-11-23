@@ -193,7 +193,7 @@ struct FullKeyboardSettings {
     /// decoder and a bilingual partner, so one gate keeps a German model out of everything
     /// until it is chosen; `TypingDecoderModel.bundled` still loads any bundled file for tests.
     func typingModel(for language: KeyboardLanguage) -> TypingDecoderModel? {
-        if language == .khmer { return nil } // Khmer's unigram model is for swipes only.
+        if language == .khmer { return nil } // Khmer reads its model for swipes and predictions; taps use Khmer spelling rules.
         if language == .german, !(spatialAutocorrect && germanSpatialAutocorrect) { return nil }
         return TypingDecoderModel.bundled(language.rawValue)
     }

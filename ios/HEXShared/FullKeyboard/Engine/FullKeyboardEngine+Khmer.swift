@@ -154,39 +154,32 @@ extension FullKeyboardEngine {
     }
 
     private static let khmerStarters = ["ខ្ញុំ", "សូម", "តើ"]
+    private static let khmerCommonWords = ["បាន", "មាន", "នៅ", "ទៅ"]
 
-    /// Small conversational word pairs. The bundled Khmer model contains only word frequencies.
-    private func khmerFollowingWords(_ previous: String) -> [String] {
-        switch previous {
-        case "ខ្ញុំ": ["ចង់", "មាន", "នឹង"]
-        case "សូម": ["អរគុណ", "ជួយ", "ទោស"]
-        case "តើ": ["អ្នក", "មាន", "អាច"]
-        case "ចង់": ["ទៅ", "បាន", "ដឹង"]
-        case "អាច": ["ជួយ", "ធ្វើ", "ទៅ"]
-        case "មាន": ["អ្វី", "ពេល", "ការ"]
-        case "អ្នក": ["មាន", "ចង់", "អាច"]
-        case "ទៅ": ["ណា", "ផ្ទះ", "សាលា"]
-        default: ["បាន", "មាន", "នៅ"]
+    private func khmerFollowingWords(_ previous: String, prefix: String = "") -> [String] {
+        func allowed(_ word: String) -> Bool {
+            word != previous && word.utf16.count > prefix.utf16.count && word.utf16.starts(with: prefix.utf16)
+                && autocorrect.mayOffer(word, after: previous)
         }
+        var words = TypingDecoderModel.bundled(KeyboardLanguage.khmer.rawValue)?.nextWords(after: previous, allowing: allowed) ?? []
+        // While typing a prefix, the ordinary frequency-ranked completions fill any spare slots.
+        guard prefix.isEmpty else { return words }
+        for word in Self.khmerCommonWords where words.count < 3 && !words.contains(word) && allowed(word) {
+            words.append(word)
+        }
+        return words
     }
 
-    private func khmerPredictions(_ words: [String], after previous: String? = nil) -> [KeyboardSuggestion] {
-        words.filter { $0 != previous && autocorrect.mayOffer($0, after: previous) }.map {
-            KeyboardSuggestion(displayText: $0, replacement: $0, kind: .khmerPrediction)
-        }
-    }
-
-    private func khmerBoundaryPredictions(before: String?) -> [KeyboardSuggestion] {
-        guard let before, !before.isEmpty else {
-            return target.hasText ? [] : khmerPredictions(Self.khmerStarters)
-        }
+    private func khmerStartsSentence(before: String?) -> Bool {
+        guard let before, !before.isEmpty else { return !target.hasText }
         var trimmed = before[...]
         while trimmed.last == " " || trimmed.last == "\u{200B}" { trimmed = trimmed.dropLast() }
-        guard let last = trimmed.last, !last.isNewline,
-              !["។", "៕", ".", "!", "?"].contains(last) else { return khmerPredictions(Self.khmerStarters) }
-        guard trimmed.endIndex != before.endIndex,
-              let previous = khmerAutocomplete?.wordSuffix(in: trimmed, personalWords: autocorrect.ownWords) else { return [] }
-        return khmerPredictions(khmerFollowingWords(previous), after: previous)
+        guard let last = trimmed.last else { return true }
+        return last.isNewline || ["។", "៕", ".", "!", "?"].contains(last)
+    }
+
+    private func khmerPredictions(_ words: [String]) -> [KeyboardSuggestion] {
+        words.map { KeyboardSuggestion(displayText: $0, replacement: $0, kind: .khmerPrediction) }
     }
 
     func khmerSuggestionChoices(live: Bool = false) -> [KeyboardSuggestion] {
@@ -195,11 +188,17 @@ extension FullKeyboardEngine {
         let caret = khmerPredictionCaret(before: before)
         let prefix = khmerPrefixAfterPick(at: caret)
         if prefix == nil && !live { khmerPickedWord = nil }
-        if let prefix, prefix.isEmpty, let pick = khmerPickedWord {
-            return khmerPredictions(khmerFollowingWords(pick.word), after: pick.word)
+        let context: (word: String, prefix: String)?
+        if let prefix, let pick = khmerPickedWord {
+            context = (pick.word, prefix)
+        } else if khmerStartsSentence(before: before) {
+            return khmerPredictions(Self.khmerStarters.filter { autocorrect.mayOffer($0) })
+        } else {
+            context = before.flatMap { khmerAutocomplete?.separatedContext(in: $0, personalWords: autocorrect.ownWords) }
         }
-        let predictions = khmerBoundaryPredictions(before: before)
-        if !predictions.isEmpty { return predictions }
+        if let context, context.prefix.isEmpty {
+            return khmerPredictions(khmerFollowingWords(context.word))
+        }
         guard let index = khmerAutocomplete else { return [] }
         let input = prefix ?? before
         if let correction = autocorrect.khmerCorrection(
@@ -222,11 +221,9 @@ extension FullKeyboardEngine {
         var completions = autocorrect.khmerCompletions(using: index, beforeInput: input).map {
             KeyboardSuggestion(displayText: $0.word, replacement: $0.suffix, kind: .khmerCompletion)
         }
-        if let prefix, let previous = khmerPickedWord?.word {
-            let preferred = khmerFollowingWords(previous).filter {
-                $0.utf16.count > prefix.utf16.count && $0.utf16.starts(with: prefix.utf16)
-                    && autocorrect.mayOffer($0, after: previous)
-            }
+        if let context {
+            let prefix = context.prefix
+            let preferred = khmerFollowingWords(context.word, prefix: prefix)
             let personal = completions.prefix { autocorrect.lexiconTerms.contains($0.displayText) }
             let contextual = preferred.filter { word in !personal.contains { $0.displayText == word } }.map { word in
                 let suffix = String(decoding: word.utf16.dropFirst(prefix.utf16.count), as: UTF16.self)
