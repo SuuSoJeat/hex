@@ -2958,8 +2958,15 @@ iOS prototype (`HEXMobile`) -> Record/transcribe/copy and keyboard handoff
 │   `KhmerAutocompleteTests`, `FullKeyboardEngineTests`.
 │   Settings › Experiments › Khmerism (off by default, App Group, `FullKeyboardSettingsTests`)
 │   ├── No colors (`experiments.khmerismNoColors`) → every cap uses the keyboard theme
-│   └── No superscripts (`experiments.khmerismNoSuperscripts`) → hide corner labels,
-│       center the main glyph, and keep hold-to-type and its pop-up
+│   ├── No superscripts (`experiments.khmerismNoSuperscripts`) → hide corner labels,
+│   │   center the main glyph, and keep hold-to-type and its pop-up
+│   └── Swipe typing (`experiments.khmerismSwipeTyping`) → trace one word using the positions
+│       of its main and corner glyphs, including coeng and vowel signs. Lift to insert
+│       without an automatic space. Near-tied words on the same path wait for a strip pick
+│       when suggestions are visible. Backspace and replacement respect the last swipe's
+│       boundary. VoiceOver and a caret immediately after coeng keep regular key input.
+│       Checks: `SwipeDecoderTests`, `FullKeyboardEngineTests`, `FullKeyboardSettingsTests`.
+│       These cover synthetic paths and proxy fixtures. Real Khmer swipe accuracy is unmeasured.
 ├── Korean keyboard (두벌식) (off by default, `experiments.koreanKeyboard`): Settings ›
 │   Experiments adds 한국어 to Settings › Keyboard › Languages, typed on the standard two-set
 │   rows (ㅂㅈㄷㄱㅅㅛㅕㅑㅐㅔ / ㅁㄴㅇㄹㅎㅗㅓㅏㅣ / ㅋㅌㅊㅍㅠㅜㅡ, shift's ㅃㅉㄸㄲㅆ and ㅒㅖ, no

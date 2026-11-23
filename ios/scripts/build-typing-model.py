@@ -30,6 +30,7 @@ differs.
     python3 -m venv /tmp/venv && /tmp/venv/bin/pip install spylls   # Spanish only
     /tmp/venv/bin/python scripts/build-typing-model.py es <workdir> HEXKeyboard/TypingModel/es.hextm
     python3 scripts/build-typing-model.py pl <workdir> pl.hextm [nkjp+parlamint|nkjp|parlamint]
+    python3 scripts/build-typing-model.py km KhmerLexicon/km-autocomplete.tsv HEXKeyboard/TypingModel/km.hextm
 
 Needs about 7 GB free in <workdir> while it runs (English downloads ~240 GB of ngrams,
 Spanish ~50 GB, each file deleted once counted) and a fast connection; every stage is
@@ -489,9 +490,36 @@ def main_polish(work, out_path, source):
     print(f"{valid_path}: {len(valid)} words outside the model")
 
 
+def build_khmer(wordlist, out_path):
+    # The bundled SIL/Keyman model supplies word counts. Khmerism's physical
+    # key assignments belong to the Swift layout, including its corner glyphs.
+    vocab = {}
+    coeng = "\u17d2"
+
+    def begins_word(character):
+        return 0x1780 <= ord(character) <= 0x17B3
+
+    with open(wordlist, encoding="utf-8") as source:
+        for line in source:
+            word, frequency = line.rstrip("\r\n").split("\t")
+            count = int(frequency)
+            if not word or count <= 0 or not begins_word(word[0]):
+                continue
+            if any(not (0x1780 <= ord(c) <= 0x17D2 or c == "\u17dd") for c in word):
+                continue
+            if word.endswith(coeng) or any(
+                first == coeng and not begins_word(second) for first, second in zip(word, word[1:])
+            ):
+                continue
+            vocab[word] = vocab.get(word, 0) + count
+    write_model("km", vocab, sum(vocab.values()), {}, out_path)
+
+
 if __name__ == "__main__":
     if len(sys.argv) in (4, 5) and sys.argv[1] == "pl" and (sys.argv[4:] or ["nkjp+parlamint"])[0] in POLISH_MIN_PAIR:
         main_polish(sys.argv[2], sys.argv[3], (sys.argv[4:] or ["nkjp+parlamint"])[0])
+    elif len(sys.argv) == 4 and sys.argv[1] == "km":
+        build_khmer(*sys.argv[2:])
     elif len(sys.argv) != 4 or sys.argv[1] not in FILES:
         sys.exit(__doc__)
     else:

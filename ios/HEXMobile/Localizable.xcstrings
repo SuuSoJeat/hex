@@ -4356,6 +4356,16 @@
     "Khmerism" : {
       "shouldTranslate" : false
     },
+    "Trace a Khmer word across its main or corner glyphs, then lift to type it." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "滑过高棉语单词对应的主字符或角标字符，抬起手指即可输入。"
+          }
+        }
+      }
+    },
     "No colors" : {
       "localizations" : {
         "zh-Hans" : {

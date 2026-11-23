@@ -106,9 +106,17 @@ nonisolated final class TypingDecoderModel: @unchecked Sendable {
         return body(UnsafeRawBufferPointer(start: base.advanced(by: blobAt + s), count: start(i + 1) - s))
     }
 
-    /// The word's letter codes, or nil when it has a letter the model doesn't.
+    /// The word's codes, or nil when it has a character the model doesn't.
     func encode(_ word: String) -> [UInt8]? {
         var out: [UInt8] = []
+        if language == "km" {
+            // Each Khmer scalar has its own key, even inside a Swift Character.
+            for scalar in word.unicodeScalars {
+                guard let code = codes[Character(scalar)] else { return nil }
+                out.append(code)
+            }
+            return out
+        }
         for c in word {
             guard let code = codes[c] else { return nil }
             out.append(code)
@@ -404,6 +412,8 @@ nonisolated struct TypingDecoder {
     struct Keys: Equatable, Sendable {
         /// Each letter key's centre, shifted by your tap offsets when there are any.
         var centres: [Character: CGPoint]
+        /// Alternate glyphs that share their main glyph's physical key during a swipe.
+        var swipeAliases: [Character: Character] = [:]
         var pitch: CGSize
         /// The bottom letter row's centre, below which a tap may have been meant for space.
         var bottomRowY: CGFloat
@@ -431,7 +441,8 @@ nonisolated struct TypingDecoder {
                 space = space.map { $0.union(bar) } ?? bar
             }
             for key in layout.keys {
-                guard let c = key.character, c.count == 1, let letter = c.first, letter.isLetter else { continue }
+                guard let c = key.character, c.count == 1, let letter = c.first, !key.isNumberRow,
+                      layout.language == .khmer || letter.isLetter else { continue }
                 let shift = offsets[letter] ?? .zero
                 // A split layout's halves are pushed together, so a letter on both halves (G, V)
                 // has one centre, where the unsplit keyboard has it.
@@ -448,6 +459,7 @@ nonisolated struct TypingDecoder {
                 bottomRowY: bottom,
                 space: space
             )
+            if layout.language == .khmer { swipeAliases = KhmerismLayout.swipeAliases }
         }
     }
 
