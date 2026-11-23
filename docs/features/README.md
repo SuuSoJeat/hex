@@ -427,7 +427,8 @@ Choose a supported language              // setup.language-conditioning; macOS +
 │   offers it (#1991)
 ├── Bangla -> Whisper only, with the `bn` hint; Auto lets Whisper guess per clip
 ├── Khmer -> Whisper only, with the `km` hint; Auto lets Whisper guess per clip
-└── Azerbaijani -> Whisper only, with the `az` hint; Auto lets Whisper guess per clip
+├── Azerbaijani -> Whisper only, with the `az` hint; Auto lets Whisper guess per clip
+└── Catalan -> Whisper only, with the `ca` hint; Auto lets Whisper guess per clip
 ```
 
 Whisper and Qwen3-ASR (including QwenCleo) read the shared
@@ -595,6 +596,14 @@ starts on Whisper. `azerbaijani_is_transcribed_by_whisper_with_its_language_hint
 checks the recommendation, the `az` hint, that Whisper's picker offers it, and
 that Qwen3-ASR rejects it. It runs no inference, and Azerbaijani accuracy has
 not been measured.
+
+Catalan (`ca`) is offered because Whisper large-v3-turbo was trained on it and
+no other available catalog model supports it, so Whisper is its only,
+recommended choice and a system whose first preferred language is Catalan
+starts on Whisper. `catalan_is_transcribed_by_whisper_with_its_language_hint`
+checks the recommendation, the `ca` hint, that Whisper's picker offers it, and
+that Qwen3-ASR rejects it. It runs no inference, and Catalan accuracy has not
+been measured.
 
 Checks start in [desktop/onboarding.rs](../../src/desktop/onboarding.rs),
 [transcription.rs](../../src/transcription.rs), and
@@ -916,10 +925,12 @@ Completed output                         // output
     ├── Labs > Copy dictation audio (off) -> copies a kept WAV as a file   // labs.copy-dictation-audio
     │   -> the card's Copy audio beside Play, and the menu bar or tray's Copy last dictation audio
     │   -> needs Keep recordings; it stores no audio itself (labs.md)
-    └── Labs > Dictation stats (off) -> History's Stats dialog and hex history stats   // labs.history-stats
-        -> headline tiles, time saved with a typing-speed slider, the busiest hour, a 30-day chart, top apps
-        -> a 53-week heatmap and all-time totals, from a daily rollup in usage.json with no text or app names
-        -> Clear all history deletes the rollup too (labs.md)
+    ├── Labs > Dictation stats (off) -> History's Stats dialog and hex history stats   // labs.history-stats
+    │   -> headline tiles, time saved with a typing-speed slider, the busiest hour, a 30-day chart, top apps
+    │   -> a 53-week heatmap and all-time totals, from a daily rollup in usage.json with no text or app names
+    │   -> Clear all history deletes the rollup too (labs.md)
+    └── Labs > Stats on History (off) -> one compact strip of those six headline numbers above the list   // labs.history-stats-strip
+        -> needs Dictation stats and its own switch; off, History is exactly as before (labs.md)
 Every entry since #1177 -> "Speech model" fact: the model that made its text (+ language when chosen)
 ```
 
@@ -1277,8 +1288,8 @@ what is playing, so Hex hears the browsers through a private process tap
 (aggregate `anomaly.hex.browser-tap.<pid>`, apart from the meeting tap) and sends
 play only after it saw the browser go silent right after its own pause. The
 browsers are the ones [microphone_activity.rs](../../src/microphone_activity.rs)
-knows: Chrome, Brave, Safari, Firefox, Edge, Arc, Vivaldi, Helium, Ardia, and
-Zen, whose helpers count as their browser. The sequence checks in
+knows: Chrome, Brave, Safari, Firefox, Edge, Arc, Vivaldi, Helium, Ardia,
+Zen, and Aside, whose helpers count as their browser. The sequence checks in
 [audio/browser_media.rs](../../src/audio/browser_media.rs) run on fakes:
 `a_confirmed_pause_is_resumed`, `two_sounding_tabs_never_get_play`,
 `a_browser_already_playing_gets_no_play`, `a_call_is_never_paused`,
@@ -1521,9 +1532,10 @@ other way. Check: `the_page_is_read_only_when_processing_uses_it` in
 browser. On macOS the front window's title is read only by meeting detection
 and while a script transformation is set up (`reads_window_title`). When
 something uses the page, macOS asks the front tab of Safari, Orion, Chrome,
-Brave, Edge, Arc, Vivaldi, Opera, Helium, and Chromium over AppleScript (one
-Automation prompt per browser; a refusal keeps the application context) and
-reads any other app's focused AXWebArea `AXURL` (Firefox, Zen, web views).
+Brave, Edge, Arc, Vivaldi, Opera, Helium, Chromium, and Aside over
+AppleScript (one Automation prompt per browser; a refusal keeps the
+application context) and reads any other app's focused AXWebArea `AXURL`
+(Firefox, Zen, web views).
 That AppleScript read is not part of the 500 ms foreground-context poll: the
 poll reads it once when a scriptable browser becomes the frontmost process
 (caching its address, or no address after a failed read, per pid), so
@@ -2282,7 +2294,8 @@ Linux beta                               // not macOS feature parity
 │       │   // keysym outside the active group
 │       │   ├── 15 s after the last paste -> session closes when its grant restores, so
 │       │   │   GNOME's remote-control indicator shows only around pastes (#718); a grant
-│       │   │   that can't restore keeps its session
+│       │   │   that can't restore keeps its session; KDE keeps it too, for the
+│       │   │   paster's lifetime, since Plasma notifies on every session start (#2508)
 │       │   ├── Session showed the dialog -> 250 ms for it to hand focus back
 │       │   └── Restored or open session -> 150 ms after wl-copy (minus the reopen), so the target holds the new
 │       │       selection before Ctrl+V (GNOME pasted nothing or the old clipboard, #578)
@@ -2353,7 +2366,9 @@ sends a letter no group has on its pc105 key, rather than keysyms, which fixes
 KWin 6.8's fake input, where a Latin `v` under a Russian layout arrived as a
 bare `v` with Ctrl stuck down (#1939), and Mutter, which drops a keysym outside
 the active group. Neither fix is observed on a real KDE or GNOME session
-either. The modifier wait (`ShortcutKeys` in
+either. The KDE session exemption (`closes_idle_remote_desktop` in
+[linux/session.rs](../../src/linux/session.rs)) is unit-tested only, not
+observed on Plasma. The modifier wait (`ShortcutKeys` in
 [linux/input.rs](../../src/linux/input.rs)) has unit tests for its timing only;
 it is not yet observed on Hyprland, and a modifier held past the wait still
 changes the paste. wtype numbers its keymap from evdev code 1 in order of first

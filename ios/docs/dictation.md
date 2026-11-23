@@ -32,7 +32,10 @@ and its page load as the keyboard shows (unless memory is already short), withou
 the microphone, so no orange dot shows until you dictate; the full keyboard's
 Hex key then starts capture as the finger lands, before the touch is a tap or
 a hold, and a slide to the style menu or a cancelled touch drops it with
-nothing transcribed (its orange dot shows for that moment). iOS ends a keyboard that passes
+nothing transcribed (its orange dot shows for that moment). Until the first
+real PCM audio buffer arrives, the keyboard shows a calm starting state
+(dim resting dots and a spinner in Done's spot, with ✕ active to cancel) and
+switches to active recording only once audio is flowing. iOS ends a keyboard that passes
 its memory limit (about 60–90 MB depending on the model), so while less is left
 than starting needs (`os_proc_available_memory`: 32 MB for the first
 dictation, 24 MB once the capture web view is loaded) Dictate and the Hex key
@@ -587,9 +590,14 @@ second time in a row (within 6 h, no model in place since) "Open Hex to download
 English.": Dictate and the Hex key then open Hex, which downloads it, until a model
 installs (in either process; Hex checks again each time it comes to the front), a
 language is chosen, or a day passes (`SpeechModelNeedsHex`,
-`settings.dictationLanguage.keyboardNeedsHex`); a move to another language keeps its
-own sentence. Coming back to Hex after it was in the background starts over a check
-that failed or never answered, and a check that gives up bumps its generation so a
+`settings.dictationLanguage.keyboardNeedsHex`). Only a language Hex itself set aside keeps
+its sentence in the keyboard ("Russian isn't available on this iPhone yet. Try English."): the
+keyboard sets nothing aside, and through TestFlight build 147 its own failed install of a
+language picked by hand on an English iPhone (Hebrew, Norwegian, German) said it wasn't
+available at every dictation and never went to Hex, which could download it. Every other
+failure is Hex's to download, Hebrew included (`SpeechModelNeedsHex.keyboardError`).
+Coming back to Hex after it was in the background starts over a check that failed or
+never answered, and a check that gives up bumps its generation so a
 late answer can't reopen the row (`KeyboardSpeechPreparation`). Reservations make room
 under `AssetInventory.maximumReservedLocales` by releasing others first. Only
 Hex's own error text reaches the app or keyboard (`HexDescribedError`); Apple's

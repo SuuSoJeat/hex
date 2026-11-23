@@ -209,6 +209,7 @@ const PATHS: &[(&str, &str)] = &[
     ("history-menu", "Window/History/Retention menu"),
     ("history-clear", "Window/History/Clear all asks first"),
     ("history-stats", "Window/History/Stats dialog"),
+    ("history-stats-strip", "Window/History/Stats strip"),
     (
         "history-selection",
         "Window/History/Select multiple dictations",
@@ -231,6 +232,8 @@ const PATHS: &[(&str, &str)] = &[
     ),
     #[cfg(all(target_os = "macos", hex_capture))]
     ("mac-history-empty", "Window/History/Nothing yet"),
+    #[cfg(all(target_os = "macos", hex_capture))]
+    ("mac-paste-picker", "Window/History/Paste Last picker"),
     #[cfg(hex_capture)]
     ("captures", "Window/Captures/Captures"),
     #[cfg(hex_capture)]
