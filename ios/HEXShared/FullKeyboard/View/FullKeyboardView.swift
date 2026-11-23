@@ -881,11 +881,11 @@ final class FullKeyboardView: UIView {
         hexKey.isWarm = model.dictatesThroughHex
         hexKey.translatingTo = model.translatingTo
         syncGlobe()
-        let recording = model.stagePhase == .recording || model.stagePhase == .transcribing
+        let recording = model.stagePhase == .starting || model.stagePhase == .recording || model.stagePhase == .transcribing
         if recording != showsRecording {
             setRecording(recording)
-            livePreview.sync()
         }
+        livePreview.sync()
         refreshRecordingPanel()
         // A language picked in the switch changes the layout at once when it follows dictation.
         syncLanguage()
@@ -925,11 +925,7 @@ final class FullKeyboardView: UIView {
         }
         // Without Full Access the strip suggests and corrects like any keyboard's; what
         // dictation needs shows only once the Hex key is tapped (`showFullAccessHint`).
-        let status: String? = if model.hasFullAccess, model.stagePhase == .failed {
-            model.statusMessage
-        } else {
-            nil
-        }
+        let status = model.failureMessage
         var clipboardOffer = clipboard.offer(
             textContentType: engine.target.textContentType,
             keyboardType: engine.target.keyboardType,
@@ -973,7 +969,7 @@ final class FullKeyboardView: UIView {
     func refreshRecordingPanel() {
         guard let panel = recordingPanel, showsRecording else { return }
         panel.update(
-            phase: model.stagePhase == .transcribing ? .processing : .recording,
+            phase: model.dotScopePhase,
             style: model.style
         )
     }
@@ -1127,22 +1123,21 @@ final class FullKeyboardView: UIView {
         if source != "selection_dictate" { engine.clearPendingSelectionDictation() }
         if allowsHaptics() { haptics.impactOccurred() }
         dismissStyleMenu()
-        guard model.hasFullAccess else {
+        switch model.route {
+        case .setUp:
             // Dictation needs Full Access (the microphone and Hex's App Group): say so,
             // instead of a dictation that can't start.
             dictatingFromHexKey = false
             showFullAccessHint()
-            return
-        }
-        if hexKey.isWarm {
+        case .warm:
             typingLog?.ui(source, [TypingLogField("dictation", .string("warm"))])
             dictatingFromHexKey = true
             model.onDictateTap?()
-        } else if let local = model.onLocalDictateTap {
+        case .inKeyboard:
             typingLog?.ui(source, [TypingLogField("dictation", .string("keyboard"))])
             dictatingFromHexKey = true
-            local()
-        } else {
+            model.onLocalDictateTap?()
+        case .needsModel, .opensHex:
             typingLog?.ui(source, [TypingLogField("dictation", .string("open_hex"))])
             dictatingFromHexKey = false
             model.onOpenURL?(model.coldStartURL)

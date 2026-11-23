@@ -101,6 +101,18 @@ pub(super) const SCENES: &[Scene] = &[
         crate::labs::apply(&ui.settings.labs);
         ui.pane = Pane::History;
     }),
+    // Labs › Stats on History: the dialog's six headline numbers as one
+    // compact strip above History's list.
+    ("history-stats-strip", |ui| {
+        *ui = portal_fixture();
+        ui.history = history::HistoryPane::fixture();
+        ui.history.stats = Some(history::HistoryPane::fixture_stats());
+        ui.history.usage = Some(history::HistoryPane::fixture_usage());
+        ui.settings.labs.history_stats = true;
+        ui.settings.labs.history_stats_strip = true;
+        crate::labs::apply(&ui.settings.labs);
+        ui.pane = Pane::History;
+    }),
     // Two entries selected, with the card
     // that copies or deletes them.
     ("history-selection", |ui| {
@@ -159,6 +171,15 @@ pub(super) const SCENES: &[Scene] = &[
         ui.history.unified.picked = Some(std::path::PathBuf::from(
             "/Users/alex/Library/Application Support/Scrawl/captures/1.scrawl",
         ));
+    }),
+    // The Paste Last picker a held Paste Last opens, centred over the
+    // window as it is over the display: a capture, a cancelled dictation,
+    // and the newest dictation selected.
+    #[cfg(all(target_os = "macos", hex_capture))]
+    ("mac-paste-picker", |ui| {
+        *ui = mac_fixture();
+        ui.settings.labs.paste_last_picker = true;
+        ui.paste_preview = true;
     }),
     #[cfg(all(target_os = "macos", hex_capture))]
     ("mac-history-empty", |ui| {

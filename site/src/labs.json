@@ -6,7 +6,9 @@
       "groupTitle": "Meetings",
       "id": "meetings",
       "oses": [
-        "macos"
+        "macos",
+        "windows",
+        "linux"
       ],
       "summary": "Record calls and keep a written copy",
       "title": "Meetings (beta)"
@@ -67,7 +69,9 @@
       "groupTitle": "Meetings",
       "id": "live-chapters",
       "oses": [
-        "macos"
+        "macos",
+        "windows",
+        "linux"
       ],
       "summary": "Split a meeting's text into chapters while it records",
       "title": "Live chapters"
@@ -407,6 +411,19 @@
       ],
       "summary": "Add a Stats button to History that summarizes the dictations you kept, with time saved against your typing speed, the hour you dictate most, a year-long heatmap, and all-time totals kept beyond History's retention (counts only, no text). The hex history stats command prints it too",
       "title": "Dictation stats"
+    },
+    {
+      "added": "2026-11-23",
+      "group": "history",
+      "groupTitle": "History",
+      "id": "history-stats-strip",
+      "oses": [
+        "macos",
+        "windows",
+        "linux"
+      ],
+      "summary": "Show your dictation totals in a compact strip at the top of History. Needs Dictation stats.",
+      "title": "Stats on History"
     },
     {
       "added": "2026-11-01",

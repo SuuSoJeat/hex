@@ -573,7 +573,13 @@ pub fn install() -> Result<Receiver<StatusItemAction>> {
         .enumerate()
         .filter(|(_, model)| model.available())
         .map(|(index, model)| {
-            let item = add_item(&models, &target, model.name, sel!(selectModel:), mtm);
+            let item = add_item(
+                &models,
+                &target,
+                model.name.as_ref(),
+                sel!(selectModel:),
+                mtm,
+            );
             item.setTag(index as isize);
             item.setHidden(true);
             (model.id, item)
@@ -807,7 +813,7 @@ pub fn update_transcription(settings: &AppSettings, status: &PreparationStatus) 
                 .model_preparing
                 .setTitle(&NSString::from_str(&tr_fill(
                     "Preparing {}…",
-                    crate::transcription::models::definition(model).name,
+                    &crate::transcription::models::definition(model).name,
                 )));
         }
         controller.model_error.setHidden(status.error.is_none());
@@ -995,12 +1001,11 @@ fn refresh_copy_dictation_audio() {
 /// is on (the row is hidden otherwise) and the newest History entry that
 /// kept its audio still has its WAV.
 fn copy_last_dictation_audio_enabled() -> bool {
-    crate::labs::copy_dictation_audio()
-        && crate::labs::keep_recordings()
-        && crate::macos_rune::runtime()
-            .and_then(|runtime| runtime.history())
-            .and_then(|history| history.newest_recording(crate::history::now_ms()))
-            .is_some()
+    crate::macos_rune::runtime()
+        .and_then(|runtime| runtime.history())
+        .as_ref()
+        .and_then(crate::history::recordings::newest_copyable)
+        .is_some()
 }
 
 /// Shows Restore Last Capture while Labs › Screenshots is on, as the menu
@@ -1103,26 +1108,14 @@ fn restore_capture_enabled() -> bool {
 }
 
 fn update_title(status: &crate::desktop::host::DesktopUpdateStatus) -> String {
-    use crate::desktop::host::DesktopUpdateStatus;
-    match status {
-        DesktopUpdateStatus::ReadyToRestart => label("Restart to Update", tr("Restart to update")),
-        DesktopUpdateStatus::Available => label("Download Update…", tr("Download update")),
-        DesktopUpdateStatus::SwitchAvailable { channel, version } => {
-            format!("{}…", crate::updater::switch_label(channel, version))
-        }
-        _ => label("Check for Updates…", tr("Check for updates")),
-    }
+    crate::updater::menu_title(status)
 }
 
 /// While a meeting records, the updater refuses Restart to update, so the
 /// item that would ask for it is dimmed instead. Every other update row
 /// (Check for updates, Download update, a channel switch) stays usable.
 fn update_enabled(recording: bool, status: &crate::desktop::host::DesktopUpdateStatus) -> bool {
-    !(recording
-        && matches!(
-            status,
-            crate::desktop::host::DesktopUpdateStatus::ReadyToRestart
-        ))
+    crate::updater::offer_hold(status, recording).is_none()
 }
 
 /// Shows the saved Paste Last binding beside Paste Last Dictation, or

@@ -2,18 +2,17 @@
 
 Labs holds features we're unsure about, **especially features people asked
 for that we built**: they land in Labs, off by default, instead of shipping
-on. Each feature also has an **audience** (`labs::Feature::audience`, one
-`match` beside `on_this_os`, so a new feature must choose): `Everyone` ships
-in every build; `Dev` exists only in dev builds (`dev_build::is_dev_build`:
-debug, local `HEX_LOCAL_BUILD`, test `HEX_TEST_BUILD`, and dev-channel
-`HEX_BUILD_CHANNEL=dev` builds). A stable build never lists, accepts
-(`hex labs on`, `hex settings set`), or runs a Dev feature: `available()`
-drops it, its gate reads false even when `settings.json` says on, and the
-saved setting is kept untouched. In dev builds a Dev row carries a quiet
-"Dev" tag, and `hex labs` prints each feature's audience. Every feature
-below is `Everyone` today unless marked `(Dev)`. Each feature also has a
-**group** (`labs::Feature::group` in `src/labs/group.rs`, one exhaustive
-`match`, so a new feature must choose): Dictation, Output (paste, formatting,
+on. Each feature's settings field, CLI name, **group**, **audience**, OSes, and
+join date live in one descriptor table in `src/labs/feature.rs`. Its
+**audience** (`labs::Feature::audience`) is either `Everyone` (ships in every
+build) or `Dev` (`dev_build::is_dev_build`: debug, local `HEX_LOCAL_BUILD`,
+test `HEX_TEST_BUILD`, and dev-channel `HEX_BUILD_CHANNEL=dev` builds). A
+stable build never lists, accepts (`hex labs on`, `hex settings set`), or
+runs a Dev feature: `available()` drops it, its gate reads false even when
+`settings.json` says on, and the saved setting is kept untouched. In dev
+builds a Dev row carries a quiet "Dev" tag, and `hex labs` prints each
+feature's audience. Every feature below is `Everyone` today unless marked
+`(Dev)`. Its **group** (`labs::Feature::group`) is one of Dictation, Output (paste, formatting,
 spoken punctuation), History, Meetings, Annotate, Shortcuts, or Models. There
 is no master switch. **Labs** is always the last item in the sidebar (Up and
 Down reach it from the last pane; pressing it while it shows keeps it open) and
@@ -51,7 +50,7 @@ not on pull requests; the live page is unverified until a deploy.
 
 ```ts
 Feature             Pane  Toggle (settings.json, hex settings)   On: what it does
-├── Meetings (beta) yes   meetings.enabled             (macOS)   Meetings joins the sidebar: call detection, recording, transcripts
+├── Meetings (beta) yes   meetings.enabled                       Meetings joins the sidebar: call detection, recording, transcripts
 ├── Voice Filter (Dev) yes experimental.hex_microphone (macOS, Linux) Voice Filter joins the sidebar; feeds the Hex Microphone (macOS driver, Linux PipeWire source)
 │                                        a stable build never feeds it; with the macOS driver installed it keeps the pane with Uninstall alone
 ├── Playground (Dev) yes  labs.playground                        a Playground sidebar item and ⇧⌘D open the story browser
@@ -71,7 +70,7 @@ Feature             Pane  Toggle (settings.json, hex settings)   On: what it doe
 ├── Failure notices no    labs.failure_notices                   when a dictation fails, its explanation sits beside the HUD for about 6 s, or until the next capture starts
 ├── Live typing     no    labs.live_typing                       (Linux Wayland) provisional words as an underlined input-method preedit in the focused field; the final text is committed there instead of pasted; on a compositor that offers no input method (GNOME) its card is disabled with a note and `hex labs` says so
 ├── Appearance      no    labs.appearance + labs.appearance_theme (system/light/dark, default system)  the main window is forced light or dark instead of following the system; the dictation HUD (including its onboarding and Sounds previews) and meeting recording pill remain dark. Other overlays follow the OS. On Windows the title bar follows too, through its background and light/dark mode; Windows 10 has no caption colour, so DWM keeps its own light or dark caption background (builds before 19041 keep the OS caption) while its text and buttons follow
-├── Live chapters   no    labs.live_chapters           (macOS)   chapters a meeting while it records, boundary pass after Stop
+├── Live chapters   no    labs.live_chapters                     chapters a meeting while it records, boundary pass after Stop
 ├── Words on screen no labs.screen_vocabulary         (macOS)   names and terms in the focused window become temporary vocabulary for each dictation; read locally through Accessibility, never saved, password fields skipped
 ├── Learn from corrections no labs.learn_from_corrections (macOS) after a dictation is pasted, watch only that field for up to 5 minutes and add up to 5 names you corrected to Vocabulary; password fields, long text, and rewrites are skipped, and nothing leaves the Mac
 ├── Rewrite reads nearby text no labs.cursor_context (macOS) the mode's OpenCode rewrite reads the focused text element's text around the caret as context for names, terms, and where the result lands; password fields skipped
@@ -157,6 +156,7 @@ Feature             Pane  Toggle (settings.json, hex settings)   On: what it doe
 ├── § key alone no  labs.section_key_alone       (Linux, macOS) the key left of 1 on ISO keyboards, § or a dead key such as ^, may be a shortcut with no modifier (#1050)
 ├── Microphone key alone no labs.microphone_key        (macOS) the microphone (dictation) key in a laptop keyboard's top row, always reported as Fn with key code 176, may be a shortcut with no modifier (#181)
 ├── Dictation stats no    labs.history_stats           History's Stats button opens a summary of retained dictations, with headline tiles, a typing-speed slider and time saved, the busiest-hour strip, a daily chart, app and Output bars, and Output time; an owner-only daily rollup (counts only, no text or app names) outlives retention, so the dialog also charts a 53-week heatmap and its headline totals cover all time; Clear all history deletes the rollup even with no entries; hex history stats prints it (#790)
+├── Stats on History no  labs.history_stats_strip    History draws the Dictation stats dialog's six headline numbers (dictations, words, time saved, words per minute, daily streak, busiest hour) as one compact strip above its list; needs Dictation stats and changes nothing else
 ├── Copy recent dictations no labs.recent_dictations (macOS) the menu bar's Copy Recent Dictation submenu copies one of the last five dictations (#877)
 ├── Skip long pauses no    labs.skip_pauses             (Linux, Windows) a whole-clip dictation run hears only the head and tail of each long pause (#899)
 ├── Fix results in Output no labs.output_fixes           Output's Try card offers Vocabulary and Fix this, which copies an agent prompt naming the wrong result (#989)
@@ -2514,6 +2514,25 @@ heatmap, and hourly strip in both themes, and its fixture is the worst case
 (five apps, four modes, long names, a six-digit word count, a year of
 heatmap). Not yet observed: the dialog in a real window, its slider dragged by
 hand, and a real dictation written to `usage.json`.
+
+Stats on History (`history-stats-strip`, every OS): while it and Dictation
+stats are both on and History has stats, History draws one compact row above
+its list with the dialog's six headline numbers. Both draw
+`stats::headline` from `stats::headline_inputs`, so the strip and the tiles
+can't drift; the Stats button and dialog are unchanged, and with the strip off
+History is exactly as before. It is inserted into both History views
+(`rune_ui/history.rs` and `rune_ui/history/unified.rs`) and reads no data of
+its own: the gate is `labs::history_stats_strip_enabled(&settings)`, which requires
+both switches, this build and OS, and no managed lock, on top of
+`HistoryPane::has_stats`. Checks:
+`history_stats_strip_requires_dictation_stats_and_no_policy_lock`
+([labs.rs](../../src/labs.rs)),
+`history_stats_strip_needs_both_labs_and_stats`,
+`history_stats_strip_shows_the_dialogs_six_headline_numbers`, and
+`history_stats_button_and_dialog_still_work_with_the_strip_on`
+([rune_ui/tests.rs](../../src/rune_ui/tests.rs)); `history-stats-strip` in
+[rune_ui/scenes.rs](../../src/rune_ui/scenes.rs) renders it in both themes. Not
+yet observed in a real window.
 
 Copy recent dictations (`recent-dictations`, issue 877, macOS): while on,
 the menu-bar menu shows a Copy Recent Dictation submenu right under Paste
