@@ -79,6 +79,7 @@ struct FullKeyboardSettings {
         static let autoCapitalization = "settings.keyboardAutoCapitalization"
         static let spatialAutocorrect = "experiments.spatialAutocorrect"
         static let germanSpatialAutocorrect = "experiments.germanSpatialAutocorrect"
+        static let khmerSpatialSuggestions = "experiments.khmerSpatialSuggestions"
         static let koreanKeyboard = KoreanKeyboardExperiment.key
         static let khmerismNoColors = "experiments.khmerismNoColors"
         static let khmerismNoSuperscripts = "experiments.khmerismNoSuperscripts"
@@ -160,6 +161,12 @@ struct FullKeyboardSettings {
     var germanSpatialAutocorrect: Bool {
         get { defaults?.object(forKey: Key.germanSpatialAutocorrect) as? Bool ?? false }
         nonmutating set { defaults?.set(newValue, forKey: Key.germanSpatialAutocorrect) }
+    }
+
+    /// Settings › Experiments › Khmer spatial suggestions. Applies to both Khmer layouts.
+    var khmerSpatialSuggestions: Bool {
+        get { defaults?.object(forKey: Key.khmerSpatialSuggestions) as? Bool ?? false }
+        nonmutating set { defaults?.set(newValue, forKey: Key.khmerSpatialSuggestions) }
     }
 
     /// Settings › Experiments › Korean keyboard (두벌식): adds 한국어 to Settings › Keyboard ›

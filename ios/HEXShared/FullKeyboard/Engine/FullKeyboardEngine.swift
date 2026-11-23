@@ -101,6 +101,15 @@ final class FullKeyboardEngine {
         let tapTime: TimeInterval?
     }
     private var khmerSmartRun: KhmerSmartRun?
+    var khmerSpatialSuggestions = false {
+        didSet {
+            guard oldValue != khmerSpatialSuggestions else { return }
+            clearKhmerSpatialTaps()
+            if layout.language == .khmer { refreshSuggestions() }
+        }
+    }
+    private var pendingKhmerTap: KhmerSpatialTap?
+    private var khmerTapRun: KhmerTapRun?
     private(set) var khmerDeleteRecovery: Task<Void, Never>?
     private var khmerRecoveryInput = ""
 
@@ -327,6 +336,7 @@ final class FullKeyboardEngine {
     func textDidChange() {
         commitHangulIfHostMoved()
         invalidateMovedKhmerSmartRun()
+        invalidateMovedKhmerTaps(before: typingContext)
         lastSpaceAt = nil
         // The host's report may be an echo of the keys' own insert, or still lag it: either
         // leaves the text as the keys left it (`typingContext`, `SwipedWord.before`).
@@ -351,6 +361,7 @@ final class FullKeyboardEngine {
     func selectionDidChange() {
         commitHangulIfHostMoved()
         invalidateMovedKhmerSmartRun()
+        if invalidateMovedKhmerTaps(before: typingContext) { refreshSuggestions() }
         if pendingKhmerSwipeChoices != nil, !khmerSwipeChoicesAreCurrent { refreshSuggestions() }
         if updateKhmerCoengContext() { onChange?() }
     }
@@ -540,10 +551,89 @@ final class FullKeyboardEngine {
             && !KhmerAutocomplete.startsWithWordText(target.documentContextAfterInput)
     }
 
+    private struct KhmerSpatialTap {
+        let unit: UInt16
+        let costs: [UInt16: Double]
+    }
+
+    private struct KhmerTapRun {
+        let taps: [KhmerSpatialTap]
+        let before: String
+        let after: String?
+        let document: UUID
+        let route: Int
+    }
+
+    private func khmerSpatialTap(_ label: String, down: CGPoint?, point: CGPoint) -> KhmerSpatialTap? {
+        guard khmerSpatialSuggestions, autocorrect.isEnabled, allowsKhmerSuggestions,
+              layerState.layer == .letters, let down, pointOnKeys(down) == point,
+              label.utf16.count == 1, let unit = label.utf16.first else { return nil }
+        let parameters = TypingDecoder.Parameters()
+        let sx = Double(layout.swipePitch) * parameters.sigmaX
+        let sy = Double(layout.metrics.keyHeight + layout.metrics.rowGap) * parameters.sigmaY
+        var costs: [UInt16: Double] = [:]
+        for key in layout.keys where key.character != nil && !key.isNumberRow {
+            // Freeze the labels from this tap, before Shift or coeng changes the key plane.
+            let glyph = displayLabel(for: key)
+            guard glyph.utf16.count == 1, let code = glyph.utf16.first, KhmerismSmartTyping.isBase(code)
+                    || KhmerismSmartTyping.isMark(code) else { continue }
+            let center = CGPoint(x: key.frame.midX, y: key.frame.midY)
+            let cost = TypingDecoder.tapCost(point, centre: center, sigmaX: sx, sigmaY: sy)
+            if cost <= parameters.maxTapCost { costs[code] = min(cost, costs[code] ?? .infinity) }
+        }
+        guard costs[unit] != nil else { return nil }
+        return KhmerSpatialTap(unit: unit, costs: costs)
+    }
+
+    private func currentKhmerTapRun(before: String?) -> KhmerTapRun? {
+        guard let run = khmerTapRun, let before, allowsKhmerSuggestions,
+              run.document == target.documentIdentifier, run.route == target.inputRouteRevision,
+              run.after == target.documentContextAfterInput,
+              before.utf16.elementsEqual(run.before.utf16) else { return nil }
+        return run
+    }
+
+    private func recordKhmerSpatialTap(before: String?, inserted: String, source: String?) {
+        guard source == "key", let tap = pendingKhmerTap, inserted.utf16.elementsEqual([tap.unit]),
+              let document = target.documentIdentifier, allowsKhmerSuggestions else {
+            clearKhmerSpatialTaps()
+            return
+        }
+        let previous = currentKhmerTapRun(before: before)?.taps ?? []
+        khmerTapRun = KhmerTapRun(
+            taps: Array(previous.suffix(31)) + [tap], before: (before ?? "") + inserted,
+            after: target.documentContextAfterInput, document: document, route: target.inputRouteRevision
+        )
+    }
+
+    func clearKhmerSpatialTaps() { khmerTapRun = nil }
+
+    @discardableResult
+    private func invalidateMovedKhmerTaps(before: String?) -> Bool {
+        guard khmerTapRun != nil, currentKhmerTapRun(before: before) == nil else { return false }
+        clearKhmerSpatialTaps()
+        return true
+    }
+
+    private func khmerSubstitutionGain(before: String?) -> KhmerAutocomplete.SubstitutionGain? {
+        guard let taps = currentKhmerTapRun(before: before)?.taps else { return nil }
+        return { offset, typed, candidate in
+            guard taps.indices.contains(offset) else { return nil }
+            let tap = taps[taps.count - offset - 1]
+            // Central taps carry no mistap evidence. Near a key edge, a neighbour
+            // can be plausible even when the tap fell just inside the literal key.
+            guard tap.unit == typed, let literal = tap.costs[typed], literal >= 0.65,
+                  let alternate = tap.costs[candidate] else { return nil }
+            return literal - alternate + 2.5
+        }
+    }
+
     private func khmerSuggestionChoices(live: Bool = false) -> [KeyboardSuggestion] {
         guard let index = khmerAutocomplete, allowsKhmerSuggestions else { return [] }
         let before = live ? textBefore : typingContext
-        if let correction = autocorrect.khmerCorrection(using: index, beforeInput: before) {
+        if let correction = autocorrect.khmerCorrection(
+            using: index, beforeInput: before, substitutionGain: khmerSubstitutionGain(before: before)
+        ) {
             return [
                 KeyboardSuggestion(displayText: "“\(correction.typed)”", replacement: correction.typed, kind: .khmerKeepLiteral),
                 KeyboardSuggestion(
@@ -666,7 +756,10 @@ final class FullKeyboardEngine {
     @discardableResult
     private func applyKhmerCorrection(ending: String, explicitlyPicked: Bool = false) -> Bool {
         guard allowsKhmerSuggestions, let before = textBefore, before == typingContext,
-              let index = khmerAutocomplete, let correction = autocorrect.khmerCorrection(using: index, beforeInput: before),
+              let index = khmerAutocomplete, let correction = autocorrect.khmerCorrection(
+                using: index, beforeInput: before,
+                substitutionGain: explicitlyPicked ? khmerSubstitutionGain(before: before) : nil
+              ),
               explicitlyPicked || correction.automaticallyApplies else {
             return false
         }
@@ -690,10 +783,13 @@ final class FullKeyboardEngine {
             changes: [.init(from: correction.typed, to: correction.replacement, language: .khmer)],
             document: target.documentIdentifier
         )
-        learning?.record(
-            explicitlyPicked ? .picked : .autocorrected,
-            typed: correction.typed, final: correction.replacement, language: KeyboardLanguage.khmer.rawValue
-        )
+        // A suggestion offered by the experiment must not become an automatic journal repair.
+        if !correction.rankedByTapPosition {
+            learning?.record(
+                explicitlyPicked ? .picked : .autocorrected,
+                typed: correction.typed, final: correction.replacement, language: KeyboardLanguage.khmer.rawValue
+            )
+        }
         tokenTaps.removeAll()
         finishedWord = nil
         swipedWord = nil
@@ -1415,7 +1511,10 @@ final class FullKeyboardEngine {
         if layout.language == .khmer {
             // The standard layout puts some Smart Mode inputs, such as ញ and ំ, on Shift.
             let directTap = !isUppercase || layout.letters == .khmer
-            insertKhmerKeyText(displayLabel(for: key), source: "key", at: point, directTap: directTap)
+            let label = displayLabel(for: key)
+            pendingKhmerTap = khmerSpatialTap(label, down: down, point: point)
+            defer { pendingKhmerTap = nil }
+            insertKhmerKeyText(label, source: "key", at: point, directTap: directTap)
             return
         }
         if typeHangul(character) {
@@ -1796,6 +1895,7 @@ final class FullKeyboardEngine {
             ])
         }
         let contextBefore = typingContext
+        if layout.language == .khmer { recordKhmerSpatialTap(before: contextBefore, inserted: text, source: source) }
         rememberTypingContext(before: contextBefore, inserted: text)
         if let khmerSyllable, let context = expectedTypingContext {
             khmerSmartRun = KhmerSmartRun(syllable: khmerSyllable, context: context, tapTime: khmerTapTime)
@@ -2061,6 +2161,7 @@ final class FullKeyboardEngine {
         if wasKhmer != isKhmer {
             shift.reset()
             clearKhmerSmartRun()
+            clearKhmerSpatialTaps()
             // Khmer and Latin swipes have different spacing and replacement rules.
             swipedWord = nil
             dismissKhmerSwipeChoices()

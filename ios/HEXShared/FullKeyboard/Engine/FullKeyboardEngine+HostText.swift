@@ -138,6 +138,7 @@ extension FullKeyboardEngine {
     /// host should report.
     func forgetTypingContext() {
         clearKhmerSmartRun()
+        clearKhmerSpatialTaps()
         expectedTypingContext = nil
         dismissKhmerSwipeChoices()
     }

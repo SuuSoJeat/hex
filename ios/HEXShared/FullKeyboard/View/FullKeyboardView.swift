@@ -288,6 +288,7 @@ final class FullKeyboardView: UIView {
         engine.deletesSwipedWordsLetterByLetter = FullKeyboardSettings().deletesSwipedWordsLetterByLetter
         engine.quickAccentsEnabled = FullKeyboardSettings().quickAccents
         engine.khmerismSmartMode = FullKeyboardSettings().khmerismSmartMode
+        engine.khmerSpatialSuggestions = FullKeyboardSettings().khmerSpatialSuggestions
         syncEmojiShortcodes()
         hidesWordSuggestions = FullKeyboardSettings().hideWordSuggestions
         syncHexPlacement()
@@ -605,6 +606,7 @@ final class FullKeyboardView: UIView {
         }
         let settings = FullKeyboardSettings()
         engine.khmerismSmartMode = settings.khmerismSmartMode
+        engine.khmerSpatialSuggestions = settings.khmerSpatialSuggestions
         plane.showsKhmerismColors = !settings.khmerismNoColors
         plane.showsKhmerismSuperscripts = !settings.khmerismNoSuperscripts
         hapticStrength = FullKeyboardSettings().hapticStrength

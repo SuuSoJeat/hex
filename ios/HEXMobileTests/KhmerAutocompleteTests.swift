@@ -198,6 +198,64 @@ final class KhmerAutocompleteTests: XCTestCase {
         )
     }
 
+    func testSpatialGainRanksAOneScalarSubstitutionWithoutMakingItAutomatic() {
+        let model = KhmerAutocomplete(wordlist: "ខ្ញុំ\t100\nចំណាក\t100\nចំណែក\t10")
+        let typed = "ចំណោក"
+        let input = "ខ្ញុំ" + typed
+        let frequent = KhmerAutocomplete.Correction(typed: typed, replacement: "ចំណាក", automaticallyApplies: false)
+        let spatial = KhmerAutocomplete.Correction(
+            typed: typed, replacement: "ចំណែក", automaticallyApplies: false, rankedByTapPosition: true
+        )
+
+        XCTAssertEqual(model.correction(beforeInput: input, substitutionGain: { _, _, _ in nil }), frequent)
+        XCTAssertEqual(model.correction(beforeInput: input, substitutionGain: { _, _, _ in 0.64 }), frequent)
+        let score: KhmerAutocomplete.SubstitutionGain = { offsetFromEnd, typed, candidate in
+            // The vowel ោ is the second scalar from the end, after a complete joined word.
+            offsetFromEnd == 1 && typed == 0x17C4 && candidate == 0x17C2 ? 0.65 : nil
+        }
+        XCTAssertEqual(model.correction(beforeInput: input, substitutionGain: score), spatial)
+    }
+
+    func testSpatialGainRespectsSpellingFilters() {
+        let model = KhmerAutocomplete(wordlist: "ចំណាក\t100\nចំណែក\t10")
+        let typed = "ចំណោក"
+        let blocked = "ចំណែក"
+        let score: KhmerAutocomplete.SubstitutionGain = { _, _, candidate in
+            candidate == 0x17C2 ? 2 : nil
+        }
+
+        XCTAssertEqual(
+            model.correction(beforeInput: typed, substitutionGain: score, mayOffer: { $0 != blocked }),
+            .init(typed: typed, replacement: "ចំណាក", automaticallyApplies: false)
+        )
+        XCTAssertNil(model.correction(beforeInput: typed, substitutionGain: score, canCorrect: { _ in false }))
+    }
+
+    func testSpatialGainPreservesAutomaticRepairsAndKnownWords() {
+        let model = KhmerAutocomplete(wordlist: """
+        ចំណុច\t100
+        ចំសុច\t1000
+        កម្ពុជា\t2000
+        សាលា\t100
+        """)
+        let score: KhmerAutocomplete.SubstitutionGain = { _, _, _ in 2 }
+
+        XCTAssertEqual(
+            model.correction(beforeInput: "ចំនុច", substitutionGain: score),
+            .init(typed: "ចំនុច", replacement: "ចំណុច")
+        )
+        XCTAssertEqual(
+            model.correction(beforeInput: "កមពុជា", substitutionGain: score),
+            .init(typed: "កមពុជា", replacement: "កម្ពុជា")
+        )
+        XCTAssertEqual(
+            model.correction(beforeInput: "សាាលា", substitutionGain: score),
+            .init(typed: "សាាលា", replacement: "សាលា")
+        )
+        XCTAssertNil(model.correction(beforeInput: "ចំណុច", substitutionGain: score))
+        XCTAssertNil(model.correction(beforeInput: "ចំនុច", personalWords: ["ចំនុច"], substitutionGain: score))
+    }
+
     func testDictionaryAutomaticallyRestoresOneMissingCoengInACommonWord() throws {
         let model = try XCTUnwrap(KhmerAutocomplete.bundled)
         let correction = KhmerAutocomplete.Correction(typed: "កមពុជា", replacement: "កម្ពុជា")

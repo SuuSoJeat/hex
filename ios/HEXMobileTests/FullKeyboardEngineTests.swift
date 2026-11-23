@@ -1237,6 +1237,40 @@ final class FullKeyboardEngineTests: XCTestCase {
         XCTAssertEqual(target.text, "សួស្តី")
     }
 
+    func testKhmerSpatialSuggestionsRankRealTapsOnBothLayouts() async throws {
+        for (letters, neighbor, replacement) in [
+            (KeyboardLetterLayout.khmer, "ន", "មាន់"),
+            (.khmerism, "ត", "មាត់"),
+        ] {
+            for (enabled, pick) in [(false, false), (true, false), (true, true)] {
+                smartField(language: .khmer)
+                target.documentIdentifier = UUID()
+                engine.letterLayout = letters
+                engine.khmerismSmartMode = true
+                engine.khmerSpatialSuggestions = enabled
+                await engine.khmerAutocompleteLoad?.value
+
+                tap(.character("ម"))
+                tap(.character("ា"))
+                let literal = point(.character("ប"))
+                let alternative = point(.character(neighbor))
+                tapAt(CGPoint(x: literal.x + 0.49 * (alternative.x - literal.x), y: literal.y))
+                tap(.character("់"))
+
+                XCTAssertEqual(target.text, "មាប់")
+                let choice = try XCTUnwrap(engine.suggestions.first { $0.kind == .khmerCorrection(autoReplace: false) })
+                XCTAssertEqual(choice.replacement, enabled ? replacement : "ចាប់")
+                if pick {
+                    engine.acceptSuggestion(choice)
+                    XCTAssertEqual(target.text, replacement)
+                } else {
+                    tap(.space)
+                    XCTAssertEqual(target.text, "មាប់ ")
+                }
+            }
+        }
+    }
+
     func testKhmerSpaceRestoresAMissingCoengAndKeepsTheNextWordJoined() async throws {
         target.documentIdentifier = UUID()
         engine.language = .khmer

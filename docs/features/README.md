@@ -2990,6 +2990,12 @@ iOS prototype (`HEXMobile`) -> Record/transcribe/copy and keyboard handoff
 │   only when the same identified field, input route, and caret confirm what changed.
 │   Checks:
 │   `KhmerAutocompleteTests`, `FullKeyboardEngineTests`.
+│   Settings › Experiments › Typing › Khmer spatial suggestions appears when Khmer is
+│   configured with Full chosen (off by default, `experiments.khmerSpatialSuggestions`).
+│   On either layout, near-edge taps rank single-character spelling guesses while Autocorrect
+│   is on. Tap a suggestion to use it. A spatially promoted guess cannot train an automatic
+│   repair. Space and closing punctuation use regular Khmer autocorrect, and swipes use
+│   their own gesture readings. Checks: `KhmerAutocompleteTests`, `FullKeyboardEngineTests`.
 │   Settings › Keyboard › Khmer appears when Khmer is configured with Full chosen. Both
 │   options apply to both layouts and default on. Saved choices are kept in the App Group.
 │   ├── Smart Mode applies in fields that accept word corrections

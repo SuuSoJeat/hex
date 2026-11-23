@@ -661,14 +661,19 @@ nonisolated struct TypingDecoder {
     /// Each letter code's cost for one tap, in nats above the likeliest letter's. An accented
     /// letter costs at most its base letter's plus `accentCost` (é on an English or Spanish
     /// layout, ñ typed with n); one with neither key is impossible (infinity).
+    /// Negative log likelihood of a tap at a key's centre, up to a constant shared by the keys.
+    static func tapCost(_ tap: CGPoint, centre: CGPoint, sigmaX: Double, sigmaY: Double) -> Double {
+        let dx = (Double(tap.x) - Double(centre.x)) / sigmaX
+        let dy = (Double(tap.y) - Double(centre.y)) / sigmaY
+        return 0.5 * (dx * dx + dy * dy)
+    }
+
     private func tapCosts(_ p: CGPoint, centres: [CGPoint?], keys: Keys) -> [Double] {
         let sx = Double(keys.pitch.width) * parameters.sigmaX
         let sy = Double(keys.pitch.height) * parameters.sigmaY
         var out = centres.map { centre -> Double in
             guard let c = centre else { return .infinity }
-            let dx = (Double(p.x) - Double(c.x)) / sx
-            let dy = (Double(p.y) - Double(c.y)) / sy
-            return 0.5 * (dx * dx + dy * dy)
+            return Self.tapCost(p, centre: c, sigmaX: sx, sigmaY: sy)
         }
         // Also from its base key even when it has its own (ñ from n on the Spanish layout):
         // whichever is cheaper.

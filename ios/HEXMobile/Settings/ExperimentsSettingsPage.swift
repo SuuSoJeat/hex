@@ -51,13 +51,15 @@ struct ExperimentsSettingsPage: View {
         return settings.autocorrect && settings.spatialAutocorrect
     }
 
-    private var usesKhmerism: Bool {
+    private var usesKhmer: Bool {
         _ = revision
-        let settings = LanguageSettings()
-        let languages = settings.keyboardLanguages
-        guard FullKeyboardSettings().isEnabled,
-              languages.isEmpty ? automaticKeyboardLanguage() == .khmer : languages.contains(.khmer) else { return false }
-        return settings.letterLayout(for: .khmer) == .khmerism
+        guard FullKeyboardSettings().isEnabled else { return false }
+        let languages = LanguageSettings().keyboardLanguages
+        return languages.isEmpty ? automaticKeyboardLanguage() == .khmer : languages.contains(.khmer)
+    }
+
+    private var usesKhmerism: Bool {
+        usesKhmer && LanguageSettings().letterLayout(for: .khmer) == .khmerism
     }
 
     var body: some View {
@@ -312,6 +314,16 @@ struct ExperimentsSettingsPage: View {
                         refreshAdaptiveTouchStatus()
                     }
                 }
+            }
+
+            if usesKhmer {
+                SettingsDivider()
+
+                SettingsToggleRow(
+                    title: String(localized: "Khmer spatial suggestions"),
+                    detail: String(localized: "Rank Khmer word suggestions by where you tap. Tap a suggestion to use it."),
+                    isOn: keyboardBinding(\.khmerSpatialSuggestions)
+                )
             }
 
             SettingsDivider()

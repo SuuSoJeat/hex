@@ -654,6 +654,14 @@ punctuation applies the correction and types the punctuation. Tap other dictiona
 guesses to use them. Tap the quoted spelling to keep it or tap the undo suggestion
 to restore it when iOS identifies the field. After a correction with punctuation,
 Backspace reveals that option.
+
+**Settings › Experiments › Typing › Khmer spatial suggestions** uses recent
+near-edge taps to rank single-character spelling guesses in either Khmer layout
+while Autocorrect is on. It is off by default and appears when Khmer is
+configured in the Full keyboard. Tap a suggestion to use it. Space and closing
+punctuation use regular Khmer autocorrect. Swipe typing uses its own gesture
+readings.
+
 Hold Backspace or swipe it left to delete a whole word at a known Khmer word
 boundary. When the boundary is uncertain or a word cannot be safely removed, the
 hold uses regular Backspace and the swipe leaves the text in place. If iOS reports

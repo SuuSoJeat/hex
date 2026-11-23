@@ -12,11 +12,13 @@ struct KhmerAutocomplete: Sendable {
         let typed: String
         let replacement: String
         let automaticallyApplies: Bool
+        let rankedByTapPosition: Bool
 
-        init(typed: String, replacement: String, automaticallyApplies: Bool = true) {
+        init(typed: String, replacement: String, automaticallyApplies: Bool = true, rankedByTapPosition: Bool = false) {
             self.typed = typed
             self.replacement = replacement
             self.automaticallyApplies = automaticallyApplies
+            self.rankedByTapPosition = rankedByTapPosition
         }
     }
 
@@ -46,6 +48,8 @@ struct KhmerAutocomplete: Sendable {
 
     private static let minimumPrefixLength = 2
     private static let minimumSpellingLength = 4
+    // Require the tap to be meaningfully closer to the alternative before changing the strip.
+    private static let minimumSubstitutionGain = 0.65
     private static let minimumCoengCorrectionFrequency = 1_000
     private static let contextLength = 96
     private static let coeng: UInt16 = 0x17D2
@@ -176,10 +180,14 @@ struct KhmerAutocomplete: Sendable {
         return []
     }
 
+    /// Offset zero identifies the last code unit before the caret. Positive gain favours the alternative.
+    typealias SubstitutionGain = (_ offsetFromEnd: Int, _ typed: UInt16, _ candidate: UInt16) -> Double?
+
     /// Spelling choices begin at an established Khmer word boundary. A full dictionary
     /// reading takes precedence unless the user has confirmed a specific misspelling.
     func correction(
         beforeInput: String?, personalWords: [String] = [], learnedSpellings: [String: String] = [:],
+        substitutionGain: SubstitutionGain? = nil,
         canCorrect: (String) -> Bool = { _ in true }, mayOffer: (String) -> Bool = { _ in true }
     ) -> Correction? {
         guard let beforeInput else { return nil }
@@ -247,9 +255,9 @@ struct KhmerAutocomplete: Sendable {
 
         let complete = eligible.filter(Self.hasCompleteClusters)
         for (index, spelling) in complete.enumerated() where spelling.count >= Self.minimumSpellingLength {
-            guard let edit = bestSingleEdit(to: spelling) else { continue }
+            guard let edit = bestSingleEdit(to: spelling, gain: substitutionGain, mayOffer: mayOffer) else { continue }
             let typed = String(decoding: spelling, as: UTF16.self)
-            guard canCorrect(typed), mayOffer(edit.entry.word) else { return nil }
+            guard canCorrect(typed) else { return nil }
             // Restoring a missing coeng requires a unique repair to a common word
             // and no competing common word at a later boundary.
             let confident = edit.insertsCoeng && edit.unique
@@ -257,7 +265,12 @@ struct KhmerAutocomplete: Sendable {
                 && complete.dropFirst(index + 1).allSatisfy {
                     (bestSingleEdit(to: $0)?.entry.frequency ?? 0) < Self.minimumCoengCorrectionFrequency
                 }
-            return Correction(typed: typed, replacement: edit.entry.word, automaticallyApplies: confident)
+            let replacement = confident ? edit.entry.word : (edit.spatial?.word ?? edit.entry.word)
+            guard mayOffer(replacement) else { return nil }
+            return Correction(
+                typed: typed, replacement: replacement, automaticallyApplies: confident,
+                rankedByTapPosition: replacement != edit.entry.word
+            )
         }
         return nil
     }
@@ -276,12 +289,21 @@ struct KhmerAutocomplete: Sendable {
         return (extra, Correction(typed: String(decoding: spelling, as: UTF16.self), replacement: match.word))
     }
 
-    private func bestSingleEdit(to spelling: ArraySlice<UInt16>) -> (entry: Entry, insertsCoeng: Bool, unique: Bool)? {
+    private func bestSingleEdit(
+        to spelling: ArraySlice<UInt16>, gain: SubstitutionGain? = nil, mayOffer: (String) -> Bool = { _ in true }
+    ) -> (entry: Entry, insertsCoeng: Bool, unique: Bool, spatial: Entry?)? {
         let original = Array(spelling)
         var best: (entry: Entry, insertsCoeng: Bool)?
+        var spatial: (entry: Entry, gain: Double)?
         var unique = true
-        func consider(_ units: [UInt16], insertsCoeng: Bool = false) {
+        func consider(_ units: [UInt16], insertsCoeng: Bool = false, substitution: Int? = nil) {
             guard let match = entry(for: units[...]), Self.hasCompleteClusters(match.units[...]) else { return }
+            if let i = substitution, original[i] != Self.coeng, units[i] != Self.coeng,
+               let tapGain = gain?(original.count - i - 1, original[i], units[i]),
+               tapGain >= Self.minimumSubstitutionGain, mayOffer(match.word),
+               spatial.map({ tapGain > $0.gain || (tapGain == $0.gain && ranksAhead(match, $0.entry)) }) ?? true {
+                spatial = (match, tapGain)
+            }
             if let current = best {
                 guard match.units != current.entry.units else { return }
                 unique = false
@@ -311,7 +333,7 @@ struct KhmerAutocomplete: Sendable {
             for candidate in Self.spellingAlphabet {
                 if candidate != unit {
                     replaced[index] = candidate
-                    consider(replaced)
+                    consider(replaced, substitution: index)
                 }
                 inserted[index] = candidate
                 let insertsCoeng = candidate == Self.coeng && index > 0
@@ -319,7 +341,7 @@ struct KhmerAutocomplete: Sendable {
                 consider(inserted, insertsCoeng: insertsCoeng)
             }
         }
-        return best.map { ($0.entry, $0.insertsCoeng, unique) }
+        return best.map { ($0.entry, $0.insertsCoeng, unique, spatial?.entry) }
     }
 
     private func markWordEnds(from start: Int, in run: [UInt16], personal: PersonalLexicon, into wordStarts: inout [Bool]) {

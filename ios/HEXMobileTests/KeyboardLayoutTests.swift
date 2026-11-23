@@ -3793,10 +3793,15 @@ final class FullKeyboardSettingsTests: XCTestCase {
         XCTAssertFalse(settings.khmerismNoSuperscripts)
         XCTAssertTrue(settings.khmerismSmartMode)
         XCTAssertTrue(settings.khmerismSwipeTyping)
+        XCTAssertFalse(settings.khmerSpatialSuggestions)
         XCTAssertFalse(FullKeyboardSettings(defaults: nil).khmerismNoColors)
         XCTAssertFalse(FullKeyboardSettings(defaults: nil).khmerismNoSuperscripts)
         XCTAssertTrue(FullKeyboardSettings(defaults: nil).khmerismSmartMode)
         XCTAssertEqual(FullKeyboardSettings(defaults: nil).swipeTypingModel(for: .khmer)?.language, "km")
+
+        settings.khmerSpatialSuggestions = true
+        XCTAssertTrue(FullKeyboardSettings(defaults: defaults).khmerSpatialSuggestions)
+        XCTAssertEqual(settings.swipeTypingModel(for: .khmer)?.language, "km")
 
         settings.khmerismNoColors = true
         XCTAssertTrue(FullKeyboardSettings(defaults: defaults).khmerismNoColors)
