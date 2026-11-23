@@ -344,11 +344,9 @@ extension FullKeyboardView {
         }
     }
 
-    /// The strip's suggestions with its emoji (`refreshStrip`): a shortcode's in its place; in an
-    /// empty strip or one of next words, the finished word's, unless `quiet` (Undo, a status or
-    /// a clipboard chip has the strip, and the next words go too); else the typed word's.
+    /// In an empty strip or one of next words, offer the finished word's emoji unless Undo,
+    /// status, or a clipboard chip takes the strip. Otherwise offer the typed word's emoji.
     func withStripEmoji(_ suggestions: [KeyboardSuggestion], quiet: Bool) -> [KeyboardSuggestion] {
-        if let shortcodes = emojiShortcodeSuggestions() { return shortcodes }
         guard suggestions.isEmpty || suggestions.first?.kind == .nextWord else {
             return withTypedWordEmoji(suggestions) ?? suggestions
         }

@@ -3220,6 +3220,16 @@
         }
       }
     },
+    "Ranks Khmer spelling suggestions by where you tap" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "根据点按位置对高棉语拼写建议排序"
+          }
+        }
+      }
+    },
     "English and Spanish only" : {
       "localizations" : {
         "zh-Hans" : {
@@ -4542,6 +4552,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "高棉语"
+          }
+        }
+      }
+    },
+    "Khmer swipe typing" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "高棉语滑行输入"
           }
         }
       }

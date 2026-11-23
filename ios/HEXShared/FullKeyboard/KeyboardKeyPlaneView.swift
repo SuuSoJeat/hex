@@ -96,6 +96,8 @@ final class KeyboardKeyPlaneView: UIView {
         let layout = engine.layout
         // An iPad's keys are as large turned as upright, so they keep the portrait labels.
         let isLandscape = layout.orientation == .landscape && layout.metrics.pad == nil
+        let isKhmer = layout.language == .khmer
+        let isKhmerism = layout.letters == .khmerism
         let labelScale = layout.keyLabelScale
         let radius = layout.metrics.cornerRadius
         // Like Apple's spacebar trackpad, key glyphs fade out while sliding the cursor, and the
@@ -103,9 +105,10 @@ final class KeyboardKeyPlaneView: UIView {
         let hideGlyphs = engine.isTrackpadActive || (engine.isSelectionActive && !engine.selectionActionsShown)
         let glyphAlpha = currentGlyphAlpha()
         let keycapAlpha = 1 - (1 - Self.trackpadKeycapAlpha) * (1 - glyphAlpha)
-        if layout.language == .khmer {
-            drawKhmer(in: context, dirty: rect, glyphAlpha: glyphAlpha, keycapAlpha: keycapAlpha, hideGlyphs: hideGlyphs)
-            return
+        if isKhmer {
+            let edge = CGRect(x: 0, y: layout.metrics.stripTop + layout.metrics.stripHeight - 1, width: bounds.width, height: 1)
+            context.setFillColor(palette.stripDivider.cgColor)
+            context.fill(pixelAligned(edge))
         }
         var pressed = engine.pressedKinds
         if let lingeringKind { pressed.insert(lingeringKind) }
@@ -120,8 +123,9 @@ final class KeyboardKeyPlaneView: UIView {
             context.setAlpha(keycapAlpha)
             // Keycaps on whole device pixels, as Apple draws them: crisp edges, not half-covered ones.
             let frame = pixelAligned(key.frame)
-            // Row 4's labels sit where they would on Apple's taller row 4 (`bottomRowTrim`).
-            let labelFrame = key.row == 3
+            // The footer's labels sit where they would on Apple's taller footer (`bottomRowTrim`).
+            let isFooter = key.row == layout.bottomRowIndex
+            let labelFrame = isFooter
                 ? CGRect(x: frame.minX, y: frame.minY, width: frame.width, height: frame.height + layout.metrics.bottomRowTrim)
                 : frame
             switch key.kind {
@@ -129,9 +133,21 @@ final class KeyboardKeyPlaneView: UIView {
                 continue
             case .character:
                 // The pressed key stays in place, grey, under iOS 27's floating pop-up.
-                let fill = pressed.contains(key.kind) ? palette.keyHeldFill : palette.keyFill
+                let isPressed = if isKhmer {
+                    lingeringKind == key.kind || engine.touches.values.contains { $0.key == key || $0.slideKey == key }
+                } else {
+                    pressed.contains(key.kind)
+                }
+                let rawLabel = engine.keycapLabel(for: key)
+                let face = isKhmerism && showsKhmerismColors && !isPressed
+                    ? KhmerismAppearance.face(for: rawLabel, isDark: palette.isDark) : nil
+                let fill = isPressed ? palette.keyHeldFill : (face?.fill ?? palette.keyFill)
                 context.fillKeycap(frame, fill: fill, shadow: palette.keyShadow, radius: radius)
                 guard showGlyphs() else { continue }
+                if isKhmer {
+                    drawKhmerLegends(rawLabel, for: key, in: frame, color: face?.ink ?? palette.textBase, context: context)
+                    continue
+                }
                 if let upper = key.shifted, let lower = key.character, layout.metrics.pad?.isDocked == true {
                     // The docked iPad's two-symbol keys: the shifted one over the one typed, as Apple's.
                     let font = UIFont.systemFont(ofSize: 18, weight: .regular)
@@ -140,7 +156,7 @@ final class KeyboardKeyPlaneView: UIView {
                     drawText(lower, in: CGRect(x: labelFrame.minX, y: labelFrame.midY - 0.2 * half, width: labelFrame.width, height: half), font: font, color: palette.textBase)
                     continue
                 }
-                var label = Self.keycapLabel(engine.keycapLabel(for: key))
+                var label = Self.keycapLabel(rawLabel)
                 let isUpperLetter = layout.layer == .letters && engine.keycapsUppercase && label.first?.isUppercase == true
                 var style = isLandscape
                     ? (isUpperLetter ? Self.landscapeCapital
@@ -161,12 +177,9 @@ final class KeyboardKeyPlaneView: UIView {
                 let fill = pressed.contains(.space) && !hideGlyphs ? palette.spaceHeldFill : palette.keyFill
                 context.fillKeycap(frame, fill: fill, shadow: palette.keyShadow, radius: radius)
                 guard showGlyphs(), let spaceLabel else { continue }
-                drawText(
-                    spaceLabel,
-                    in: labelFrame,
-                    font: .systemFont(ofSize: isLandscape ? 13 : 14.5, weight: .regular),
-                    color: palette.textMuted
-                )
+                let size: CGFloat = isLandscape ? 13 : 14.5
+                let font = isKhmer ? KhmerismAppearance.font(for: spaceLabel, size: size) : .systemFont(ofSize: size)
+                drawText(spaceLabel, in: labelFrame, font: font, color: palette.textMuted)
             case .returnKey:
                 drawReturnKey(
                     in: context, frame: frame, labelFrame: labelFrame, pressed: pressed.contains(.returnKey),
@@ -189,15 +202,20 @@ final class KeyboardKeyPlaneView: UIView {
                 context.fillKeycap(frame, fill: lit ? palette.keyHeldFill : palette.keyFill, shadow: palette.keyShadow, radius: radius)
                 guard showGlyphs() else { continue }
                 var style = isLandscape
-                    ? (key.label == "123" && key.row == 3 ? LabelStyle(size: 15.5, weight: UIFont.Weight(rawValue: -0.05), yOffset: 0)
-                        : key.row == 3 ? LabelStyle(size: 17.75, weight: UIFont.Weight(rawValue: 0.08), yOffset: -0.83)
+                    ? (key.label == "123" && isFooter ? LabelStyle(size: 15.5, weight: UIFont.Weight(rawValue: -0.05), yOffset: 0)
+                        : isFooter ? LabelStyle(size: 17.75, weight: UIFont.Weight(rawValue: 0.08), yOffset: -0.83)
                         : key.label == "#+=" ? LabelStyle(size: 12.25, weight: UIFont.Weight(rawValue: 0.2), yOffset: -1.33)
                         : LabelStyle(size: 15.5, weight: UIFont.Weight(rawValue: -0.05), yOffset: 0))
-                    : key.row == 3 ? LabelStyle.pageKey
+                    : isFooter ? LabelStyle.pageKey
                     : key.label == "#+=" ? LabelStyle.symbolsPageKey
                     : LabelStyle(size: 15.5, yOffset: 0)
                 style = style.scaled(by: labelScale)
-                drawText(key.label, in: labelFrame, font: style.font, color: palette.textBase, yOffset: style.yOffset)
+                let font = if isKhmer, key.kind == .layerSwitch(.letters) {
+                    KhmerismAppearance.font(for: key.label, size: min(style.size, frame.height * 0.6))
+                } else {
+                    style.font
+                }
+                drawText(key.label, in: labelFrame, font: font, color: palette.textBase, yOffset: style.yOffset)
             case .globe:
                 let lit = pressed.contains(.globe)
                 context.fillKeycap(frame, fill: lit ? palette.functionHeldFill : palette.keyFill, shadow: palette.keyShadow, radius: radius)
@@ -258,90 +276,25 @@ final class KeyboardKeyPlaneView: UIView {
         }
     }
 
-    private func drawKhmer(
-        in context: CGContext, dirty: CGRect, glyphAlpha: CGFloat, keycapAlpha: CGFloat, hideGlyphs: Bool
+    private func drawKhmerLegends(
+        _ label: String, for key: KeyboardKey, in frame: CGRect, color: UIColor, context: CGContext
     ) {
         let layout = engine.layout
-        let metrics = layout.metrics
-        let isDark = palette.isDark
-        let isKhmerism = layout.letters == .khmerism
-        let neutral = KhmerismAppearance.Face(fill: palette.keyFill, ink: palette.textBase)
-        let pageEdge = CGRect(x: 0, y: metrics.stripTop + metrics.stripHeight - 1, width: bounds.width, height: 1)
-        context.setFillColor(palette.stripDivider.cgColor)
-        context.fill(pixelAligned(pageEdge))
-
-        for key in layout.keys where key.kind != .hex && key.frame.intersects(dirty) {
-            let frame = pixelAligned(key.frame)
-            let isPressed = engine.touches.values.contains { $0.key == key || $0.slideKey == key }
-            let isHighlighted = isPressed || lingeringKind == key.kind || lingeringFunctionKinds.contains(key.kind)
-            let iconSize = min(19, frame.width * 0.75, frame.height * 0.62)
-            context.setAlpha(keycapAlpha)
-            if key.kind == .returnKey {
-                drawReturnKey(
-                    in: context, frame: frame, labelFrame: frame, pressed: isHighlighted,
-                    glyphAlpha: glyphAlpha, hideGlyphs: hideGlyphs, pointSize: iconSize, yOffset: -0.33
-                )
-                continue
-            }
-
-            let label = engine.keycapLabel(for: key)
-            let face = if isHighlighted {
-                KhmerismAppearance.Face(fill: heldFill(for: key.kind), ink: palette.textBase)
-            } else if isKhmerism, showsKhmerismColors, key.character != nil {
-                KhmerismAppearance.face(for: label, isDark: isDark) ?? neutral
-            } else {
-                neutral
-            }
-
-            context.fillKeycap(frame, fill: face.fill, radius: metrics.cornerRadius)
-            guard glyphAlpha > 0 else { continue }
-            context.saveGState()
-            context.clip(to: frame)
-            context.setAlpha(glyphAlpha)
-            let ink = face.ink
-            switch key.kind {
-            case .character:
-                let title = layout.layer == .letters ? label : Self.keycapLabel(label == "•" ? "⦁" : label)
-                let cornerLabel = isKhmerism && showsKhmerismSuperscripts
-                    ? engine.khmerismAlternate(for: key, onKeycap: true) : nil
-                let width = min(440, layout.width - 2 * layout.horizontalInset)
-                let size = min(max(12, width * 0.053), frame.height * 0.62)
-                if isKhmerism {
-                    let labels = KhmerismAppearance.legends(
-                        main: title, alternate: cornerLabel, in: frame, mainSize: min(21, size), ink: ink
-                    )
-                    labels.main?.draw(in: context)
-                    labels.alternate?.draw(in: context)
-                } else {
-                    drawText(title, in: frame, font: KhmerismAppearance.font(for: title, size: size), color: ink)
-                }
-            case .shift:
-                drawSymbol(shiftSymbol, in: frame, color: ink, pointSize: iconSize, yOffset: 0.67)
-            case .delete:
-                drawSymbol(isPressed ? "delete.left.fill" : "delete.left", in: frame, color: ink, pointSize: iconSize, yOffset: 0.33)
-            case .emoji:
-                drawEmojiFace(in: frame, diameter: iconSize, context: context, keyFill: face.fill, color: ink)
-            case .globe:
-                drawSymbol("globe", in: frame, color: ink, pointSize: iconSize, yOffset: -1)
-            case .dismiss:
-                drawSymbol("keyboard.chevron.compact.down", in: frame, color: ink, pointSize: iconSize)
-            case .space, .layerSwitch:
-                let title = key.kind == .space ? (spaceLabel ?? label) : label
-                let size = min(13, frame.height * 0.6)
-                drawText(title, in: frame, font: KhmerismAppearance.font(for: title, size: size), color: ink)
-            case .hex, .returnKey:
-                break
-            }
-            context.restoreGState()
-        }
-        context.setAlpha(1)
-    }
-
-    private func heldFill(for kind: KeyKind) -> UIColor {
-        switch kind {
-        case .space: palette.spaceHeldFill
-        case .character, .layerSwitch: palette.keyHeldFill
-        default: palette.functionHeldFill
+        let title = layout.layer == .letters ? label : Self.keycapLabel(label == "•" ? "⦁" : label)
+        let width = min(440, layout.width - 2 * layout.horizontalInset)
+        let size = min(max(12, width * 0.053), frame.height * 0.62)
+        context.saveGState()
+        defer { context.restoreGState() }
+        context.clip(to: frame)
+        if layout.letters == .khmerism {
+            let cornerLabel = showsKhmerismSuperscripts ? engine.khmerismAlternate(for: key, onKeycap: true) : nil
+            let legends = KhmerismAppearance.legends(
+                main: title, alternate: cornerLabel, in: frame, mainSize: min(21, size), ink: color
+            )
+            legends.main?.draw(in: context)
+            legends.alternate?.draw(in: context)
+        } else {
+            drawText(title, in: frame, font: KhmerismAppearance.font(for: title, size: size), color: color)
         }
     }
 
@@ -389,8 +342,8 @@ final class KeyboardKeyPlaneView: UIView {
     /// features cut out); 2 x 2.67 eyes 2.78 either side and 2.13 above the centre; a mouth 12.33
     /// wide, its top 0.5 below the centre at the corners and 1.5 in the middle, its bottom an arc
     /// 6.5 down; teeth a 1 pt band 1 under its top, always the light colour.
-    private func drawEmojiFace(in frame: CGRect, diameter: CGFloat, context: CGContext, keyFill: UIColor, color: UIColor? = nil) {
-        let ink = (color ?? palette.textBase).cgColor
+    private func drawEmojiFace(in frame: CGRect, diameter: CGFloat, context: CGContext, keyFill: UIColor) {
+        let ink = palette.textBase.cgColor
         context.saveGState()
         context.translateBy(x: frame.midX, y: frame.midY - 0.67)
         let k = diameter / 19

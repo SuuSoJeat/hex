@@ -83,7 +83,6 @@ final class SwipeTyping {
         decoder.neverSuggest = TypingDecoder.NeverSuggest(
             autocorrect.offensiveWords.blocked(allowSwearing: autocorrect.allowsSwearing), model: model
         )
-        guard !isKhmer else { return }
         var extra = SwipeDecoder.ExtraWords()
         if model.language == KeyboardLanguage.english.rawValue {
             extra.add(AutocorrectEngine.englishContractions, cost: { SwipeDecoder.costOfContraction($0) }, model: model, contractions: true)

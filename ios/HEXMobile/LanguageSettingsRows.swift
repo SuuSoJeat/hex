@@ -170,7 +170,7 @@ struct DictationLanguageRow: View {
 
 /// What Automatic picks on this iPhone now: the dictation language's layout.
 @MainActor
-private func automaticKeyboardLanguage() -> KeyboardLanguage {
+func automaticKeyboardLanguage() -> KeyboardLanguage {
     KeyboardLanguage.automatic(
         dictationLanguage: LanguageSettings().effectiveDictationLanguage,
         inputModes: UITextInputMode.activeInputModes.compactMap(\.primaryLanguage),

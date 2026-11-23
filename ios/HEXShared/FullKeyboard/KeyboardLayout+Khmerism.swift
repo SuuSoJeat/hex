@@ -11,7 +11,8 @@ extension KeyboardLayout {
         showsGlobe: Bool,
         showsEmoji: Bool,
         hexPlacement: HexKeyPlacement,
-        letters: KeyboardLetterLayout
+        letters: KeyboardLetterLayout,
+        commaPeriodKeys: Bool
     ) -> [KeyboardKey] {
         typealias Entry = (kind: KeyKind, label: String, weight: CGFloat, character: KhmerismLayout.Key?)
         typealias Cap = (entry: Entry, x: CGFloat, width: CGFloat)
@@ -26,6 +27,7 @@ extension KeyboardLayout {
         let firstY = metrics.stripArea + metrics.keysTop
         let numberRow = drawsNumberRow(metrics, layer: layer)
         let isKhmerism = letters == .khmerism
+        let isDocked = metrics.pad?.isDocked == true
         var keys: [KeyboardKey] = []
 
         func character(_ key: KhmerismLayout.Key) -> Entry {
@@ -119,28 +121,55 @@ extension KeyboardLayout {
         case .symbols: KhmerismLayout.symbolsFooter
         }
         let footerCharacters = isKhmerism ? khmerismFooter : []
-        var footer: [Entry] = [layer == .letters
+        let hasFooterGlobe = showsGlobe && !isKhmerism
+        let globe: Entry = (.globe, "globe", 114, nil)
+        let emoji: Entry = (.emoji, "emoji", 114, nil)
+        let hex: Entry = (.hex, "hex", 114, nil)
+        var footer: [Entry] = []
+        if hasFooterGlobe && isDocked { footer.append(globe) }
+        footer.append(layer == .letters
             ? (.layerSwitch(.numbers), "123", 151, nil)
-            : (.layerSwitch(.letters), isKhmerism ? "កខគ" : "ក", 151, nil)]
-        if showsEmoji { footer.append((.emoji, "emoji", 114, nil)) }
+            : (.layerSwitch(.letters), isKhmerism ? "កខគ" : "ក", 151, nil))
+        if hasFooterGlobe && !isDocked { footer.append(globe) }
+        if showsEmoji && (isKhmerism || !isDocked) { footer.append(emoji) }
+        if hexPlacement == .leftOfSpace { footer.append(hex) }
         footer.append((.space, "ខ្មែរ", 507, nil))
         for (index, key) in footerCharacters.enumerated() {
             var entry = character(key)
             if index == 0 { entry.weight = 101 }
             footer.append(entry)
         }
-        if isKhmerism {
-            switch field {
-            case .text: break
-            case .webSearch: footer.append(character(.init(text: ".")))
-            case .url: footer.append(contentsOf: [character(.init(text: ".")), character(.init(text: "/"))])
-            case .email: footer.append(contentsOf: [character(.init(text: "@")), character(.init(text: "."))])
+        for (kind, weight, label) in field.keysRightOfSpace(width: 100) {
+            footer.append((kind, label, weight, nil))
+        }
+        if hexPlacement == .rightOfSpace { footer.append(hex) }
+        footer.append((.returnKey, "↵", 221, nil))
+        if isDocked {
+            if showsEmoji && !isKhmerism { footer.append(emoji) }
+            footer.append((.dismiss, "dismiss", 100, nil))
+        }
+        var footerCaps = weightedCaps(footer)
+        if commaPeriodKeys, let index = footerCaps.firstIndex(where: { $0.entry.kind == .space }) {
+            let space = footerCaps[index]
+            let frame = CGRect(x: space.x, y: rowY(footerRow), width: space.width, height: metrics.bottomRowHeight)
+            let keyWidth = letterWidth(innerWidth: innerWidth, metrics: metrics, columns: KhmerLayout.letters[0].count)
+            if let carved = spaceBarTakingCommaAndPeriod(frame, keyWidth: keyWidth, gap: gap) {
+                footerCaps.replaceSubrange(index...index, with: [
+                    (character(.init(text: ",")), carved.comma.minX, carved.comma.width),
+                    (space.entry, carved.space.minX, carved.space.width),
+                    (character(.init(text: ".")), carved.period.minX, carved.period.width),
+                ])
             }
         }
-        footer.append((.returnKey, "↵", 221, nil))
-        if metrics.pad?.isDocked == true { footer.append((.dismiss, "dismiss", 100, nil)) }
-        addRow(weightedCaps(footer), row: footerRow)
+        addRow(footerCaps, row: footerRow)
         giveSpaceBarItsTopGap(in: &keys, metrics: metrics)
+
+        if !isKhmerism {
+            if hexPlacement.isInStrip {
+                keys.append(joinedStripHexKey(width: width, inset: inset, metrics: metrics, placement: hexPlacement))
+            }
+            return keys
+        }
 
         func addStripKey(_ kind: KeyKind, label: String, leading: Bool) {
             let span: CGFloat = 44

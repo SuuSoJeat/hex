@@ -188,7 +188,6 @@ extension FullKeyboardEngine {
     /// replacement ("home" as "at my house"), the swiped word's first, as Apple's keyboard
     /// offers one after a swipe (black box, iOS 27.2); space never puts it in.
     func swipeAlternatives(_ readings: [String], capital: Bool) -> [String] {
-        if layout.language == .khmer { return Array(readings.dropFirst().prefix(3)) }
         func replacement(_ reading: String) -> String? {
             guard target.autocorrectionType != .no else { return nil }
             let typed = capital ? reading.prefix(1).uppercased() + reading.dropFirst() : reading

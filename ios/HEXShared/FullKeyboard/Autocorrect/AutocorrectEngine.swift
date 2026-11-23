@@ -311,10 +311,13 @@ final class AutocorrectEngine {
         index.suggestions(beforeInput: beforeInput, personalWords: lexiconTerms) { mayOffer($0) }
     }
 
-    func khmerCorrection(using index: KhmerAutocomplete, beforeInput: String?) -> KhmerAutocomplete.Correction? {
+    func khmerCorrection(
+        using index: KhmerAutocomplete, beforeInput: String?, substitutionGain: KhmerAutocomplete.SubstitutionGain? = nil
+    ) -> KhmerAutocomplete.Correction? {
         guard isEnabled else { return nil }
         return index.correction(
             beforeInput: beforeInput, personalWords: lexiconTerms, learnedSpellings: learning.typos,
+            substitutionGain: substitutionGain,
             canCorrect: { typed in
                 let key = typed.lowercased()
                 return !suppressedInSession.contains(key) && !learning.rejected.contains(key) && !learnedWords.contains(key)
@@ -397,13 +400,18 @@ final class AutocorrectEngine {
         lastCorrection = nil
     }
 
-    func recordAppliedCorrection(original: String, corrected: String, anchor: String, changes: [AppliedCorrection.Change]) {
-        lastCorrection = AppliedCorrection(original: original, corrected: corrected, changes: changes, anchor: anchor)
+    func recordAppliedCorrection(
+        original: String, corrected: String, anchor: String, changes: [AppliedCorrection.Change], document: UUID? = nil
+    ) {
+        lastCorrection = AppliedCorrection(original: original, corrected: corrected, changes: changes, anchor: anchor, document: document)
     }
 
     /// The latest autocorrection when the cursor is right after it (`AppliedCorrection.isAtEnd`).
-    func revertibleCorrection(before: String?) -> AppliedCorrection? {
+    func revertibleCorrection(before: String?, document: UUID?) -> AppliedCorrection? {
         guard let lastCorrection, lastCorrection.isAtEnd(of: before) else { return nil }
+        if lastCorrection.changes.contains(where: { $0.language == .khmer }) {
+            guard let document, lastCorrection.document == document else { return nil }
+        }
         return lastCorrection
     }
 

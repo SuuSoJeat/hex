@@ -20,6 +20,8 @@ protocol KeyboardTextTarget: AnyObject {
     var selectedText: String? { get }
     /// `UITextDocumentProxy.documentIdentifier`: the field, where UIKit names it.
     var documentIdentifier: UUID? { get }
+    /// Changes when the target redirects edits away from or back to the host field.
+    var inputRouteRevision: Int { get }
     func insertText(_ text: String)
     func deleteBackward()
     func adjustTextPosition(byCharacterOffset offset: Int)
@@ -32,6 +34,7 @@ extension KeyboardTextTarget {
     var isSecureTextEntry: Bool? { nil }
     var selectedText: String? { nil }
     var documentIdentifier: UUID? { nil }
+    var inputRouteRevision: Int { 0 }
     func adjustTextPosition(byCharacterOffset offset: Int) {}
 }
 
@@ -97,8 +100,9 @@ extension FullKeyboardEngine {
     private var hostIsBehind: Bool {
         guard let expected = expectedTypingContext, clock() <= expected.until,
               target.hasText, (target.selectedText ?? "").isEmpty,
-              target.documentIdentifier == expected.document,
               target.documentContextAfterInput == expected.after else { return false }
+        if layout.language == .khmer, let previous = expected.document,
+           let current = target.documentIdentifier, current != previous { return false }
         guard let reported = textBefore else { return true }
         if reported == expected.expected { return false }
         if reported == expected.reported { return true }
@@ -125,7 +129,7 @@ extension FullKeyboardEngine {
             reported: textBefore,
             expected: (before ?? "") + SmartPunctuation.plain(inserted),
             after: target.documentContextAfterInput,
-            document: target.documentIdentifier,
+            document: layout.language == .khmer ? target.documentIdentifier : nil,
             until: clock() + Self.typingContextLifetime
         )
     }
@@ -134,6 +138,7 @@ extension FullKeyboardEngine {
     /// host should report.
     func forgetTypingContext() {
         clearKhmerSmartRun()
+        clearKhmerSpatialTaps()
         expectedTypingContext = nil
         dismissKhmerSwipeChoices()
     }

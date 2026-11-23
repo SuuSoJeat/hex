@@ -243,17 +243,19 @@ final class FullKeyboardView: UIView {
         plane.onAccentMenuOpened = { [weak self] in self?.selectionFeedback() }
         engine.onSelectionStep = { [weak self] in self?.selectionFeedback() }
         engine.onChange = { [weak self] in self?.engineChanged() }
-        engine.onEdit = { [weak self] in
+        engine.onEdit = { [weak self] kind in
             guard let self else { return }
             if self.routedTarget.isSearching {
                 self.refreshEmojiSearch()
                 return
             }
             self.hideUndo()
-            self.vocabularyOffer = nil
-            self.hideFullAccessHint()
-            self.hideAllowPasteHint()
-            self.hideModelNotice()
+            if case .normal = kind {
+                self.vocabularyOffer = nil
+                self.hideFullAccessHint()
+                self.hideAllowPasteHint()
+                self.hideModelNotice()
+            }
             self.refreshReturnKey()
             self.refreshStrip()
             self.onTextEdit?()
@@ -357,7 +359,8 @@ final class FullKeyboardView: UIView {
     private var keysHeight: CGFloat {
         KeyboardLayout.height(
             for: orientation, posture: engine.posture, phoneSize: engine.phoneSize, pad: engine.pad,
-            numberRow: engine.hasNumberRow, language: engine.layout.language, layer: engine.layout.layer
+            numberRow: engine.hasNumberRow, language: engine.layout.language, layer: engine.layout.layer,
+            letters: engine.layout.letters
         )
     }
 
@@ -542,11 +545,12 @@ final class FullKeyboardView: UIView {
         model.onLanguageSelected?(nil)
     }
 
-    /// With two or more languages the space bar names the keyboard's; otherwise, with Full
-    /// Access, the dictation language's.
+    /// Space names the keyboard language while switching, or the dictation language when
+    /// available. A Khmer keyboard without either label shows its own name.
     private func refreshSpaceLabel() {
-        plane.spaceLabel = languages.spaceLabel ?? (engine.layout.language == .khmer ? KeyboardLanguage.khmer.shortName
-            : model.hasFullAccess ? model.languageSummary : nil)
+        let dictation = model.hasFullAccess ? model.languageSummary : nil
+        let khmer = engine.layout.language == .khmer ? KeyboardLanguage.khmer.shortName : nil
+        plane.spaceLabel = languages.spaceLabel ?? dictation ?? khmer
     }
 
     /// Settings › Experiments › Emoji shortcodes, in the App Group: cached for the strip, and
@@ -638,7 +642,6 @@ final class FullKeyboardView: UIView {
     /// Each supported layout uses its own bundled model. Khmerism has its own swipe setting.
     /// Off under VoiceOver, which has its own way to type.
     private func syncSwipeTyping() {
-        engine.khmerSwipeOffersChoices = !hidesWordSuggestions
         let language: KeyboardLanguage = engine.layout.language == .khmer ? .khmer : engine.language
         let model = UIAccessibility.isVoiceOverRunning ? nil
             : FullKeyboardSettings().swipeTypingModel(for: language, override: swipeOverride)
@@ -655,8 +658,10 @@ final class FullKeyboardView: UIView {
     /// centres to where Learn how I type saw you tap. The same word list lets the likely next
     /// letter claim a few points of its neighbour's touch target whether or not Spatial
     /// autocorrect is on (`FullKeyboardEngine.letterOdds`; only while autocorrecting).
+    /// In Khmer, the switch enables tap-ranked spelling suggestions.
     private func syncSpatialAutocorrect() {
         let settings = FullKeyboardSettings()
+        engine.khmerSpatialSuggestions = settings.autocorrect && settings.spatialAutocorrect
         let words = settings.typingModel(for: engine.language)
         if engine.letterOdds !== words {
             engine.letterOdds = words
@@ -939,7 +944,10 @@ final class FullKeyboardView: UIView {
             if case .code = clipboardOffer {} else { clipboardOffer = .dictation }
         }
         stripOffer = clipboardOffer
-        var suggestions = withStripEmoji(engine.suggestions, quiet: lastDictation != nil || status != nil || clipboardOffer != nil)
+        let shortcodes = emojiShortcodeSuggestions()
+        var suggestions = shortcodes ?? withStripEmoji(
+            engine.suggestions, quiet: lastDictation != nil || status != nil || clipboardOffer != nil
+        )
         // The experiment hides the words, not the strip: Undo, Paste, status, notices and the
         // Hex key keep their places, and an empty strip offers the clipboard as it does when no
         // word is suggested. What you typed before a correction (`.revert`) stays, so Delete
@@ -957,6 +965,8 @@ final class FullKeyboardView: UIView {
             fullAccessHint: showsFullAccessHint && !model.hasFullAccess,
             notice: allowPasteNotice ?? vocabularyNotice ?? translationNotice ?? modelNotice
         )
+        engine.khmerSwipeOffersChoices = shortcodes == nil && !hidesWordSuggestions && !stripView.isHidden
+            && stripView.acceptsSuggestions
     }
 
     /// The last dictation went in as spoken while Translate what I say was on: what happened,

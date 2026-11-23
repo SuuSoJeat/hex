@@ -2945,10 +2945,11 @@ iOS prototype (`HEXMobile`) -> Record/transcribe/copy and keyboard handoff
 │   dictionary behind its autocorrect (a missing accent is the cheapest fix, "koszonom" →
 │   "köszönöm", while a word of its own such as "meg" keeps its spelling), English as its
 │   bilingual partner through the Latin-script rule, and no typing (spatial) model
-├── Khmer (ភាសាខ្មែរ, `km-KH`) → Layout → Khmerism (default) or Khmer.
+├── Khmer (ភាសាខ្មែរ, `km-KH`) → Layout → Khmer (default) or Khmerism.
 │   Khmer follows the iPhone's main, Shift, 123 and #+= key order with Hex's theme.
 │   Its top letter row includes Khmer digits and its 123 page starts with Arabic digits.
-│   ក returns to letters. Key positions stay fixed after coeng.
+│   ក returns to letters. Key positions stay fixed after coeng. The standard layout
+│   follows Hex's Globe and Hex placement, Comma and period keys, and Duo split setting.
 │   Khmerism's five rows use Hex's key height and corner radius. The background and press
 │   colors follow the keyboard theme, with teal marks, green independent vowels,
 │   and rose Khmer digits in light and dark. Arabic digits use the keyboard theme.
@@ -2962,10 +2963,13 @@ iOS prototype (`HEXMobile`) -> Record/transcribe/copy and keyboard handoff
 │   With the caret just after coeng (្),
 │   the letter page brings common subscript consonants onto the main keys and hides
 │   the corner labels. Holds still work, and Shift still selects the full shifted
-│   layer. The usual labels return when the caret moves past or away from coeng. The five-row
-│   letter plane stays joined on the unfolded Duo. Checks: `KhmerKeyboardLanguageTests`,
+│   layer. The usual labels return when the caret moves past or away from coeng. Khmerism
+│   stays joined on the Duo and uses strip positions for Hex and Globe to keep its footer.
+│   Checks: `KhmerKeyboardLanguageTests`,
 │   `KeyboardLayoutTests`, `FullKeyboardEngineTests`.
-│   On both layouts, Space shows ខ្មែរ and uses the regular language swipe. The emoji key
+│   Both layouts have the usual Search, URL, and email keys. Space uses the regular
+│   language swipe and keeps the active dictation or translation label when applicable.
+│   The emoji key
 │   opens Hex's picker and Number Row follows the shared setting. With Smart Mode off, marks
 │   insert as entered and the host handles backspace. The suggestion strip offers up to three
 │   offline completions from a bundled SIL/Keyman dictionary. It draws each Khmer suggestion as one word so coeng
@@ -2978,11 +2982,23 @@ iOS prototype (`HEXMobile`) -> Record/transcribe/copy and keyboard handoff
 │   Closing punctuation applies the
 │   correction and types the punctuation. Other dictionary guesses are tap-to-accept.
 │   After a correction accepted with Space, the strip offers the original spelling
-│   immediately. After a correction with punctuation, Backspace reveals that option.
+│   immediately. After a correction with punctuation, Backspace reveals that option in
+│   the same field when iOS identifies it. Held and swiped word deletion use
+│   dictionary boundaries for joined Khmer and stop at a Khmer–Latin boundary. When
+│   the word boundary is uncertain or the edit cannot start safely, holding deletes
+│   one unit through the host and swiping leaves the text as it is. A delayed delete is restored
+│   only when the same identified field, input route, and caret confirm what changed.
 │   Checks:
 │   `KhmerAutocompleteTests`, `FullKeyboardEngineTests`.
-│   Settings › Keyboard › Khmer, with Full chosen (for both layouts, off by default, App Group)
-│   ├── Smart Mode
+│   Settings › Keyboard › Spatial autocorrect (on by default while Autocorrect is on)
+│   uses near-edge taps to rank single-character spelling guesses in either layout.
+│   Tap a suggestion to apply it to the current word. Space and closing punctuation
+│   use regular Khmer autocorrect, which handles learned repairs. Swipes use their
+│   own gesture readings.
+│   Checks: `KhmerAutocompleteTests`, `FullKeyboardEngineTests`.
+│   Settings › Keyboard › Khmer appears when Khmer is configured with Full chosen. Both
+│   options apply to both layouts and default on. Saved choices are kept in the App Group.
+│   ├── Smart Mode applies in fields that accept word corrections
 │   │   ├── Tap ញ then ំ → ខ្ញុំ, including next to another word. Subscript ញ and
 │   │   │   text already in the field keep their literal spelling.
 │   │   ├── After a newly typed consonant, the ៉ key in Khmerism or the ៊ key in Khmer
@@ -2993,14 +3009,19 @@ iOS prototype (`HEXMobile`) -> Record/transcribe/copy and keyboard handoff
 │   │       and replaces a conflicting shifter. A late vowel moves before trailing
 │   │       signs when the syllable has no vowel yet. Rewrites that delete text
 │   │       require the field to confirm the syllable. Checks: `FullKeyboardEngineTests`.
-│   └── Swipe typing → trace one word using the positions of its characters on the selected
+│   └── Khmer swipe typing → trace one word using the positions of its characters on the selected
 │       layout, including shifted glyphs, coeng and vowel signs. Lift to insert
 │       without an automatic space. Near-tied words on the same path wait for a strip pick
-│       when suggestions are visible. Backspace and replacement respect the last swipe's
+│       when suggestions are visible. A chip, emoji shortcode, or notice covering the
+│       suggestions lets the swipe insert its best reading while the notice remains usable.
+│       The main Swipe typing switch also disables Khmer
+│       swipe. Personal words and iOS Text Replacement use Hex's shared swipe suggestions.
+│       Backspace and replacement respect the last swipe's
 │       boundary. VoiceOver and a caret immediately after coeng keep regular key input.
 │       Checks: `SwipeDecoderTests`, `FullKeyboardEngineTests`, `FullKeyboardSettingsTests`.
 │       These cover synthetic paths and proxy fixtures. Real Khmer swipe accuracy is unmeasured.
-│   Settings › Experiments › Khmerism (Khmerism layout only, off by default, App Group,
+│   Settings › Experiments › Khmerism is visible when the Khmerism layout is selected
+│   (both switches off by default, App Group,
 │   `FullKeyboardSettingsTests`)
 │   ├── No colors → every cap uses the keyboard theme
 │   └── No superscripts → hide corner labels, center the main glyph, and keep hold-to-type

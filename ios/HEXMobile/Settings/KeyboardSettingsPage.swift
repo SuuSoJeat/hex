@@ -112,15 +112,31 @@ struct KeyboardSettingsPage: View {
         fullAccessOn ? nil : String(localized: "Needs Full Access")
     }
 
+    private var usesKhmer: Bool {
+        _ = revision
+        let chosen = LanguageSettings().keyboardLanguages
+        return chosen.isEmpty ? automaticKeyboardLanguage() == .khmer : chosen.contains(.khmer)
+    }
+
     /// Swipe typing's detail: the layouts that swipe.
     private var swipeLanguages: String {
         _ = revision
-        let current = FullKeyboardSettings()
-        guard current.swipeMoreLanguages else { return String(localized: "English and Spanish only") }
-        guard current.spatialAutocorrect, current.germanSpatialAutocorrect else {
+        let settings = FullKeyboardSettings()
+        let includesGerman = settings.spatialAutocorrect && settings.germanSpatialAutocorrect
+        guard usesKhmer, settings.swipesIn(.khmer) else {
+            guard settings.swipeMoreLanguages else { return String(localized: "English and Spanish only") }
+            if includesGerman { return String(localized: "English, Spanish, French, Polish and German") }
             return String(localized: "English, Spanish, French and Polish")
         }
-        return String(localized: "English, Spanish, French, Polish and German")
+        var languages: [KeyboardLanguage] = [.english, .spanish]
+        if settings.swipeMoreLanguages {
+            languages += [.french, .polish]
+            if includesGerman { languages.append(.german) }
+        }
+        languages.append(.khmer)
+        return ListFormatter.localizedString(byJoining: languages.map {
+            Locale.current.localizedString(forLanguageCode: $0.rawValue) ?? $0.displayName
+        })
     }
 
     var body: some View {
@@ -235,7 +251,9 @@ struct KeyboardSettingsPage: View {
 
                         SettingsToggleRow(
                             title: String(localized: "Spatial autocorrect"),
-                            detail: String(localized: "English, Spanish, French and Polish only"),
+                            detail: usesKhmer
+                                ? String(localized: "Ranks Khmer spelling suggestions by where you tap")
+                                : String(localized: "English, Spanish, French and Polish only"),
                             isOn: binding(\.spatialAutocorrect)
                         )
                     }
@@ -260,22 +278,25 @@ struct KeyboardSettingsPage: View {
                     KeyboardVocabularyRow()
                 }
 
-                SettingsSectionHeader(title: "Khmer")
+                if usesKhmer {
+                    SettingsSectionHeader(title: "Khmer")
 
-                SettingsCard {
-                    SettingsToggleRow(
-                        title: String(localized: "Smart Mode"),
-                        detail: String(localized: "Use shortcuts like ញ + ំ → ខ្ញុំ, double-tap vowels, and arrange marks as you type."),
-                        isOn: binding(\.khmerismSmartMode)
-                    )
+                    SettingsCard {
+                        SettingsToggleRow(
+                            title: String(localized: "Smart Mode"),
+                            detail: String(localized: "Use shortcuts like ញ + ំ → ខ្ញុំ, double-tap vowels, and arrange marks as you type."),
+                            isOn: binding(\.khmerismSmartMode)
+                        )
 
-                    SettingsDivider()
+                        SettingsDivider()
 
-                    SettingsToggleRow(
-                        title: String(localized: "Swipe typing"),
-                        detail: String(localized: "Trace a Khmer word across the keys, then lift to type it."),
-                        isOn: binding(\.khmerismSwipeTyping)
-                    )
+                        SettingsToggleRow(
+                            title: String(localized: "Khmer swipe typing"),
+                            detail: String(localized: "Trace a Khmer word across the keys, then lift to type it."),
+                            isOn: binding(\.khmerismSwipeTyping)
+                        )
+                        .disabled(!settings.swipeTyping)
+                    }
                 }
             }
 

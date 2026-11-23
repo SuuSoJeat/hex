@@ -401,6 +401,7 @@ final class TranslationPasteSwitchTests: XCTestCase {
     private func checkPasteBar(language: KeyboardLanguage) throws {
         let view = FullKeyboardView(model: KeyboardViewModel(), target: FixtureTextTarget(text: ""))
         view.languageOverride = language
+        if language == .khmer { view.letterLayoutOverride = .khmerism }
         view.hexPlacementOverride = .stripTrailing
         view.frame = CGRect(x: 0, y: 0, width: 402, height: 262)
         view.layoutIfNeeded()

@@ -249,7 +249,7 @@ final class KeyboardStripView: UIView {
         // Words swap letter by letter (and leave the same way when a chip or status takes the
         // strip); the strip being shown for the first time just draws them.
         let animated = animates
-        if showsHint || showsUndo || showsClipboard {
+        if !acceptsSuggestions || showsClipboard {
             show(statusLabel, false)
             slotButtons.forEach { $0.configure(with: nil, palette: palette, animated: animated) }
         } else if let statusText, suggestions.isEmpty {
@@ -308,6 +308,13 @@ final class KeyboardStripView: UIView {
     static func slots(for suggestions: [KeyboardSuggestion]) -> [Int] {
         if suggestions.count == 1, ![.keepLiteral, .secondary, .revert].contains(suggestions[0].kind) { return [1] }
         return Array(suggestions.indices.prefix(3))
+    }
+
+    /// Whether this strip can show words even when an offer is already visible.
+    var acceptsSuggestions: Bool {
+        guard !showsUndo, !showsFullAccessHint, notice == nil else { return false }
+        if case .code = clipboard, statusText == nil { return false }
+        return true
     }
 
     /// Clipboard chips replace the empty strip; suggestions and status win.
