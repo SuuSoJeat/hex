@@ -1,7 +1,7 @@
 import SwiftUI
 
 /// Settings › Experiments: unfinished features grouped by domain (Dictation, Languages,
-/// Keyboard layout, Typing, and Khmer), off until turned on. They live in the App Group so
+/// Keyboard layout, Typing, and Khmerism), off until turned on. They live in the App Group so
 /// the keyboard reads them too.
 struct ExperimentsSettingsPage: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -51,24 +51,14 @@ struct ExperimentsSettingsPage: View {
         return settings.autocorrect && settings.spatialAutocorrect
     }
 
-    private var khmerLetterLayout: KeyboardLetterLayout? {
-        _ = revision
-        let settings = LanguageSettings()
-        let languages = settings.keyboardLanguages
-        guard FullKeyboardSettings().isEnabled,
-              languages.isEmpty ? automaticKeyboardLanguage() == .khmer : languages.contains(.khmer) else { return nil }
-        return settings.letterLayout(for: .khmer)
-    }
-
     var body: some View {
         SettingsPageScaffold(title: "Experiments") {
             dictationSection
             languagesSection
             layoutSection
             typingSection
-            if let khmerLetterLayout {
-                khmerSection
-                if khmerLetterLayout == .khmerism { khmerismSection }
+            if FullKeyboardSettings().isEnabled, configuredKhmerLayout() == .khmerism {
+                khmerismSection
             }
         }
         .animation(HexMotion.settleAnimation(reduceMotion: reduceMotion), value: adaptiveTouchOn)
@@ -358,28 +348,6 @@ struct ExperimentsSettingsPage: View {
                     { TypingJournalSettings().learnsPerLanguage = $0 }
                 )
             )
-        }
-    }
-
-    @ViewBuilder
-    private var khmerSection: some View {
-        SettingsSectionHeader(title: "Khmer")
-
-        SettingsCard {
-            SettingsToggleRow(
-                title: String(localized: "Smart Mode"),
-                detail: String(localized: "Use shortcuts like ញ + ំ → ខ្ញុំ, double-tap vowels, and arrange marks as you type."),
-                isOn: keyboardBinding(\.khmerismSmartMode)
-            )
-
-            SettingsDivider()
-
-            SettingsToggleRow(
-                title: String(localized: "Khmer swipe typing"),
-                detail: String(localized: "Trace a Khmer word across the keys, then lift to type it."),
-                isOn: keyboardBinding(\.khmerismSwipeTyping)
-            )
-            .disabled(!FullKeyboardSettings().swipeTyping)
         }
     }
 

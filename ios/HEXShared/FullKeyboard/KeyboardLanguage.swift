@@ -693,7 +693,7 @@ nonisolated enum KeyboardLanguage: String, CaseIterable, Sendable {
         case .greek: ["el", "el_GR"]
         // Latin only: a Cyrillic `sr` dictionary would reject every Latin word.
         case .serbianLatin: ["sr_Latn", "sr_Latn_RS", "sr-Latn"]
-        // Hangul composition and Khmerism's direct Unicode input use no spelling dictionary.
+        // Hangul composes directly; Khmer uses the bundled lexicon.
         case .korean, .khmer: []
         }
     }

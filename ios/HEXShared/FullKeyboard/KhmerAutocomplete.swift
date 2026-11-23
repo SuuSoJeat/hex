@@ -56,23 +56,6 @@ struct KhmerAutocomplete: Sendable {
     private static let dependentVowels: ClosedRange<UInt16> = 0x17B6...0x17C5
     private static let spellingAlphabet = Array(UInt16(0x1780)...0x17B3) + Array(UInt16(0x17B6)...0x17D2) + [0x17DD]
 
-    // Orthographic examples from Table 5 of Kong et al., Khmer Spellchecking: A Holistic Approach
-    // (https://arxiv.org/pdf/2511.09812#page=6). The ចំណុច example is from Chuon Nath's Khmer
-    // dictionary, discussed in https://www.thmeythmey.com/index.php/detail/38623 and
-    // https://www.thmeythmey.com/detail/80744.
-    private static let reviewedMisspellings = [
-        "សមាគុមន៍": "សមាគម",
-        "ទន់ភ្លុន": "ទន់ភ្លន់",
-        "កូមារភាព": "កុមារភាព",
-        "បុំផ្ទុះ": "បំផ្ទុះ",
-        "ចំនុច": "ចំណុច",
-        "សមត្ថិភាព": "សមត្ថភាព",
-    ].map { (units: Array($0.key.utf16), fix: Correction(typed: $0.key, replacement: $0.value)) }
-
-    private static let schoolMisspelling = Correction(typed: "សាលារ", replacement: "សាលា")
-    private static let schoolMisspellingUnits = Array(schoolMisspelling.typed.utf16)
-    private static let schoolUnits = Array(schoolMisspelling.replacement.utf16)
-
     private let entries: [Entry]
     private let longestWord: Int
 
@@ -183,8 +166,8 @@ struct KhmerAutocomplete: Sendable {
     /// Offset zero identifies the last code unit before the caret. Positive gain favours the alternative.
     typealias SubstitutionGain = (_ offsetFromEnd: Int, _ typed: UInt16, _ candidate: UInt16) -> Double?
 
-    /// Spelling choices begin at an established Khmer word boundary. A full dictionary
-    /// reading takes precedence unless the user has confirmed a specific misspelling.
+    /// Spelling choices begin at an established Khmer word boundary. A complete reading
+    /// as dictionary or personal words keeps the literal text.
     func correction(
         beforeInput: String?, personalWords: [String] = [], learnedSpellings: [String: String] = [:],
         substitutionGain: SubstitutionGain? = nil,
@@ -205,26 +188,7 @@ struct KhmerAutocomplete: Sendable {
             markWordEnds(from: start, in: run, personal: personal, into: &wordStarts)
         }
 
-        // The dictionary can split this confirmed misspelling into សាលា + រ.
-        // Preserve a whole dictionary word at or across the split before the school word.
-        let schoolStart = run.count - Self.schoolMisspellingUnits.count
-        if schoolStart >= 0, wordStarts[schoolStart],
-           run[schoolStart...].elementsEqual(Self.schoolMisspellingUnits),
-           contains(Self.schoolUnits[...]),
-           !(0...schoolStart).contains(where: { wordStarts[$0] && contains(run[$0...], personal: personal) }),
-           canCorrect(Self.schoolMisspelling.typed), mayOffer(Self.schoolMisspelling.replacement) {
-            return Self.schoolMisspelling
-        }
         guard !wordStarts[run.count] else { return nil }
-
-        let reviewed = Self.reviewedMisspellings.filter { units, fix in
-            run.suffix(units.count).elementsEqual(units) && wordStarts[run.count - units.count]
-                && contains(Array(fix.replacement.utf16)[...])
-        }
-        if !reviewed.isEmpty {
-            guard reviewed.count == 1, let fix = reviewed.first?.fix, canCorrect(fix.typed), mayOffer(fix.replacement) else { return nil }
-            return fix
-        }
 
         let suffixes = run.indices.filter { wordStarts[$0] }.map { run[$0...] }
         // Let the completion path handle a prefix of a word the person may still be typing.

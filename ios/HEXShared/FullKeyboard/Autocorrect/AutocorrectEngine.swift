@@ -348,10 +348,10 @@ final class AutocorrectEngine {
     }
 
     /// The latest autocorrection when the cursor is right after it (`AppliedCorrection.isAtEnd`).
-    func revertibleCorrection(before: String?, document: UUID?) -> AppliedCorrection? {
+    func revertibleCorrection(before: String?, document: @autoclosure () -> UUID?) -> AppliedCorrection? {
         guard let lastCorrection, lastCorrection.isAtEnd(of: before) else { return nil }
         if lastCorrection.changes.contains(where: { $0.language == .khmer }) {
-            guard let document, lastCorrection.document == document else { return nil }
+            guard let document = document(), lastCorrection.document == document else { return nil }
         }
         return lastCorrection
     }

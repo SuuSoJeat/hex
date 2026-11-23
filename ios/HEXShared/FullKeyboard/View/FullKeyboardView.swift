@@ -287,7 +287,6 @@ final class FullKeyboardView: UIView {
         engine.trackpadSelectionState.enabled = FullKeyboardSettings().twoThumbSelection
         engine.deletesSwipedWordsLetterByLetter = FullKeyboardSettings().deletesSwipedWordsLetterByLetter
         engine.quickAccentsEnabled = FullKeyboardSettings().quickAccents
-        engine.khmerismSmartMode = FullKeyboardSettings().khmerismSmartMode
         syncEmojiShortcodes()
         hidesWordSuggestions = FullKeyboardSettings().hideWordSuggestions
         syncHexPlacement()
@@ -604,7 +603,6 @@ final class FullKeyboardView: UIView {
             applyAppearance()
         }
         let settings = FullKeyboardSettings()
-        engine.khmerismSmartMode = settings.khmerismSmartMode
         plane.showsKhmerismColors = !settings.khmerismNoColors
         plane.showsKhmerismSuperscripts = !settings.khmerismNoSuperscripts
         hapticStrength = FullKeyboardSettings().hapticStrength
@@ -617,6 +615,7 @@ final class FullKeyboardView: UIView {
         let wantsAutocorrect = FullKeyboardSettings().autocorrect
         if engine.autocorrect.isEnabled != wantsAutocorrect {
             engine.autocorrect.isEnabled = wantsAutocorrect
+            engine.clearKhmerSmartRun()
             engine.refreshSuggestions()
         }
         let vocabulary = CustomVocabularySettings().terms
@@ -639,7 +638,7 @@ final class FullKeyboardView: UIView {
     /// Fixtures and tests turn Swipe typing on or off; otherwise its switch in Settings › Keyboard.
     var swipeOverride: Bool? { didSet { syncSwipeTyping() } }
 
-    /// Each supported layout uses its own bundled model. Khmerism has its own swipe setting.
+    /// Each supported layout uses its own bundled model and the shared Swipe typing setting.
     /// Off under VoiceOver, which has its own way to type.
     private func syncSwipeTyping() {
         let language: KeyboardLanguage = engine.layout.language == .khmer ? .khmer : engine.language
@@ -1070,7 +1069,7 @@ final class FullKeyboardView: UIView {
             endCalloutLinger()
             let label = layout.language == .khmer ? preview.label : KeyboardKeyPlaneView.keycapLabel(preview.label)
             let style = KeyCalloutView.style(for: label)
-            let khmerFont = label.unicodeScalars.contains { (0x1780...0x17FF).contains($0.value) }
+            let khmerFont = KhmerismAppearance.containsKhmer(label)
                 ? KhmerismAppearance.font(for: label, size: min(style.size, balloon.bubble.height * 0.56))
                 : nil
             callout.show(balloon, label: label, style: style, font: khmerFont)

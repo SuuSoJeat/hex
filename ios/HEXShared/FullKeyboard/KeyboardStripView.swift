@@ -249,7 +249,7 @@ final class KeyboardStripView: UIView {
         // Words swap letter by letter (and leave the same way when a chip or status takes the
         // strip); the strip being shown for the first time just draws them.
         let animated = animates
-        if !acceptsSuggestions || showsClipboard {
+        if showsHint || showsUndo || showsClipboard {
             show(statusLabel, false)
             slotButtons.forEach { $0.configure(with: nil, palette: palette, animated: animated) }
         } else if let statusText, suggestions.isEmpty {
@@ -312,9 +312,7 @@ final class KeyboardStripView: UIView {
 
     /// Whether this strip can show words even when an offer is already visible.
     var acceptsSuggestions: Bool {
-        guard !showsUndo, !showsFullAccessHint, notice == nil else { return false }
-        if case .code = clipboard, statusText == nil { return false }
-        return true
+        !showsUndo && !showsFullAccessHint && notice == nil && !showsNextKeyboardChip
     }
 
     /// Clipboard chips replace the empty strip; suggestions and status win.
@@ -825,7 +823,7 @@ final class KeyboardStripView: UIView {
                 var glyphs: [Glyph] = []
                 var prefix = ""
                 // Khmer shaping can span Swift Characters, including across coeng and its consonant.
-                let runs = Self.containsKhmer(text) ? [text] : text.map(String.init)
+                let runs = KhmerismAppearance.containsKhmer(text) ? [text] : text.map(String.init)
                 for run in runs {
                     let offset = (prefix as NSString).size(withAttributes: [.font: font]).width
                     glyphs.append(Glyph(text: run, font: font, offset: offset, y: origin.y, box: nil))
@@ -840,10 +838,6 @@ final class KeyboardStripView: UIView {
             let box = CGSize(width: width, height: smallSize.height)
             let glyph = Glyph(text: text, font: small, offset: 0, y: origin.y, box: box)
             return Word(font: small, origin: origin, width: width, box: box, glyphs: [glyph])
-        }
-
-        private static func containsKhmer(_ text: String) -> Bool {
-            text.utf16.contains { (0x1780...0x17FF).contains($0) }
         }
 
         static let chipPadding: CGFloat = 12
@@ -862,7 +856,7 @@ final class KeyboardStripView: UIView {
                 let word = layout(suggestion)
                 let arrowRoom = suggestion.kind == .revert ? Self.revertArrowSize + Self.revertArrowGap : 0
                 let normalHeight = chipHeight ?? max(22, bounds.height - 2 * pillInset)
-                let needsKhmerMarkRoom = Self.containsKhmer(suggestion.displayText)
+                let needsKhmerMarkRoom = KhmerismAppearance.containsKhmer(suggestion.displayText)
                 let chipH = needsKhmerMarkRoom ? min(bounds.height, max(26, normalHeight)) : normalHeight
                 let chipW = min(bounds.width, word.width + arrowRoom + 2 * Self.chipPadding)
                 let midY = textCenterY ?? bounds.height * 0.5

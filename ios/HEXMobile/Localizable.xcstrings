@@ -1378,6 +1378,16 @@
         }
       }
     },
+    "Fixes typos on space and applies Khmer typing shortcuts" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "按空格时纠正拼写，并启用高棉语快捷输入"
+          }
+        }
+      }
+    },
     "Fixes typos when you press space" : {
       "localizations" : {
         "zh-Hans" : {
@@ -3220,12 +3230,12 @@
         }
       }
     },
-    "Ranks Khmer spelling suggestions by where you tap" : {
+    "English, Spanish, French and Polish. In Khmer, ranks spelling suggestions by where you tap." : {
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "根据点按位置对高棉语拼写建议排序"
+            "value" : "支持英语、西班牙语、法语和波兰语。使用高棉语时，根据点按位置对拼写建议排序。"
           }
         }
       }
@@ -4545,56 +4555,6 @@
     },
     "Khmerism" : {
       "shouldTranslate" : false
-    },
-    "Khmer" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "高棉语"
-          }
-        }
-      }
-    },
-    "Khmer swipe typing" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "高棉语滑行输入"
-          }
-        }
-      }
-    },
-    "Smart Mode" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "智能模式"
-          }
-        }
-      }
-    },
-    "Use shortcuts like ញ + ំ → ខ្ញុំ, double-tap vowels, and arrange marks as you type." : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "支持 ញ + ំ → ខ្ញុំ 等快捷输入、双击元音组合，并在输入时调整符号顺序。"
-          }
-        }
-      }
-    },
-    "Trace a Khmer word across the keys, then lift to type it." : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "滑过高棉语单词对应的按键，抬起手指即可输入。"
-          }
-        }
-      }
     },
     "No colors" : {
       "localizations" : {

@@ -36,6 +36,14 @@ extension KeyboardTextTarget {
     var documentIdentifier: UUID? { nil }
     var inputRouteRevision: Int { 0 }
     func adjustTextPosition(byCharacterOffset offset: Int) {}
+
+    var hasRestrictedTextContentType: Bool {
+        switch textContentType {
+        case .password, .newPassword, .oneTimeCode, .username, .emailAddress, .URL,
+             .creditCardNumber, .telephoneNumber: true
+        default: false
+        }
+    }
 }
 
 @MainActor
@@ -101,24 +109,21 @@ extension FullKeyboardEngine {
         guard let expected = expectedTypingContext, clock() <= expected.until,
               target.hasText, (target.selectedText ?? "").isEmpty,
               target.documentContextAfterInput == expected.after else { return false }
-        let document = target.documentIdentifier
-        if let previous = expected.document, let document, document != previous { return false }
-        let matches: Bool
-        if let reported = textBefore {
-            if reported == expected.expected { return false }
-            if reported == expected.reported {
-                matches = true
-            } else if layout.language == .khmer {
-                matches = reported.utf16.count >= (expected.reported?.utf16.count ?? 0)
-                && expected.expected.utf16.starts(with: reported.utf16)
-            } else {
-                matches = reported.count >= (expected.reported?.count ?? 0) && expected.expected.hasPrefix(reported)
+        if layout.language == .khmer {
+            let document = target.documentIdentifier
+            if let previous = expected.document, let document, document != previous { return false }
+            if let reported = textBefore {
+                if reported == expected.expected { return false }
+                guard reported == expected.reported || (reported.utf16.count >= (expected.reported?.utf16.count ?? 0)
+                    && expected.expected.utf16.starts(with: reported.utf16)) else { return false }
             }
-        } else {
-            matches = true
+            if expected.document == nil { expectedTypingContext?.document = document }
+            return true
         }
-        if matches, expected.document == nil, let document { expectedTypingContext?.document = document }
-        return matches
+        guard let reported = textBefore else { return true }
+        if reported == expected.expected { return false }
+        if reported == expected.reported { return true }
+        return reported.count >= (expected.reported?.count ?? 0) && expected.expected.hasPrefix(reported)
     }
 
     /// The text before the cursor as word boundaries and casing read it: the host's, unless it
@@ -137,7 +142,7 @@ extension FullKeyboardEngine {
             reported: textBefore,
             expected: (before ?? "") + SmartPunctuation.plain(inserted),
             after: target.documentContextAfterInput,
-            document: target.documentIdentifier,
+            document: layout.language == .khmer ? target.documentIdentifier : nil,
             until: clock() + Self.typingContextLifetime
         )
     }

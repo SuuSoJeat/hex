@@ -2,9 +2,9 @@ import QuartzCore
 import UIKit
 
 /// Settings › Keyboard › Swipe typing: slide from a letter through the letters of a word and lift,
-/// and the word goes in, as with Apple's QuickPath and Gboard's glide typing. English and
-/// Spanish layouts. French (France), Polish, and German use Swipe typing in more languages.
-/// The Khmer layouts share their own swipe typing setting.
+/// and the word goes in, as with Apple's QuickPath and Gboard's glide typing. English, Spanish,
+/// and both Khmer layouts use this setting. French (France), Polish, and German use Swipe
+/// typing in more languages.
 ///
 /// A touch on a letter key becomes a swipe once it travels more than a key's pitch from
 /// where it went down: the key no longer types, a light trail follows the finger, and the
@@ -301,10 +301,10 @@ final class SwipeTyping {
 }
 
 extension KeyboardLanguage {
-    /// Swipe typing's default layouts, English and Spanish. Another language swipes too with a
+    /// Swipe typing's default layouts, English, Spanish, and Khmer. Another language swipes too with a
     /// typing model when Settings › Experiments › Swipe typing in more languages is on
     /// (`FullKeyboardSettings.swipesIn`); elsewhere a drag stays a slide to another key.
-    var supportsSwipeTyping: Bool { self == .english || self == .spanish }
+    var supportsSwipeTyping: Bool { self == .english || self == .spanish || self == .khmer }
 }
 
 /// The light trail behind a swiping finger: the last `tail` seconds of its path, which

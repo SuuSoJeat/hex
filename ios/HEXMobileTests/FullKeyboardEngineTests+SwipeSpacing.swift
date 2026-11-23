@@ -487,12 +487,16 @@ extension FullKeyboardEngineTests {
         XCTAssertTrue(InputModeListTouch.passes(phase: .cancelled, onKey: true, leftKey: false, appleKeyboardSplits: true))
     }
 
-    func testSwipeOverridesUseTheSupportedLayouts() {
+    func testSwipeOverrideEnablesEnglishSpanishAndKhmer() {
+        let settings = FullKeyboardSettings()
+        let wasMore = settings.swipeMoreLanguages
+        defer { settings.swipeMoreLanguages = wasMore }
+        settings.swipeMoreLanguages = false
         let view = FullKeyboardView(model: KeyboardViewModel(), target: FixtureTextTarget())
         view.swipeOverride = true
         for language in KeyboardLanguage.allCases {
             view.languageOverride = language
-            XCTAssertEqual(view.plane.swipe != nil, FullKeyboardSettings().swipesIn(language), language.rawValue)
+            XCTAssertEqual(view.plane.swipe != nil, [.english, .spanish, .khmer].contains(language), language.rawValue)
             if let swipe = view.plane.swipe {
                 XCTAssertEqual(swipe.model.language, language.rawValue)
             }
