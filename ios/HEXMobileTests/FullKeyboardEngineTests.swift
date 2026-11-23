@@ -1551,8 +1551,8 @@ final class FullKeyboardEngineTests: XCTestCase {
         XCTAssertEqual(engine.shift.state, .locked)
         XCTAssertTrue(engine.shift.isUserShift)
         XCTAssertEqual(engine.keycapLabel(for: comma), "<")
-        tap(.character(";"))
-        XCTAssertEqual(target.text, ",ok. ,<:")
+        tap(.character("."))
+        XCTAssertEqual(target.text, ",ok. ,<>")
     }
 
     /// Settings › Experiments › Comma and period keys: the flag rebuilds the layout with a comma
