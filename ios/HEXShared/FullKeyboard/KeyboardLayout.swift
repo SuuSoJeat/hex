@@ -224,7 +224,7 @@ nonisolated struct KeyboardMetrics: Equatable, Sendable {
     /// Settings › Keyboard › Number row: the keycap height of the row of 1 to 0 above row 1
     /// (`withNumberRow()`), with a row gap under it; 0 without it.
     var numberRowHeight: CGFloat = 0
-    /// Khmerism's letter page uses five rows. Other pages use four.
+    /// Khmer letter pages use five rows. Other pages use four.
     var keyRowCount: Int = 4
     /// The strip is Apple's prediction bar (`withAppleBar(turned:)`): as thick as Apple's, its
     /// words on Apple's line and a pending word in Apple's cell-wide bubble.
@@ -669,7 +669,7 @@ nonisolated struct KeyboardLayout: Equatable, Sendable {
         let offered = language.offered(letters)
         let letters = pad?.isDocked == true && language == .german && offered == .own ? .qwertz : offered
         self.letters = letters
-        // Khmerism keeps its footer geometry by placing Hex in the strip.
+        // The Khmer layouts keep their footer geometry by placing Hex in the strip.
         if language == .khmer {
             self.hexPlacement = hexPlacement == .stripLeading || hexPlacement == .leftOfSpace ? .stripLeading : .stripTrailing
         } else {
@@ -698,9 +698,9 @@ nonisolated struct KeyboardLayout: Equatable, Sendable {
         if let availableHeight { metrics = metrics.fitted(toHeight: availableHeight) }
         self.metrics = metrics
         if language == .khmer {
-            self.keys = Self.buildKhmerismKeys(
+            self.keys = Self.buildKhmerKeys(
                 width: width, metrics: metrics, layer: layer, field: field, inset: self.horizontalInset,
-                showsGlobe: showsGlobe, showsEmoji: showsEmoji, hexPlacement: self.hexPlacement
+                showsGlobe: showsGlobe, showsEmoji: showsEmoji, hexPlacement: self.hexPlacement, letters: letters
             )
             self.split = nil
             self.padLetterWidth = nil
@@ -914,7 +914,8 @@ nonisolated struct KeyboardLayout: Equatable, Sendable {
         if isSplit { return SplitGeometry.keyWidth }
         if let padLetterWidth { return padLetterWidth }
         if language == .khmer, layer == .letters {
-            return Self.letterWidth(innerWidth: width - 2 * horizontalInset, metrics: metrics, columns: 11)
+            let columns = letters == .khmerism ? 11 : 12
+            return Self.letterWidth(innerWidth: width - 2 * horizontalInset, metrics: metrics, columns: columns)
         }
         if hasDvorakPunctuationRow { return letterWidth }
         if layer == .letters, letters == .dvorak {
@@ -994,6 +995,10 @@ nonisolated struct KeyboardLayout: Equatable, Sendable {
         language: KeyboardLanguage = .english,
         letters: KeyboardLetterLayout? = nil
     ) -> [[String]] {
+        if language.offered(letters) == .khmer {
+            if layer == .numbers { return KhmerLayout.numbers }
+            if layer == .symbols { return KhmerLayout.symbols }
+        }
         // Greek's pages, as the system Greek keyboard shows them: ; is its question mark, so it
         // takes ?'s key on both, the ano teleia · takes ;'s key on 123, and ? takes |'s on #+=.
         let greek = language == .greek

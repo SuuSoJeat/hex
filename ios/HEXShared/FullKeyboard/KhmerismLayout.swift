@@ -72,13 +72,6 @@ nonisolated enum KhmerismLayout {
         "ុ": "ឋ", "ូ": "ឍ",
     ]
 
-    /// A whole-word stroke can visit either glyph at each physical position.
-    static let swipeAliases: [Character: Character] = Dictionary(uniqueKeysWithValues: base.flatMap { $0 }.compactMap { key in
-        guard let corner = key.shifted, let scalar = corner.unicodeScalars.first,
-              (0x1780...0x17D2).contains(scalar.value) || scalar.value == 0x17DD else { return nil }
-        return (Character(corner), Character(key.text))
-    })
-
     // The English number and symbol rows use their usual keys. Only their footer adds these.
     static let numbersFooter = [Key(text: "។"), Key(text: "៕")]
     static let symbolsFooter = [Key(text: "។", alternate: "៙"), Key(text: "៖", alternate: "៚")]

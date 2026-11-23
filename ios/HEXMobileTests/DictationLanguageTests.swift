@@ -195,12 +195,16 @@ final class KhmerKeyboardLanguageTests: XCTestCase {
         XCTAssertEqual(languages.layout, .khmer)
         XCTAssertEqual(languages.spaceLabel, "ខ្មែរ")
         XCTAssertEqual(languages.switched(by: 1), .english)
-        XCTAssertEqual(KeyboardLanguage.khmer.letterLayouts, [.khmerism])
+        XCTAssertEqual(KeyboardLanguage.khmer.letterLayouts, [.khmerism, .khmer])
         XCTAssertEqual(KeyboardLanguage.khmer.layoutName(.khmerism), "Khmerism")
+        XCTAssertEqual(KeyboardLanguage.khmer.layoutName(.khmer), "Khmer")
         XCTAssertEqual(settings.letterLayout(for: .khmer), .khmerism)
         settings.setLetterLayout(.khmerism, for: .khmer)
         XCTAssertEqual(settings.letterLayouts["km"], "khmerism")
         XCTAssertEqual(LanguageSettings(defaults: defaults).letterLayout(for: .khmer), .khmerism)
+        settings.setLetterLayout(.khmer, for: .khmer)
+        XCTAssertEqual(settings.letterLayouts["km"], "khmer")
+        XCTAssertEqual(LanguageSettings(defaults: defaults).letterLayout(for: .khmer), .khmer)
     }
 
     func testKhmerTypingDoesNotAssumeDictionaryOrSpeechSupport() {

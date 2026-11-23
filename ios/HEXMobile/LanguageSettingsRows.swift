@@ -348,7 +348,7 @@ struct KeyboardLanguagesPage: View {
         }
     }
 
-    /// Shows Khmerism and languages with a layout choice, using Automatic's language when
+    /// Shows languages with a layout choice, using Automatic's language when
     /// none is chosen. English and Spanish or English and German can share the first
     /// language's keys (`KeyboardLanguageList.layout`).
     private var arranged: [KeyboardLanguage] {
@@ -356,7 +356,7 @@ struct KeyboardLanguagesPage: View {
         var seen = Set<KeyboardLanguage>()
         return typing
             .map { KeyboardLanguageList(languages: typing, current: $0).layout }
-            .filter { ($0 == .khmer || $0.letterLayouts.count > 1) && seen.insert($0).inserted }
+            .filter { $0.letterLayouts.count > 1 && seen.insert($0).inserted }
     }
 
     private func layoutRow(_ language: KeyboardLanguage) -> some View {

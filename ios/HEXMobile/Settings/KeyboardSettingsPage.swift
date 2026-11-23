@@ -260,7 +260,7 @@ struct KeyboardSettingsPage: View {
                     KeyboardVocabularyRow()
                 }
 
-                SettingsSectionHeader(title: "Khmerism")
+                SettingsSectionHeader(title: "Khmer")
 
                 SettingsCard {
                     SettingsToggleRow(
@@ -273,7 +273,7 @@ struct KeyboardSettingsPage: View {
 
                     SettingsToggleRow(
                         title: String(localized: "Swipe typing"),
-                        detail: String(localized: "Trace a Khmer word across its main or corner glyphs, then lift to type it."),
+                        detail: String(localized: "Trace a Khmer word across the keys, then lift to type it."),
                         isOn: binding(\.khmerismSwipeTyping)
                     )
                 }

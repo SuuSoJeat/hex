@@ -508,6 +508,50 @@ final class KeyboardLayoutTests: XCTestCase {
         }
     }
 
+    func testStandardKhmerMatchesNativeKeyOrderOnEveryPage() {
+        let makeLayout = { (layer: KeyboardLayer) in
+            KeyboardLayout(width: 440, layer: layer, showsGlobe: true, showsEmoji: true, language: .khmer, letters: .khmer)
+        }
+        let layout = makeLayout(.letters)
+        let base = [
+            ["១", "២", "៣", "៤", "៥", "៦", "៧", "៨", "៩", "០", "ឥ", "ឲ"],
+            ["ឆ", "ឹ", "េ", "រ", "ត", "យ", "ុ", "ិ", "ោ", "ផ", "ៀ", "ឪ"],
+            ["ា", "ស", "ដ", "ថ", "ង", "ហ", "្", "ក", "ល", "ើ", "់", "ឭ"],
+            ["ឋ", "ខ", "ច", "វ", "ប", "ន", "ម", "ឦ", "។", "៊"],
+        ]
+        let shifted = [
+            ["!", "ៗ", "\"", "៛", "%", "៍", "័", "៏", "ឰ", "ឳ", "៌", "៎"],
+            ["ឈ", "ឺ", "ែ", "ឬ", "ទ", "ួ", "ូ", "ី", "ៅ", "ភ", "ឿ", "ឧ"],
+            ["ឫ", "ៃ", "ឌ", "ធ", "អ", "ះ", "ញ", "គ", "ឡ", "៖", "៉", "ឮ"],
+            ["ឍ", "ឃ", "ជ", "ៈ", "ព", "ណ", "ំ", "ឱ", "៕", "ឯ"],
+        ]
+        for row in base.indices {
+            let keys = layout.keys.filter { $0.row == row && $0.character != nil }
+            XCTAssertEqual(keys.compactMap(\.character), base[row])
+            XCTAssertEqual(keys.compactMap(\.shifted), shifted[row])
+            for key in keys {
+                XCTAssertEqual(layout.hitTest(CGPoint(x: key.frame.midX, y: key.frame.midY)), key)
+            }
+        }
+        XCTAssertEqual(layout.bottomRowIndex, 4)
+        XCTAssertEqual(layout.keys.filter { $0.row == 3 }.first?.kind, .shift)
+        XCTAssertEqual(layout.keys.filter { $0.row == 3 }.last?.kind, .delete)
+        XCTAssertEqual(layout.keys.filter { $0.row == 4 }.map(\.kind), [.layerSwitch(.numbers), .emoji, .space, .returnKey])
+
+        let numbers = makeLayout(.numbers)
+        XCTAssertEqual(numbers.bottomRowIndex, 3)
+        XCTAssertEqual(letters(numbers, row: 0), KeyboardLayout.numberRowDigits)
+        XCTAssertEqual(letters(numbers, row: 1), ["«", "»", "@", "៑", "៛", "/", "៙", "៚", "(", ")"])
+        XCTAssertEqual(letters(numbers, row: 2), ["ឩ", "ឝ", "ឞ", "?", "!"])
+        XCTAssertEqual(numbers.key(.layerSwitch(.letters))?.label, "ក")
+
+        let symbols = makeLayout(.symbols)
+        XCTAssertEqual(symbols.bottomRowIndex, 3)
+        XCTAssertEqual(letters(symbols, row: 0), ["[", "]", "{", "}", "#", "%", "^", "*", "+", "="])
+        XCTAssertEqual(letters(symbols, row: 1), ["-", "_", ":", ";", "<", ">", "$", "£", "€", "•"])
+        XCTAssertEqual(letters(symbols, row: 2), [".", ",", "'", "?", "!"])
+    }
+
     func testKhmerismLaysOutEveryPageWithReachableControls() {
         let screens: [(CGFloat, KeyboardOrientation, KeyboardPhoneSize, KeyboardPosture, CGFloat, KeyboardPadPlacement?)] = [
             (320, .portrait, .regular, .phone, 0, .floating),
@@ -1012,7 +1056,7 @@ final class KeyboardLayoutTests: XCTestCase {
             .czech: [.own, .qwerty],
             .hungarian: [.own, .qwerty],
             .korean: [.own],
-            .khmer: [.khmerism],
+            .khmer: [.khmerism, .khmer],
         ]
         for language in KeyboardLanguage.allCases {
             XCTAssertEqual(language.letterLayouts, offered[language], "\(language)")

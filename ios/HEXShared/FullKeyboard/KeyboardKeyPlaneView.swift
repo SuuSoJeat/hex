@@ -104,7 +104,7 @@ final class KeyboardKeyPlaneView: UIView {
         let glyphAlpha = currentGlyphAlpha()
         let keycapAlpha = 1 - (1 - Self.trackpadKeycapAlpha) * (1 - glyphAlpha)
         if layout.language == .khmer {
-            drawKhmerism(in: context, dirty: rect, glyphAlpha: glyphAlpha, keycapAlpha: keycapAlpha, hideGlyphs: hideGlyphs)
+            drawKhmer(in: context, dirty: rect, glyphAlpha: glyphAlpha, keycapAlpha: keycapAlpha, hideGlyphs: hideGlyphs)
             return
         }
         var pressed = engine.pressedKinds
@@ -258,12 +258,13 @@ final class KeyboardKeyPlaneView: UIView {
         }
     }
 
-    private func drawKhmerism(
+    private func drawKhmer(
         in context: CGContext, dirty: CGRect, glyphAlpha: CGFloat, keycapAlpha: CGFloat, hideGlyphs: Bool
     ) {
         let layout = engine.layout
         let metrics = layout.metrics
         let isDark = palette.isDark
+        let isKhmerism = layout.letters == .khmerism
         let neutral = KhmerismAppearance.Face(fill: palette.keyFill, ink: palette.textBase)
         let pageEdge = CGRect(x: 0, y: metrics.stripTop + metrics.stripHeight - 1, width: bounds.width, height: 1)
         context.setFillColor(palette.stripDivider.cgColor)
@@ -286,7 +287,7 @@ final class KeyboardKeyPlaneView: UIView {
             let label = engine.keycapLabel(for: key)
             let face = if isHighlighted {
                 KhmerismAppearance.Face(fill: heldFill(for: key.kind), ink: palette.textBase)
-            } else if showsKhmerismColors, key.character != nil {
+            } else if isKhmerism, showsKhmerismColors, key.character != nil {
                 KhmerismAppearance.face(for: label, isDark: isDark) ?? neutral
             } else {
                 neutral
@@ -301,7 +302,8 @@ final class KeyboardKeyPlaneView: UIView {
             switch key.kind {
             case .character:
                 let title = layout.layer == .letters ? label : Self.keycapLabel(label == "•" ? "⦁" : label)
-                let cornerLabel = showsKhmerismSuperscripts ? engine.khmerismAlternate(for: key, onKeycap: true) : nil
+                let cornerLabel = isKhmerism && showsKhmerismSuperscripts
+                    ? engine.khmerismAlternate(for: key, onKeycap: true) : nil
                 drawKhmerismCharacter(title, alternate: cornerLabel, in: frame, ink: ink)
             case .shift:
                 drawSymbol(shiftSymbol, in: frame, color: ink, pointSize: iconSize, yOffset: 0.67)

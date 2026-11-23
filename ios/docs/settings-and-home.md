@@ -44,8 +44,9 @@ list starts at the top. The pages, one file each in `HEXMobile/Settings/`
   chosen, and Languages, Hex key and Number row (off by default) while Full is; under
   **Typing**, only while Full is chosen, Auto-capitalization, Autocorrect (with Spatial
   autocorrect below it while it's on), Swipe typing, Suggest swear words and Vocabulary (Hex's
-  custom vocabulary list, how many words it holds); under **Feedback**, Key pop-ups (Full
-  only), Haptics (the dictation bar uses it too; Strength below it while it's on: Light, the
+  custom vocabulary list, how many words it holds); under **Khmer**, Smart Mode and Swipe
+  typing for both Khmer layouts (Full only, both off by default); under **Feedback**, Key
+  pop-ups (Full only), Haptics (the dictation bar uses it too; Strength below it while it's on: Light, the
   default until you choose, Medium or Strong) and Emoji (Clear emoji history while it's on,
   which asks first); and a field to try the keyboard in.
 - **Privacy:** "Everything stays on this iPhone", Learn how I type (what it
@@ -61,8 +62,9 @@ list starts at the top. The pages, one file each in `HEXMobile/Settings/`
   keyboard when unfolded (only on a foldable iPhone, `FullKeyboardView.isFoldable`);
   **Typing**: Adaptive touch (its status and Reset touch learning below the switch),
   Two-thumb selection, Delete swiped words letter by letter, Hide word suggestions, Emoji
-  shortcodes and Learn each language separately. **Khmerism** offers No colors, No
-  superscripts and Swipe typing. See [Khmerism](keyboard.md#khmerism) for what each switch changes.
+  shortcodes and Learn each language separately. **Khmerism** offers No colors and No
+  superscripts for the Khmerism layout. See [Khmer keyboard layouts](keyboard.md#khmer-keyboard-layouts)
+  for what each switch changes.
 
 Simulator scenes: `--snap-state settings-home` (ready), `setup` (keyboard
 added, Full Access not confirmed yet), `setup-sheet`, `setup-sheet-microphone`

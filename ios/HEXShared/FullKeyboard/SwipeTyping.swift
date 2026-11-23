@@ -4,7 +4,7 @@ import UIKit
 /// Settings › Keyboard › Swipe typing: slide from a letter through the letters of a word and lift,
 /// and the word goes in, as with Apple's QuickPath and Gboard's glide typing. English and
 /// Spanish layouts. French (France), Polish, and German use Swipe typing in more languages.
-/// Khmerism has its own swipe typing setting.
+/// The Khmer layouts share their own swipe typing setting.
 ///
 /// A touch on a letter key becomes a swipe once it travels more than a key's pitch from
 /// where it went down: the key no longer types, a light trail follows the finger, and the
@@ -67,7 +67,7 @@ final class SwipeTyping {
     var model: TypingDecoderModel { decoder.model }
     private var isKhmer: Bool { model.language == KeyboardLanguage.khmer.rawValue }
 
-    /// Khmerism also needs short strokes between adjacent keys.
+    /// Khmer also needs short strokes between adjacent keys.
     var threshold: CGFloat { engine.layout.swipePitch * (isKhmer ? 0.65 : 1) }
 
     var isSwiping: Bool { active != nil }
@@ -111,8 +111,7 @@ final class SwipeTyping {
     }
 
     private func isSwipeKey(_ key: KeyboardKey) -> Bool {
-        guard let glyph = key.character?.first, !key.isNumberRow else { return false }
-        return isKhmer || glyph.isLetter
+        TypingDecoder.Keys.swipeLetter(on: key, language: engine.layout.language) != nil
     }
 
     /// True when the touch is a swipe (now or already): the plane leaves it to this.

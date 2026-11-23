@@ -491,8 +491,8 @@ def main_polish(work, out_path, source):
 
 
 def build_khmer(wordlist, out_path):
-    # The bundled SIL/Keyman model supplies word counts. Khmerism's physical
-    # key assignments belong to the Swift layout, including its corner glyphs.
+    # The bundled SIL/Keyman model supplies word counts. The Swift layouts
+    # supply the physical positions of base and alternate glyphs.
     vocab = {}
     coeng = "\u17d2"
 

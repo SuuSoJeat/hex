@@ -2930,26 +2930,29 @@ iOS prototype (`HEXMobile`) -> Record/transcribe/copy and keyboard handoff
 │   dictionary behind its autocorrect (a missing accent is the cheapest fix, "koszonom" →
 │   "köszönöm", while a word of its own such as "meg" keeps its spelling), English as its
 │   bilingual partner through the Latin-script rule, and no typing (spatial) model
-├── Khmer (ភាសាខ្មែរ) → Layout → Khmerism: a regular keyboard language (`km-KH`).
-│   Its five rows use Hex's key height and corner radius. The background and press
+├── Khmer (ភាសាខ្មែរ, `km-KH`) → Layout → Khmerism (default) or Khmer.
+│   Khmer follows the iPhone's main, Shift, 123 and #+= key order with Hex's theme.
+│   Its top letter row includes Khmer digits and its 123 page starts with Arabic digits.
+│   ក returns to letters. Key positions stay fixed after coeng.
+│   Khmerism's five rows use Hex's key height and corner radius. The background and press
 │   colors follow the keyboard theme, with teal marks, green independent vowels,
 │   and rose Khmer digits in light and dark. Arabic digits use the keyboard theme.
 │   Tap for the main glyph
 │   or hold for the corner glyph, which replaces the main glyph in the key pop-up
 │   when pop-ups are enabled. Tap Shift for one character or double-tap to lock
-│   the shifted layer. Tap Shift again to unlock. Space shows ខ្មែរ and uses
-│   the regular language swipe. The emoji key opens Hex's picker.
+│   the shifted layer. Tap Shift again to unlock.
 │   123 and #+= fit four English rows and keep two Khmer punctuation keys beside Space.
 │   On #+=, hold ។ or ៖ for ៙ or ៚. Space, Return or កខគ returns to letters.
-│   The optional Number Row follows the shared setting. With Smart Mode off, Khmer
-│   marks insert as entered. The host handles backspace. With the caret just after coeng (្),
+│   With the caret just after coeng (្),
 │   the letter page brings common subscript consonants onto the main keys and hides
 │   the corner labels. Holds still work, and Shift still selects the full shifted
 │   layer. The usual labels return when the caret moves past or away from coeng. The five-row
 │   letter plane stays joined on the unfolded Duo. Checks: `KhmerKeyboardLanguageTests`,
 │   `KeyboardLayoutTests`, `FullKeyboardEngineTests`.
-│   The suggestion strip offers up to three offline completions from a bundled
-│   SIL/Keyman dictionary. It draws each Khmer suggestion as one word so coeng
+│   On both layouts, Space shows ខ្មែរ and uses the regular language swipe. The emoji key
+│   opens Hex's picker and Number Row follows the shared setting. With Smart Mode off, marks
+│   insert as entered and the host handles backspace. The suggestion strip offers up to three
+│   offline completions from a bundled SIL/Keyman dictionary. It draws each Khmer suggestion as one word so coeng
 │   and its following consonant shape together. Tap one to append the missing
 │   characters. With Autocorrect on, the same dictionary suggests nearby spellings
 │   for one-edit typos. Space accepts a confident correction and leaves the words
@@ -2962,25 +2965,27 @@ iOS prototype (`HEXMobile`) -> Record/transcribe/copy and keyboard handoff
 │   immediately. After a correction with punctuation, Backspace reveals that option.
 │   Checks:
 │   `KhmerAutocompleteTests`, `FullKeyboardEngineTests`.
-│   Settings › Keyboard › Khmerism, with Full chosen (off by default, App Group)
+│   Settings › Keyboard › Khmer, with Full chosen (for both layouts, off by default, App Group)
 │   ├── Smart Mode
 │   │   ├── Tap ញ then ំ → ខ្ញុំ, including next to another word. Subscript ញ and
 │   │   │   text already in the field keep their literal spelling.
-│   │   ├── After a newly typed consonant, the ៉ key offers the matching sign for
-│   │   │   ក៏, ដ៏, ន៍, ស៊, ហ៊, អ៊, or ប៉. Shift and hold give access to fixed signs.
+│   │   ├── After a newly typed consonant, the ៉ key in Khmerism or the ៊ key in Khmer
+│   │   │   offers the matching sign for ក៏, ដ៏, ន៍, ស៊, ហ៊, អ៊, or ប៉.
+│   │   │   Shift and hold give access to fixed signs.
 │   │   ├── Double-tap ា, េ, or ោ within 350 ms → ាំ, េះ, or ោះ.
 │   │   └── In the syllable just typed, a register shifter moves next to the base
 │   │       and replaces a conflicting shifter. A late vowel moves before trailing
 │   │       signs when the syllable has no vowel yet. Rewrites that delete text
 │   │       require the field to confirm the syllable. Checks: `FullKeyboardEngineTests`.
-│   └── Swipe typing → trace one word using the positions
-│       of its main and corner glyphs, including coeng and vowel signs. Lift to insert
+│   └── Swipe typing → trace one word using the positions of its characters on the selected
+│       layout, including shifted glyphs, coeng and vowel signs. Lift to insert
 │       without an automatic space. Near-tied words on the same path wait for a strip pick
 │       when suggestions are visible. Backspace and replacement respect the last swipe's
 │       boundary. VoiceOver and a caret immediately after coeng keep regular key input.
 │       Checks: `SwipeDecoderTests`, `FullKeyboardEngineTests`, `FullKeyboardSettingsTests`.
 │       These cover synthetic paths and proxy fixtures. Real Khmer swipe accuracy is unmeasured.
-│   Settings › Experiments › Khmerism (off by default, App Group, `FullKeyboardSettingsTests`)
+│   Settings › Experiments › Khmerism (Khmerism layout only, off by default, App Group,
+│   `FullKeyboardSettingsTests`)
 │   ├── No colors → every cap uses the keyboard theme
 │   └── No superscripts → hide corner labels, center the main glyph, and keep hold-to-type
 │       and its pop-up

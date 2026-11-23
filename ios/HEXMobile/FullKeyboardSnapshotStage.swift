@@ -6,7 +6,7 @@ import UIKit
 /// `-dark` is a dark app; `-dark-field` is a light app whose field asks for a dark keyboard.
 /// The layout follows `--dictation-language` (Automatic, English, without it), or
 /// `--keyboard-layout nb|es|de|it|fr|fr-CA|fr-CH|pt|pl|cs|hu|ro|ru|uk|el|sr-Latn|ko|km|en` pins it; drafts are in the layout's language.
-/// `--keyboard-letters qwerty|qwertz|azerty|dvorak|khmerism|own` arranges its letters (its own without it).
+/// `--keyboard-letters qwerty|qwertz|azerty|dvorak|khmerism|khmer|own` arranges its letters (its own without it).
 /// `--accent-key ø` (or Cyrillic `е`, `ь`, `ʼ`, Greek `α`, `σ`, `t` on Romanian, or `o` on Hungarian) picks the key the `accents` state holds; `--emoji-query kiss` what `emoji-search` types.
 /// Emoji states (`emoji`, `emoji-search`, `emoji-tones`, `emoji-food`, `emoji-strip`) turn
 /// Settings › Keyboard › Emoji on with a seeded history; `emoji-probe` prints the panel's

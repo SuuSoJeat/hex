@@ -8,7 +8,9 @@ import XCTest
 /// the keys type a swipe is in FullKeyboardEngineTests.
 @MainActor
 final class SwipeDecoderTests: XCTestCase {
-    private func decoder(_ language: KeyboardLanguage, swearing: Bool = false) throws -> (SwipeDecoder, TypingDecoder.Keys) {
+    private func decoder(
+        _ language: KeyboardLanguage, swearing: Bool = false, letters: KeyboardLetterLayout? = nil
+    ) throws -> (SwipeDecoder, TypingDecoder.Keys) {
         let model = try XCTUnwrap(TypingDecoderModel.bundled(language.rawValue), "the \(language) model is bundled")
         var decoder = SwipeDecoder(model: model)
         decoder.neverSuggest = TypingDecoder.NeverSuggest(
@@ -19,7 +21,7 @@ final class SwipeDecoderTests: XCTestCase {
                 AutocorrectEngine.englishContractions, cost: { SwipeDecoder.costOfContraction($0) }, model: model
             )
         }
-        let keys = try XCTUnwrap(TypingDecoder.Keys(layout: KeyboardLayout(width: 390, language: language)))
+        let keys = try XCTUnwrap(TypingDecoder.Keys(layout: KeyboardLayout(width: 390, language: language, letters: letters)))
         return (decoder, keys)
     }
 
@@ -79,6 +81,22 @@ final class SwipeDecoderTests: XCTestCase {
         let reading = decoder.read(SwipePath.through("ដៃ", keys: keys), keys: keys)
         XCTAssertEqual(Set(reading.candidates.prefix(2).map(\.text)), ["ដៃ", "ដ៏"])
         XCTAssertTrue(reading.requiresChoice)
+    }
+
+    func testRegularKhmerSwipesUseItsOwnBaseAndShiftedPositions() throws {
+        let (decoder, keys) = try decoder(.khmer, letters: .khmer)
+        let (khmerism, khmerismKeys) = try self.decoder(.khmer)
+        XCTAssertTrue(decoder.model === khmerism.model, "one bundled Khmer model")
+        XCTAssertNotEqual(SwipePath.through("ខ្ញុំ", keys: keys), SwipePath.through("ខ្ញុំ", keys: khmerismKeys))
+        XCTAssertLessThan(keys.pitch.width, khmerismKeys.pitch.width, "regular Khmer fits twelve columns")
+        XCTAssertEqual(keys.swipeAliases["ភ"], "ផ")
+        XCTAssertNil(keys.swipeAliases["ខ"], "regular Khmer has a base key for ខ")
+        for word in ["ខ្ញុំ", "ភាសា"] {
+            XCTAssertTrue(word.unicodeScalars.map(Character.init).allSatisfy {
+                keys.centres[keys.swipeAliases[$0] ?? $0] != nil
+            }, "\(word) has a position for every scalar")
+            XCTAssertEqual(read(word, decoder, keys).first, word)
+        }
     }
 
     /// Google Books splits "don't" into "do n't", so the model barely counts it: the decoder

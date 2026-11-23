@@ -4506,6 +4506,16 @@
     "Khmerism" : {
       "shouldTranslate" : false
     },
+    "Khmer" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "高棉语"
+          }
+        }
+      }
+    },
     "Smart Mode" : {
       "localizations" : {
         "zh-Hans" : {
@@ -4526,12 +4536,12 @@
         }
       }
     },
-    "Trace a Khmer word across its main or corner glyphs, then lift to type it." : {
+    "Trace a Khmer word across the keys, then lift to type it." : {
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "滑过高棉语单词对应的主字符或角标字符，抬起手指即可输入。"
+            "value" : "滑过高棉语单词对应的按键，抬起手指即可输入。"
           }
         }
       }

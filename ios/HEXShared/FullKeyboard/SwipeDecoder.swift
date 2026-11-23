@@ -364,7 +364,7 @@ nonisolated struct SwipeDecoder: Sendable {
             candidates.append(Candidate(text: word >= 0 ? model.word(word) : extraWords.texts[-1 - word], cost: cost))
         }
         var requiresChoice = false
-        if !keys.swipeAliases.isEmpty, let best = scored.first {
+        if model.language == KeyboardLanguage.khmer.rawValue, let best = scored.first {
             func path(_ c: Int) -> ArraySlice<UInt8> { sequence[Int(offsets[c])..<Int(offsets[c + 1])] }
             // Identical geometry offers no evidence to distinguish these spellings.
             // A one-nat gap allows a clear frequency favorite to commit immediately.
@@ -715,5 +715,8 @@ extension KeyboardLayout {
     }
 
     /// The distance between neighbouring letter keys' centres across: a split half's own pitch.
-    var swipePitch: CGFloat { isSplit ? SplitGeometry.pitch : letterWidth + metrics.gap }
+    var swipePitch: CGFloat {
+        if isSplit { return SplitGeometry.pitch }
+        return (letters == .khmer ? characterWidth : letterWidth) + metrics.gap
+    }
 }
