@@ -1614,7 +1614,9 @@ final class FullKeyboardEngineTests: XCTestCase {
         engine.dvorakPunctuation = true
         XCTAssertFalse(engine.layout.commaPeriodKeys, "Dvorak punctuation already has both on row 1")
         XCTAssertEqual(engine.layout.key(.character(","))?.row, 0)
-        XCTAssertEqual(engine.layout.key(.character(";"))?.row, 3)
+        XCTAssertNil(engine.layout.key(.character(";")))
+        tap(.layerSwitch(.numbers))
+        XCTAssertEqual(engine.layout.key(.character(";"))?.row, 1)
     }
 
     func testHoldNumbersSlideToADigitAndLetGo() {
