@@ -634,15 +634,22 @@ the shared shortcut behavior. Closing
 punctuation applies the correction and types the punctuation. Tap other dictionary
 guesses to use them. Tap the quoted spelling to keep it or tap the undo suggestion
 to restore it. After a correction with punctuation, Backspace reveals that option.
+
+Under **Settings › Keyboard › Khmerism**, both options are off by default.
+
+- **Smart Mode** adds shortcuts such as **ញ** + **ំ** → **ខ្ញុំ**, adapts the
+  diacritic key after common consonants, and orders marks within the syllable
+  you just typed.
+- **Swipe typing** reads one word from the positions of its main and corner
+  glyphs, including coeng and vowel signs. Trace the keys in typing order and
+  lift to insert the word. Near-tied spellings wait for a tap in the suggestion
+  strip when suggestions are visible. Consecutive swipes join without spaces,
+  and Backspace takes back the last swiped word unless letter-by-letter deletion
+  is enabled.
+
 Under **Settings › Experiments › Khmerism**, **No colors** uses the keyboard theme
 for every key, and **No superscripts** hides the small corner labels while keeping
-hold-to-type. **Swipe typing** reads one word from the positions of its main and
-corner glyphs, including coeng and vowel signs. Trace the keys in typing order
-and lift to insert the word. Near-tied spellings with the same path wait for a
-tap in the suggestion strip when suggestions are visible. Consecutive swipes
-join without spaces, and Backspace immediately after insertion takes back the
-last swiped word unless letter-by-letter deletion is enabled. All three
-experiments are off by default.
+hold-to-type. Both are off by default.
 
 ## Keyboard layouts (each language's letters)
 
