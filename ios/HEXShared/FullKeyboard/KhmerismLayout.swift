@@ -1,5 +1,6 @@
-/// The Khmerism designer's letter rows, including the pair beside Space. Shift swaps
-/// the main and corner characters at each position.
+/// Hex's adaptation of the Khmerism letter rows, including the pair beside Space.
+/// See ios/docs/acknowledgements.md for the layout's provenance. Shift swaps the main
+/// and corner characters at each position.
 nonisolated enum KhmerismLayout {
     struct Key {
         let text: String

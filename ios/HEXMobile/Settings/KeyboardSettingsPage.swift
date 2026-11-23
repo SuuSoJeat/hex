@@ -277,27 +277,6 @@ struct KeyboardSettingsPage: View {
 
                     KeyboardVocabularyRow()
                 }
-
-                if usesKhmer {
-                    SettingsSectionHeader(title: "Khmer")
-
-                    SettingsCard {
-                        SettingsToggleRow(
-                            title: String(localized: "Smart Mode"),
-                            detail: String(localized: "Use shortcuts like ញ + ំ → ខ្ញុំ, double-tap vowels, and arrange marks as you type."),
-                            isOn: binding(\.khmerismSmartMode)
-                        )
-
-                        SettingsDivider()
-
-                        SettingsToggleRow(
-                            title: String(localized: "Khmer swipe typing"),
-                            detail: String(localized: "Trace a Khmer word across the keys, then lift to type it."),
-                            isOn: binding(\.khmerismSwipeTyping)
-                        )
-                        .disabled(!settings.swipeTyping)
-                    }
-                }
             }
 
             // Feedback & extras: key pop-ups, haptics, emoji.
