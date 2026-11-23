@@ -620,8 +620,7 @@ nonisolated struct KeyboardLayout: Equatable, Sendable {
     /// Settings › Experiments › Join the keyboard when unfolded: the Duo unfolded upright
     /// draws one keyboard rather than Apple's split one.
     let joinsUnfoldedKeyboard: Bool
-    /// Settings › Experiments › Dvorak punctuation keys: English's Dvorak letters gain comma
-    /// and period on row 1 and a semicolon by the space bar. False on every other arrangement,
+    /// Settings › Experiments › Dvorak punctuation keys. False on every other arrangement,
     /// and on a docked iPad, so those layouts are the same with the experiment on or off.
     let dvorakPunctuation: Bool
     /// Settings › Experiments › Comma and period keys: a comma just left of the space bar and a
@@ -923,6 +922,7 @@ nonisolated struct KeyboardLayout: Equatable, Sendable {
             let columns = letters == .khmerism ? 11 : 12
             return Self.letterWidth(innerWidth: width - 2 * horizontalInset, metrics: metrics, columns: columns)
         }
+        if hasDvorakPunctuationRow { return letterWidth }
         if layer == .letters, letters == .dvorak {
             return Self.dvorakLetterWidth(innerWidth: width - 2 * horizontalInset, metrics: metrics)
         }
@@ -1030,9 +1030,8 @@ nonisolated struct KeyboardLayout: Equatable, Sendable {
 
     /// `joinedUnfoldedWide` is the Duo unfolded upright with Settings › Experiments › Join the
     /// keyboard when unfolded on: its rows keep the split keyboard's 39 pt keycaps, under the
-    /// portrait bottom row's columns. `dvorakPunctuation` is the experiment of that name: comma
-    /// and period on row 1 and a semicolon by the space bar. `commaPeriodKeys` is the other
-    /// experiment's, already narrowed to the letters page in a text field on an iPhone.
+    /// portrait bottom row's columns. `commaPeriodKeys` is already narrowed to the letters page
+    /// in a text field on an iPhone.
     private static func buildKeys(
         width: CGFloat,
         metrics m: KeyboardMetrics,
@@ -1091,23 +1090,29 @@ nonisolated struct KeyboardLayout: Equatable, Sendable {
             return inset + (innerWidth - total) / 2
         }
 
-        if dvorak {
+        if punctuationRow {
+            let punctuation = [("'", "\""), (",", "<"), (".", ">")]
+            for (index, (character, shifted)) in punctuation.enumerated() {
+                let x = left + CGFloat(index) * (referenceW + m.gap)
+                add(.character(character), row: 0, x: x, w: referenceW, label: character, shifted: shifted)
+            }
+            addCharacters(
+                rows[0], row: 0, startX: left + CGFloat(punctuation.count) * (referenceW + m.gap), keyWidth: referenceW
+            )
+            addCharacters(rows[1], row: 1, startX: left, keyWidth: referenceW)
+
+            let middle = Array(rows[2].dropLast(2))
+            let middleWidth = (right - left - 2 * modW - CGFloat(middle.count + 1) * m.gap) / CGFloat(middle.count)
+            add(.shift, row: 2, x: left, w: modW, label: "shift")
+            addCharacters(middle, row: 2, startX: left + modW + m.gap, keyWidth: middleWidth)
+            add(.delete, row: 2, x: right - modW, w: modW, label: "delete")
+        } else if dvorak {
             // Apple's Dvorak: row 1's seven letters end at a delete key a pitch and a half wide,
             // row 2's ten start at the edge, and row 3 is shift and nine letters, edge to edge.
             let pitch = lw + m.gap
             let deleteW = 1.5 * pitch - m.gap
             add(.delete, row: 0, x: right - deleteW, w: deleteW, label: "delete")
-            if punctuationRow {
-                // With the experiment, comma and period come before P on a pitch narrowed so the
-                // nine keys start at the left margin and end where row 1's letters ended.
-                let count = rows[0].count + 2
-                let rowWidth = min(lw, (right - deleteW - m.gap - left - CGFloat(count - 1) * m.gap) / CGFloat(count))
-                add(.character(","), row: 0, x: left, w: rowWidth, label: ",", shifted: "<")
-                add(.character("."), row: 0, x: left + rowWidth + m.gap, w: rowWidth, label: ".", shifted: ">")
-                addCharacters(rows[0], row: 0, startX: left + 2 * (rowWidth + m.gap), keyWidth: rowWidth)
-            } else {
-                addCharacters(rows[0], row: 0, startX: right - deleteW - CGFloat(rows[0].count) * pitch, keyWidth: lw)
-            }
+            addCharacters(rows[0], row: 0, startX: right - deleteW - CGFloat(rows[0].count) * pitch, keyWidth: lw)
             addCharacters(rows[1], row: 1, startX: left, keyWidth: lw)
             add(.shift, row: 2, x: left, w: modW, label: "shift")
             addCharacters(rows[2], row: 2, startX: left + modW + m.gap, keyWidth: lw)
@@ -1181,7 +1186,33 @@ nonisolated struct KeyboardLayout: Equatable, Sendable {
             trailing.append((.dismiss, referenceW, "dismiss"))
         }
 
-        if field == .text, let returnColumn = m.bottomRowReturnColumn {
+        if punctuationRow {
+            // Distribute the full row so the space bar and optional globe, emoji and Hex keys
+            // still fit alongside the semicolon, V and Z on the narrowest keyboards.
+            let letterCount = 3 // Semicolon, V, Z.
+            let keyCount = leading.count + trailing.count + letterCount + 1 // Space.
+            let spaceUnits: CGFloat = 3.15
+            let returnUnits: CGFloat = 1.65
+            let units = CGFloat(keyCount - 2) + spaceUnits + returnUnits
+            let unitWidth = (right - left - CGFloat(keyCount - 1) * m.gap) / units
+            var x = left
+            for (kind, _, label) in leading {
+                add(kind, row: 3, x: x, w: unitWidth, label: label)
+                x += unitWidth + m.gap
+            }
+            add(.character(";"), row: 3, x: x, w: unitWidth, label: ";", shifted: ":")
+            x += unitWidth + m.gap
+            add(.space, row: 3, x: x, w: spaceUnits * unitWidth, label: "space")
+            x += spaceUnits * unitWidth + m.gap
+            let lastLetters = Array(rows[2].suffix(2))
+            addCharacters(lastLetters, row: 3, startX: x, keyWidth: unitWidth)
+            x += CGFloat(lastLetters.count) * (unitWidth + m.gap)
+            for (kind, _, label) in trailing {
+                let w = kind == .returnKey ? returnUnits * unitWidth : unitWidth
+                add(kind, row: 3, x: x, w: w, label: label)
+                x += w + m.gap
+            }
+        } else if field == .text, let returnColumn = m.bottomRowReturnColumn {
             // Turned, and on the Duo folded: the page key, the globe and emoji on row 1's
             // columns (`bottomRowLeadColumn`), space up to return's column (on the Duo, Apple's
             // dictation key sits just before return: Hex has none, so space runs on) and a Hex
@@ -1274,9 +1305,8 @@ nonisolated struct KeyboardLayout: Equatable, Sendable {
             }
         }
 
-        // Settings › Experiments › Dvorak punctuation: a semicolon just left of the space bar,
-        // taking its width from it, where the bar holds a letter-wide key and a space besides.
-        if punctuation, let i = drawn.firstIndex(where: { $0.kind == .space && $0.row == 3 }) {
+        // In URL and email fields, add just the semicolon where the space bar has room.
+        if punctuation && !punctuationRow, let i = drawn.firstIndex(where: { $0.kind == .space && $0.row == 3 }) {
             let space = drawn[i].frame
             if space.width >= 2 * referenceW + m.gap {
                 drawn[i] = (

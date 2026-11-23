@@ -427,7 +427,8 @@ Choose a supported language              // setup.language-conditioning; macOS +
 │   offers it (#1991)
 ├── Bangla -> Whisper only, with the `bn` hint; Auto lets Whisper guess per clip
 ├── Khmer -> Whisper only, with the `km` hint; Auto lets Whisper guess per clip
-└── Azerbaijani -> Whisper only, with the `az` hint; Auto lets Whisper guess per clip
+├── Azerbaijani -> Whisper only, with the `az` hint; Auto lets Whisper guess per clip
+└── Catalan -> Whisper only, with the `ca` hint; Auto lets Whisper guess per clip
 ```
 
 Whisper and Qwen3-ASR (including QwenCleo) read the shared
@@ -595,6 +596,14 @@ starts on Whisper. `azerbaijani_is_transcribed_by_whisper_with_its_language_hint
 checks the recommendation, the `az` hint, that Whisper's picker offers it, and
 that Qwen3-ASR rejects it. It runs no inference, and Azerbaijani accuracy has
 not been measured.
+
+Catalan (`ca`) is offered because Whisper large-v3-turbo was trained on it and
+no other available catalog model supports it, so Whisper is its only,
+recommended choice and a system whose first preferred language is Catalan
+starts on Whisper. `catalan_is_transcribed_by_whisper_with_its_language_hint`
+checks the recommendation, the `ca` hint, that Whisper's picker offers it, and
+that Qwen3-ASR rejects it. It runs no inference, and Catalan accuracy has not
+been measured.
 
 Checks start in [desktop/onboarding.rs](../../src/desktop/onboarding.rs),
 [transcription.rs](../../src/transcription.rs), and
@@ -916,10 +925,12 @@ Completed output                         // output
     ├── Labs > Copy dictation audio (off) -> copies a kept WAV as a file   // labs.copy-dictation-audio
     │   -> the card's Copy audio beside Play, and the menu bar or tray's Copy last dictation audio
     │   -> needs Keep recordings; it stores no audio itself (labs.md)
-    └── Labs > Dictation stats (off) -> History's Stats dialog and hex history stats   // labs.history-stats
-        -> headline tiles, time saved with a typing-speed slider, the busiest hour, a 30-day chart, top apps
-        -> a 53-week heatmap and all-time totals, from a daily rollup in usage.json with no text or app names
-        -> Clear all history deletes the rollup too (labs.md)
+    ├── Labs > Dictation stats (off) -> History's Stats dialog and hex history stats   // labs.history-stats
+    │   -> headline tiles, time saved with a typing-speed slider, the busiest hour, a 30-day chart, top apps
+    │   -> a 53-week heatmap and all-time totals, from a daily rollup in usage.json with no text or app names
+    │   -> Clear all history deletes the rollup too (labs.md)
+    └── Labs > Stats on History (off) -> one compact strip of those six headline numbers above the list   // labs.history-stats-strip
+        -> needs Dictation stats and its own switch; off, History is exactly as before (labs.md)
 Every entry since #1177 -> "Speech model" fact: the model that made its text (+ language when chosen)
 ```
 
@@ -1277,8 +1288,8 @@ what is playing, so Hex hears the browsers through a private process tap
 (aggregate `anomaly.hex.browser-tap.<pid>`, apart from the meeting tap) and sends
 play only after it saw the browser go silent right after its own pause. The
 browsers are the ones [microphone_activity.rs](../../src/microphone_activity.rs)
-knows: Chrome, Brave, Safari, Firefox, Edge, Arc, Vivaldi, Helium, Ardia, and
-Zen, whose helpers count as their browser. The sequence checks in
+knows: Chrome, Brave, Safari, Firefox, Edge, Arc, Vivaldi, Helium, Ardia,
+Zen, and Aside, whose helpers count as their browser. The sequence checks in
 [audio/browser_media.rs](../../src/audio/browser_media.rs) run on fakes:
 `a_confirmed_pause_is_resumed`, `two_sounding_tabs_never_get_play`,
 `a_browser_already_playing_gets_no_play`, `a_call_is_never_paused`,
@@ -1521,9 +1532,10 @@ other way. Check: `the_page_is_read_only_when_processing_uses_it` in
 browser. On macOS the front window's title is read only by meeting detection
 and while a script transformation is set up (`reads_window_title`). When
 something uses the page, macOS asks the front tab of Safari, Orion, Chrome,
-Brave, Edge, Arc, Vivaldi, Opera, Helium, and Chromium over AppleScript (one
-Automation prompt per browser; a refusal keeps the application context) and
-reads any other app's focused AXWebArea `AXURL` (Firefox, Zen, web views).
+Brave, Edge, Arc, Vivaldi, Opera, Helium, Chromium, and Aside over
+AppleScript (one Automation prompt per browser; a refusal keeps the
+application context) and reads any other app's focused AXWebArea `AXURL`
+(Firefox, Zen, web views).
 That AppleScript read is not part of the 500 ms foreground-context poll: the
 poll reads it once when a scriptable browser becomes the frontmost process
 (caching its address, or no address after a failed read, per pid), so
@@ -3112,19 +3124,16 @@ iOS prototype (`HEXMobile`) -> Record/transcribe/copy and keyboard handoff
 │   when the globe shows, space after them, return from m). Apple's Split Keyboard
 │   preference can't be read by a keyboard extension. Off, the split keyboard is unchanged.
 │   Unit tests only: no CI compiles the iOS targets, and no physical iPhone run checks it
-├── Dvorak punctuation keys (off by default, `experiments.dvorakPunctuation`): English's Dvorak
-│   letters gain comma and period ahead of P on row 1, whose nine keys narrow to start at the
-│   left margin and end at the same delete key, and a semicolon just left of the space bar,
-│   a letter wide (`referenceW`), only where the bar still holds a letter-wide space; on the
-│   Duo's split keyboard only the left half takes the two punctuation keys, on a pitch narrowed
-│   so the half keeps its right edge (its top-row keys are narrower than the right half's), and
-│   the semicolon takes from the left space bar, which keeps ending where it did. They type
-│   < > : with a shift you press or caps lock; auto-capitalization leaves the comma. A URL or
-│   email field keeps its own `.` key rather than a second key of the same kind. With the
-│   experiment off, every layout is key for key the one it was; a docked iPad keeps Apple's own
-│   rows. Adaptive touch learns the narrower key plane apart from Apple's Dvorak.
-│   Unit tests only (`KeyboardLayoutTests`, `FullKeyboardEngineTests`): no CI compiles the iOS
-│   targets, and no physical iPhone run checks it
+├── Dvorak punctuation keys (off by default, `experiments.dvorakPunctuation`): English Dvorak
+│   in a plain text field on the joined keyboard (including a floating iPad) starts row 1 with
+│   apostrophe, comma and period. Delete ends row 3. The bottom row puts semicolon before
+│   space and V, Z immediately after it. Manual shift or caps lock types the double quote,
+│   <, > and : from their punctuation keys. Auto-capitalization leaves punctuation alone.
+│   On the split Duo, comma and period join the left half's top row and semicolon fits beside
+│   the left space bar. URL and email fields keep their own period and add semicolon where it
+│   fits. Docked iPads keep the system layout. Adaptive touch learns the alternate key positions
+│   separately. `KeyboardLayoutTests` check rows, bounds and hit targets across keyboard shapes.
+│   `FullKeyboardEngineTests` check typing and shift. Physical iPhone coverage is pending.
 ├── Comma and period keys (off by default, `experiments.commaPeriodKeys`): a comma just left
 │   of the space bar and a period just right of it, both a letter wide, on an iPhone's letters
 │   page in a plain text field. On the joined keyboard the comma starts where the bar used to

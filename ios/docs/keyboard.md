@@ -600,16 +600,10 @@ letter keys holds them right after their base letter, as Apple's does (German QW
 A Ä À…, O Ö…, U Ü…; Spanish QWERTY: N Ñ Ń). Apple's Dvorak is P Y F G C R L and delete,
 A O E U I D H T N S from the edge, shift and Q J K X B M W V Z, on keys narrowed so that
 row fits (38.3 pt pitch on a 402 pt iPhone); split on the Duo it keeps delete on row 3
-(Apple's split Dvorak unobserved). Settings › Experiments › Dvorak punctuation keys (off by
-default, `experiments.dvorakPunctuation`) puts `,` and `.` ahead of P on row 1, whose nine keys
-narrow to start at the left margin and end at the same delete key, puts `;` just left of the
-space bar where it can give up a letter's width, and types `<`, `>` and `:` with a shift you
-press or caps lock (auto-capitalization leaves the comma); on the split Duo the two
-punctuation keys join only the left half, on a pitch narrowed so it keeps its right edge (its
-top-row keys are narrower), and `;` takes from the left space bar. A URL, email or web search
-field keeps its own `.` key instead of row 1's, and Experiments › Comma and period keys adds no second pair
-beside the space bar where this experiment put them on row 1. Off, every layout is key for key
-the one it was. Kept per
+(Apple's split Dvorak unobserved). Settings › Experiments › Dvorak punctuation keys
+(off by default, `experiments.dvorakPunctuation`) adds an alternate layout for plain text on
+the joined keyboard. The [feature map](../../docs/features/README.md#developer-and-prototype-surfaces)
+lists its key positions and the layouts used in split, URL and email fields. Kept per
 language in the App Group
 (`settings.keyboardLanguages.layouts`, `LanguageSettings.letterLayout(for:)`); unset,
 not offered, or unreadable (an iPhone that keeps the App Group from a keyboard without

@@ -89,7 +89,7 @@ final class LiveDictationPreviewView: UIView {
     /// slop or is held as long as a key takes to open its accents does nothing, so a thumb
     /// resting or sliding where the keys were never ends a dictation.
     func touchDown(at point: CGPoint, time: TimeInterval) {
-        down = time - shownAt >= Self.settle ? (point, time) : nil
+        down = time >= shownAt + Self.settle ? (point, time) : nil
     }
 
     func touchMoved(to point: CGPoint) {
@@ -99,7 +99,7 @@ final class LiveDictationPreviewView: UIView {
 
     func touchUp(at point: CGPoint, time: TimeInterval) {
         defer { down = nil }
-        guard let down, time - down.time < FullKeyboardEngine.accentHoldDelay,
+        guard let down, time < down.time + FullKeyboardEngine.accentHoldDelay,
               hypot(point.x - down.point.x, point.y - down.point.y) <= FullKeyboardEngine.accentSlop else { return }
         finish()
     }
