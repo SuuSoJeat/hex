@@ -626,7 +626,9 @@ Arabic digits use the keyboard theme. Web search fields add a period before Retu
 hold **។** or **៖** to type **៙** or **៚**. The five letter rows use Hex's key
 height and corner radius, with teal marks, green
 independent vowels and rose Khmer digits. The background and press colors follow
-the keyboard theme.
+the keyboard theme. Main and corner labels fit within each key using the visible
+bounds of the shaped character. The space between them keeps wide vowels and
+combining marks clear on narrow keys.
 When the caret follows coeng (**្**), common subscript consonants move onto the
 main keys and the corner labels hide. Hold a changed key to type its usual
 character. Shift still selects the full shifted layer. The usual labels return

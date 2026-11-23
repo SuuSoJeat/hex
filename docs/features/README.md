@@ -2937,6 +2937,7 @@ iOS prototype (`HEXMobile`) -> Record/transcribe/copy and keyboard handoff
 │   Khmerism's five rows use Hex's key height and corner radius. The background and press
 │   colors follow the keyboard theme, with teal marks, green independent vowels,
 │   and rose Khmer digits in light and dark. Arabic digits use the keyboard theme.
+│   Main and corner glyphs fit in separate padded areas, including wide vowels and marks.
 │   Tap for the main glyph
 │   or hold for the corner glyph, which replaces the main glyph in the key pop-up
 │   when pop-ups are enabled. Tap Shift for one character or double-tap to lock

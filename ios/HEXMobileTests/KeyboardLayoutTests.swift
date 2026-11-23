@@ -727,6 +727,31 @@ final class KeyboardLayoutTests: XCTestCase {
     }
 
     @MainActor
+    func testKhmerismLegendsFitWithSpaceBetweenMainAndCorner() throws {
+        for (width, phoneSize) in [(420.0, KeyboardPhoneSize.large), (375, .homeButton), (320, .homeButton)] {
+            for layer in layers {
+                let layout = KeyboardLayout(width: width, layer: layer, showsEmoji: true, language: .khmer, phoneSize: phoneSize)
+                for key in layout.keys where key.character != nil {
+                    let labels = [(key.label, key.alternate), (key.shifted ?? key.label, key.shiftedAlternate)]
+                    let safeFrame = key.frame.insetBy(dx: 2, dy: 2)
+                    for (main, alternate) in labels {
+                        let legends = KhmerismAppearance.legends(
+                            main: main, alternate: alternate, in: key.frame, mainSize: 21, ink: .black
+                        )
+                        let primary = try XCTUnwrap(legends.main, "\(width) \(layer) \(main)")
+                        XCTAssertTrue(safeFrame.contains(primary.bounds), "\(width) \(layer) \(main)")
+                        if let alternate {
+                            let corner = try XCTUnwrap(legends.alternate, alternate)
+                            XCTAssertTrue(safeFrame.contains(corner.bounds), alternate)
+                            XCTAssertGreaterThanOrEqual(primary.bounds.minY - corner.bounds.maxY, 1.99, "\(main) / \(alternate)")
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    @MainActor
     func testKhmerismRequestsAHostResizeWhenItsRowCountChanges() {
         let target = FixtureTextTarget()
         let view = FullKeyboardView(model: KeyboardViewModel(), target: target)
