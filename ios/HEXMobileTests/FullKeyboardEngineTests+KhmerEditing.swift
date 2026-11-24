@@ -3,6 +3,100 @@ import XCTest
 @testable import HEX
 
 extension FullKeyboardEngineTests {
+    func testKhmerPersonalSuggestionsLearnAnUnspacedWordFromDifferentContexts() async throws {
+        let word = "ណាវី"
+        let first = "ខ្ញុំចូលចិត្តណាវីណាស់"
+        let second = "ខ្ញុំបានជួបណាវីម្សិលមិញ"
+        let index = KhmerAutocomplete(wordlist: """
+            ខ្ញុំ\t100
+            ចូលចិត្ត\t100
+            ណាស់\t100
+            បានជួប\t100
+            ម្សិលមិញ\t100
+            """)
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let settings = TypingJournalSettings(defaults: defaults)
+
+        for layout in [KeyboardLetterLayout.khmer, .khmerism] {
+            TypingJournal.delete(in: directory, settings: settings)
+            smartField(language: .khmer)
+            target.documentIdentifier = UUID()
+            engine.letterLayout = layout
+            await engine.khmerAutocompleteLoad?.value
+            engine.khmerAutocomplete = index
+            engine.khmerPersonalSuggestions = true
+            engine.autocorrect.isEnabled = false
+            engine.journal = TypingJournal(directory: directory, settings: settings)
+
+            for sentence in [first, first] {
+                for unit in sentence.unicodeScalars {
+                    engine.insertKhmerKeyText(String(unit), source: "key")
+                }
+                tap(.returnKey)
+            }
+            let reloaded = TypingJournal(directory: directory, settings: settings)
+            engine.journal = reloaded
+            XCTAssertTrue(reloaded.khmerSuggestions.isEmpty)
+
+            for unit in second.unicodeScalars {
+                engine.insertKhmerKeyText(String(unit), source: "key")
+            }
+            tap(.returnKey)
+            XCTAssertEqual(reloaded.khmerSuggestions.preferredWords(prefix: "ណា"), [word])
+            XCTAssertFalse(reloaded.khmerSuggestions.preferredWords().contains(first))
+        }
+    }
+
+    func testKhmerContinuationUsesTheTwoPrecedingWordsOnBothLayouts() async throws {
+        for layout in [KeyboardLetterLayout.khmer, .khmerism] {
+            smartField(language: .khmer)
+            target.documentIdentifier = UUID()
+            engine.letterLayout = layout
+            await engine.khmerAutocompleteLoad?.value
+            target.insertText("ប្រហិតសាច់")
+            engine.textDidChange()
+            XCTAssertEqual(engine.suggestions.first?.displayText, "គោ")
+            engine.insertKhmerKeyText("គ", source: "key")
+            let completion = try XCTUnwrap(engine.suggestions.first)
+            XCTAssertEqual(completion.displayText, "គោ")
+            engine.acceptSuggestion(completion)
+            XCTAssertEqual(target.text, "ប្រហិតសាច់គោ")
+
+            target.insertText("\nសាច់")
+            engine.textDidChange()
+            XCTAssertNotEqual(engine.suggestions.first?.displayText, "គោ")
+        }
+    }
+
+    func testKhmerPersonalContinuationOverridesMoreFrequentSingleWordContext() async throws {
+        smartField(language: .khmer)
+        target.documentIdentifier = UUID()
+        await engine.khmerAutocompleteLoad?.value
+        engine.khmerAutocomplete = KhmerAutocomplete(wordlist: "ខ្ញុំ\t100\nគាត់\t100\nចង់\t100\nបាន\t100\nទៅ\t100")
+        engine.autocorrect.isEnabled = false
+        let journal = TypingJournal(directory: nil, settings: TypingJournalSettings(defaults: defaults))
+        engine.journal = journal
+        engine.khmerPersonalSuggestions = true
+
+        for sentence in Array(repeating: "គាត់ចង់ទៅ", count: 3) + Array(repeating: "ខ្ញុំចង់បាន", count: 2) {
+            for unit in sentence.unicodeScalars {
+                engine.insertKhmerKeyText(String(unit), source: "key")
+            }
+            tap(.returnKey)
+        }
+        XCTAssertEqual(journal.khmerSuggestions.preferredWords(after: "ចង់").first, "ទៅ")
+        XCTAssertEqual(journal.khmerSuggestions.contextualFollowers["ខ្ញុំ ចង់"], ["បាន"])
+
+        target.insertText("ខ្ញុំចង់")
+        engine.textDidChange()
+        XCTAssertEqual(engine.suggestions.first?.displayText, "បាន")
+        let json = try JSONSerialization.jsonObject(with: KhmerLearningDocument(learning: journal.khmerSuggestions).data)
+        let triples = (json as? [String: Any])?["triples"] as? [String: [String: Int]]
+        XCTAssertEqual(triples?["ខ្ញុំ ចង់"]?["បាន"], 2)
+    }
+
     func testKhmerPersonalSuggestionsLearnNewManuallyTypedWord() async throws {
         let word = "ហេក្ស"
         let index = KhmerAutocomplete(wordlist: "សូម\t100\nហាម\t50")

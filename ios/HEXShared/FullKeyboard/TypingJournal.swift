@@ -104,6 +104,8 @@ nonisolated struct TypingJournalSnapshot: Codable, Equatable, Sendable {
     var keys: [String: TypingJournalKeyStats] = [:]
     var corrections: [TypingJournalCorrection] = []
     var khmerSuggestions = KhmerSuggestionLearning()
+    /// First neighboring-word context of each spelling inferred from joined text.
+    var khmerEvidence: [String: String]?
     /// Word-level (heard → meant) pairs from dictations, with counts.
     var dictationFixes: [TypingJournalDictationFix] = []
     /// What happened to each dictation (kept, edited, …), without its text.
@@ -112,13 +114,14 @@ nonisolated struct TypingJournalSnapshot: Codable, Equatable, Sendable {
     var tapCount: Int { keys.values.reduce(0) { $0 + $1.count } }
 
     var isEmpty: Bool {
-        tapCount == 0 && corrections.isEmpty && dictationFixes.isEmpty && dictationOutcomes.isEmpty && khmerSuggestions.isEmpty
+        tapCount == 0 && corrections.isEmpty && dictationFixes.isEmpty && dictationOutcomes.isEmpty
+            && khmerSuggestions.isEmpty && (khmerEvidence?.isEmpty ?? true)
     }
 }
 
 extension TypingJournalSnapshot {
     private enum CodingKeys: String, CodingKey {
-        case keys, corrections, dictationFixes, dictationOutcomes, khmerSuggestions
+        case keys, corrections, dictationFixes, dictationOutcomes, khmerSuggestions, khmerEvidence
     }
 
     /// Journals written before dictation learning have only keys and corrections.
@@ -127,6 +130,7 @@ extension TypingJournalSnapshot {
         keys = try container.decodeIfPresent([String: TypingJournalKeyStats].self, forKey: .keys) ?? [:]
         corrections = try container.decodeIfPresent([TypingJournalCorrection].self, forKey: .corrections) ?? []
         khmerSuggestions = try container.decodeIfPresent(KhmerSuggestionLearning.self, forKey: .khmerSuggestions) ?? .init()
+        khmerEvidence = try container.decodeIfPresent([String: String].self, forKey: .khmerEvidence)
         dictationFixes = try container.decodeIfPresent([TypingJournalDictationFix].self, forKey: .dictationFixes) ?? []
         dictationOutcomes = try container.decodeIfPresent([TypingJournalDictationOutcome].self, forKey: .dictationOutcomes) ?? []
     }
@@ -236,11 +240,32 @@ final class TypingJournal {
         return snapshot.khmerSuggestions
     }
 
-    func recordKhmerWords(_ words: [String], after previous: String?) {
+    func recordKhmerWords(
+        _ words: [String], after previous: String?, precededBy earlier: String? = nil, inferredIndex: Int? = nil
+    ) {
         refreshFromDisk()
+        if let inferredIndex {
+            let word = words[inferredIndex]
+            let context = words[inferredIndex - 1] + " " + words[inferredIndex + 1]
+            var evidence = snapshot.khmerEvidence ?? [:]
+            guard let first = evidence[word] else {
+                if evidence.count >= 64, let evicted = evidence.keys.min() { evidence.removeValue(forKey: evicted) }
+                evidence[word] = context
+                snapshot.khmerEvidence = evidence
+                save()
+                return
+            }
+            guard first != context else { return }
+            snapshot.khmerEvidence?.removeValue(forKey: word)
+            // Credit the first observation once a different context confirms the spelling.
+            snapshot.khmerSuggestions.record(word, after: nil)
+        }
         var previous = previous
+        var earlier = earlier
         for word in words {
-            snapshot.khmerSuggestions.record(word, after: previous)
+            snapshot.khmerEvidence?.removeValue(forKey: word)
+            snapshot.khmerSuggestions.record(word, after: previous, precededBy: earlier)
+            earlier = previous
             previous = word
         }
         save()

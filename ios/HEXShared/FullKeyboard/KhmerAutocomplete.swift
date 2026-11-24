@@ -61,7 +61,7 @@ struct KhmerAutocomplete: Sendable {
     private static let minimumSubstitutionGain = 0.65
     private static let minimumCoengCorrectionFrequency = 1_000
     private static let contextLength = 96
-    static let learningRunLimit = 48
+    static let learningRunLimit = contextLength
     private static let coeng: UInt16 = 0x17D2
     private static let dependentVowels: ClosedRange<UInt16> = 0x17B6...0x17C5
     private static let spellingAlphabet = Array(UInt16(0x1780)...0x17B3) + Array(UInt16(0x17B6)...0x17D2) + [0x17DD]
@@ -134,31 +134,158 @@ struct KhmerAutocomplete: Sendable {
         text.utf16.last.map(isWordUnit) ?? false
     }
 
-    /// Learn a joined run when its shortest dictionary reading is unambiguous.
-    /// A short, manually typed run with explicit boundaries can also be a new word.
+    struct LearningReading {
+        let words: [String]
+        var inferredIndex: Int? = nil
+    }
+
+    private struct DictionaryReading {
+        let words: [String]
+        var unique: Bool
+
+        func preferred(over other: Self?) -> Self {
+            guard var other, other.words.count <= words.count else { return self }
+            if other.words.count == words.count { other.unique = false }
+            return other
+        }
+    }
+
     func wordsForLearning(in text: String, vocabulary: [String], allowsNewWord: Bool = false) -> [String] {
+        learningReading(in: text, vocabulary: vocabulary, allowsNewWord: allowsNewWord)?.words ?? []
+    }
+
+    /// Prefer a complete dictionary reading. Otherwise look for one short gap
+    /// with complete dictionary readings on both sides.
+    func learningReading(
+        in text: String, vocabulary: [String], allowsNewWord: Bool = false, inferJoinedWord: Bool = false
+    ) -> LearningReading? {
         let run = Array(text.utf16)
         guard let first = run.first, Self.beginsWord(first), run.count <= Self.learningRunLimit,
-              run.allSatisfy(Self.isWordUnit), Self.hasCompleteClusters(run[...]) else { return [] }
+              run.allSatisfy(Self.isWordUnit), Self.hasCompleteClusters(run[...]) else { return nil }
         let personal = PersonalLexicon(vocabulary)
-        var readings: [(words: [String], unique: Bool)?] = Array(repeating: nil, count: run.count + 1)
-        readings[run.count] = ([], true)
-        for start in run.indices.reversed() where start == 0 || Self.isBoundary(start, in: run) {
+        let edges = run.indices.map { start -> [Int] in
+            guard start == 0 || Self.isBoundary(start, in: run) else { return [] }
             var ends = Array(repeating: false, count: run.count + 1)
             markWordEnds(from: start, in: run, personal: personal, expanded: expandedWords, into: &ends)
-            for end in (start + 1)...run.count where ends[end] {
-                guard let suffix = readings[end] else { continue }
-                let count = suffix.words.count + 1
-                if let best = readings[start] {
-                    if best.words.count == count { readings[start]?.unique = false }
-                    if best.words.count <= count { continue }
-                }
+            return ((start + 1)...run.count).filter { ends[$0] }
+        }
+        var suffixes = Array<DictionaryReading?>(repeating: nil, count: run.count + 1)
+        suffixes[run.count] = DictionaryReading(words: [], unique: true)
+        for start in run.indices.reversed() {
+            for end in edges[start] {
+                guard let suffix = suffixes[end] else { continue }
                 let word = String(decoding: run[start..<end], as: UTF16.self)
-                readings[start] = ([word] + suffix.words, suffix.unique)
+                suffixes[start] = DictionaryReading(words: [word] + suffix.words, unique: suffix.unique)
+                    .preferred(over: suffixes[start])
             }
         }
-        if let reading = readings[0] { return reading.unique ? reading.words : [] }
-        return allowsNewWord && (2...24).contains(run.count) ? [text] : []
+        if let reading = suffixes[0] { return reading.unique ? LearningReading(words: reading.words) : nil }
+        guard allowsNewWord else { return nil }
+        let standalone = (2...24).contains(run.count) ? LearningReading(words: [text]) : nil
+        guard inferJoinedWord else { return standalone }
+
+        var prefixes = Array<DictionaryReading?>(repeating: nil, count: run.count + 1)
+        prefixes[0] = DictionaryReading(words: [], unique: true)
+        for start in run.indices {
+            guard let prefix = prefixes[start] else { continue }
+            for end in edges[start] {
+                let word = String(decoding: run[start..<end], as: UTF16.self)
+                prefixes[end] = DictionaryReading(words: prefix.words + [word], unique: prefix.unique)
+                    .preferred(over: prefixes[end])
+            }
+        }
+        var best: (length: Int, reading: LearningReading?)?
+        var hasFramedGap = false
+        for start in run.indices.dropFirst() {
+            guard let prefix = prefixes[start] else { continue }
+            for end in ((start + 1)..<run.count) {
+                let gap = run[start..<end]
+                guard (2...24).contains(gap.count), let suffix = suffixes[end],
+                      Self.hasCompleteClusters(gap) else { continue }
+                hasFramedGap = true
+                guard supportsShortAnchor(prefix.words, onRight: false),
+                      supportsShortAnchor(suffix.words, onRight: true) else { continue }
+                if let current = best, current.length <= gap.count {
+                    if current.length == gap.count { best?.reading = nil }
+                    continue
+                }
+                let word = String(decoding: gap, as: UTF16.self)
+                let reading = LearningReading(words: prefix.words + [word] + suffix.words, inferredIndex: prefix.words.count)
+                best = (gap.count, prefix.unique && suffix.unique ? reading : nil)
+            }
+        }
+        if let best { return best.reading }
+        return hasFramedGap ? nil : standalone
+    }
+
+    /// Short dictionary matches often occur inside names. Trust one inside a
+    /// longer known phrase when the bundled model has seen the neighboring pair.
+    private func supportsShortAnchor(_ words: [String], onRight: Bool) -> Bool {
+        guard let model = expandedWords, words.count >= 2 else { return true }
+        let pair = onRight ? Array(words.prefix(2)) : Array(words.suffix(2))
+        let anchor = onRight ? pair[0] : pair[1]
+        if anchor.utf16.count >= 3 { return true }
+        guard let first = model.index(of: pair[0]), let second = model.index(of: pair[1]) else { return false }
+        return model.bigramCost(first, second) != nil
+    }
+
+    struct ContextualCompletions {
+        let previous: String
+        let prefix: String
+        var words: [String]
+    }
+
+    /// Match an exact two-word context at the caret, with or without visible spaces.
+    /// The text after the context is a prefix of the proposed continuation.
+    func contextualCompletions(
+        before: String, followers: [String: [String]], personalWords: [String], mayOffer: (String, String) -> Bool
+    ) -> ContextualCompletions? {
+        let tail = Array(before.utf16.suffix(Self.contextLength))
+        let boundaries = tail.indices.filter { $0 == 0 || Self.isBoundary($0, in: tail) }
+        var best: (prefix: Int, context: Int, match: ContextualCompletions)?
+        for (context, words) in followers {
+            let parts = context.split(separator: " ").map { Array($0.utf16) }
+            guard parts.count == 2 else { continue }
+            for start in boundaries where tail[start...].starts(with: parts[0]) {
+                let middle = tail.indices.dropFirst(start + parts[0].count)
+                    .drop(while: { Self.isContextSpace(tail[$0]) }).first ?? tail.count
+                guard tail[middle...].starts(with: parts[1]) else { continue }
+                let end = tail.indices.dropFirst(middle + parts[1].count)
+                    .drop(while: { Self.isContextSpace(tail[$0]) }).first ?? tail.count
+                let prefix = tail[end...]
+                guard prefix.allSatisfy(Self.isWordUnit) else { continue }
+                // A joined context must begin after a confirmed word boundary.
+                if start > 0, Self.isWordUnit(tail[start - 1]) {
+                    let leading = String(decoding: tail[..<start], as: UTF16.self)
+                    guard wordSuffix(in: leading[...], personalWords: personalWords) != nil else { continue }
+                } else if start == 0, before.utf16.count > tail.count {
+                    continue
+                }
+                let size = parts[0].count + parts[1].count
+                if let best, best.prefix < prefix.count || (best.prefix == prefix.count && best.context > size) { continue }
+                let previous = String(decoding: parts[1], as: UTF16.self)
+                let candidates = words.filter { word in
+                    let units = word.utf16
+                    return units.count > prefix.count && units.starts(with: prefix) && mayOffer(word, previous)
+                }
+                guard !candidates.isEmpty else { continue }
+                if let current = best, current.prefix == prefix.count, current.context == size {
+                    if current.match.words != candidates { best?.match.words = [] }
+                } else {
+                    best = (prefix.count, size, ContextualCompletions(
+                        previous: previous,
+                        prefix: String(decoding: prefix, as: UTF16.self),
+                        words: candidates
+                    ))
+                }
+            }
+        }
+        guard let best, !best.match.words.isEmpty else { return nil }
+        return best.match
+    }
+
+    private static func isContextSpace(_ unit: UInt16) -> Bool {
+        unit == 0x20 || unit == 0x00A0 || unit == 0x200B
     }
 
     /// A space or zero-width space marks the previous word even after the next word has begun.

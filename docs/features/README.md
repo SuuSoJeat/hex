@@ -2978,10 +2978,10 @@ iOS prototype (`HEXMobile`) -> Record/transcribe/copy and keyboard handoff
 │   │   Tap to replace the matched text at the caret. Space keeps what you typed.
 │   │   The bundled lexicon covers app names, Cambodian services, and digital loanwords.
 │   ├── Experiments → Languages → Personal Khmer suggestions (off by default)
-│   │   With Learn how I type on, both layouts count completed words and adjacent pairs
-│   │   from typing and suggestion picks. A short new spelling typed twice as a separate
-│   │   word can become a personal completion. Repeated words can move up in prefix completions,
-│   │   and repeated pairs in next-word predictions. Settings → Privacy → Export Khmer
+│   │   With Learn how I type on, both layouts learn completed words and short sequences.
+│   │   A short new spelling can complete after two separate-word uses or two distinct
+│   │   known-word contexts in joined text. Next-word ranking uses up to two preceding
+│   │   words, including ប្រហិតសាច់ → គោ. Settings → Privacy → Export Khmer
 │   │   learning data saves retained counts as JSON through the iOS document picker.
 │   │   Delete what Hex learned clears the on-device counts. See ios/docs/khmer-keyboards.md.
 │   │   FullKeyboardEngineTests cover ranking, persistence, reset, both layouts and
