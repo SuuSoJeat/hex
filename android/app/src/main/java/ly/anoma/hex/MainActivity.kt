@@ -55,6 +55,8 @@ class MainActivity : ComponentActivity() {
         /** The keyboard's Settings tool opens Hex on this page, not Home: [PAGE_KEYBOARD] names it. */
         const val EXTRA_PAGE = "ly.anoma.hex.extra.page"
         const val PAGE_KEYBOARD = "keyboard"
+        /** The keyboard's "Speed test done" line opens Labs › Diagnostics. */
+        const val PAGE_DIAGNOSTICS = "diagnostics"
     }
     private val prefs by lazy { getSharedPreferences("setup", MODE_PRIVATE) }
     private val imm by lazy { getSystemService(InputMethodManager::class.java) }
@@ -77,7 +79,8 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         capture = MicCapture(LocalSpeech(applicationContext),
-            update = { next, reason -> phase = next; notice = speechNote(reason) },
+            // Home's Dictate bar too: onStop cancels, so the screen mustn't sleep mid-dictation.
+            update = { next, reason -> phase = next; notice = speechNote(reason); window.keepAwake(next) },
             meter = {}, insert = { text, _ -> transcript = text })
         page = prefs.getInt("page", 0).coerceIn(0, 3)
         // The keyboard's Settings tool opens Hex on its Keyboard page for the launch that carried the extra.

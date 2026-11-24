@@ -12,12 +12,12 @@
 // default and write only to the App Group. The Android page is checked
 // against android/ the same way (the setup's labels, the 190 MB model,
 // Android 12, and Hex Preview's update check in src/preview).
-import { ANDROID_DOWNLOAD_PATH, withBase } from "./base"
+import { ANDROID_DOWNLOAD_PATH, ANDROID_PATH, withBase } from "./base"
 import { shell } from "./labs"
 
+export { ANDROID_PATH }
 export const IPHONE_PATH = withBase("/iphone")
 export const PRIVACY_PATH = withBase("/privacy")
-export const ANDROID_PATH = withBase("/android")
 // What each page's social card says (scripts/iphone.ts draws them). Bump CARD_VERSION
 // when a card changes, so link previews that cached the old one fetch it again.
 export const CARDS = {
@@ -142,7 +142,7 @@ export function renderAndroid(origin: string): string {
 </section>
 <section>
 <h2>Updates</h2>
-<p>Hex Preview looks for a newer build when you open it and at most once a day from the keyboard, and shows what changed. Tap <strong>Download update</strong> and your browser downloads the new build from GitHub. Open the download and tap <strong>Update</strong> when Android asks.</p>
+<p>Hex Preview looks for a newer build when you open it and at most once a day from the keyboard, and shows what changed. Tap <strong>Download update</strong> and your browser downloads the new build from GitHub. Open the download and tap <strong>Update</strong> when Android asks. The first time, Android asks you to allow your browser to install apps: allow it, go back, and tap the download again.</p>
 <p>On a build before 2348, the button says <strong>Update</strong> and Hex Preview installs that one update itself. If Google Play Protect asks to scan it, tap <strong>Scan app</strong>, then <strong>Install</strong>.</p>
 <p>Updating closes the keyboard for a moment. Tap a text field to bring it back.</p>
 </section>

@@ -40,8 +40,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import ly.anoma.hex.diagnostics.DiagnosticsPage
 import ly.anoma.hex.feedback.Feedback
 import ly.anoma.hex.feedback.FeedbackForm
+import ly.anoma.hex.keyboard.VoiceOnly
 import ly.anoma.hex.speech.*
 import ly.anoma.hex.typing.TypingPreferences
 import ly.anoma.hex.updates.Updates
@@ -51,8 +53,9 @@ private enum class Page(val title: Int) {
     Labs(R.string.settings_labs),
     Language(R.string.settings_dictation_language), Layout(R.string.settings_keyboard_layout), Styles(R.string.settings_style),
     Policy(R.string.settings_privacy_policy), Licences(R.string.settings_licences), Licence(R.string.settings_licences),
-    Feedback(R.string.feedback_send_feedback);
+    Feedback(R.string.feedback_send_feedback), Diagnostics(R.string.diagnostics);
     val parent get() = when (this) {
+        Diagnostics -> Labs
         Language, Styles -> Dictation
         Layout -> Keyboard
         Policy, Licences -> Privacy
@@ -79,7 +82,11 @@ internal fun HexSettings(setup: Setup, speech: SpeechPreferences, typing: Typing
                          notice: String?, dictate: () -> Unit, cancel: () -> Unit, clear: () -> Unit, setupPage: (Int) -> Unit,
                          systemSettings: () -> Unit, startPage: String? = null) {
     var page by rememberSaveable {
-        mutableStateOf(if (startPage == MainActivity.PAGE_KEYBOARD) Page.Keyboard else Page.Home)
+        mutableStateOf(when (startPage) {
+            MainActivity.PAGE_KEYBOARD -> Page.Keyboard
+            MainActivity.PAGE_DIAGNOSTICS -> Page.Diagnostics
+            else -> Page.Home
+        })
     }
     var licence by rememberSaveable { mutableStateOf("") }
     var practice by remember { mutableStateOf("") }
@@ -109,6 +116,9 @@ internal fun HexSettings(setup: Setup, speech: SpeechPreferences, typing: Typing
     var signatureDraft by remember { mutableStateOf(speech.signatureText) }
     val emojiSuggestions = remember(revision) { typing.emojiSuggestions }
     val keyboardTools = remember(revision) { typing.keyboardTools }
+    val smartQuotes = remember(revision) { typing.smartQuotes }
+    val passwordManager = remember(revision) { typing.passwordManagerSuggestions }
+    val voiceOnly = remember(revision) { typing.voiceOnly }
     // A hidden field or leaving Labs shows the saved line again, never an unsaved draft.
     LaunchedEffect(page, signature) { if (page != Page.Labs || !signature) signatureDraft = speech.signatureText }
     val autoCapitalize = remember(revision) { typing.autoCapitalize }
@@ -120,6 +130,7 @@ internal fun HexSettings(setup: Setup, speech: SpeechPreferences, typing: Typing
     val haptics = remember(revision) { typing.haptics }
     val letterSymbols = remember(revision) { typing.letterSymbols }
     val numberRow = remember(revision) { typing.numberRow }
+    val localCurrency = remember(revision) { typing.localCurrency }
     var copied by remember(transcript) { mutableStateOf(false) }
     fun open(next: Page) {
         // A send in progress keeps the form; leaving it otherwise drops what was written.
@@ -303,6 +314,7 @@ internal fun HexSettings(setup: Setup, speech: SpeechPreferences, typing: Typing
                         }
                     }
                     Page.Feedback -> FeedbackForm(done = { open(Page.Home) })
+                    Page.Diagnostics -> DiagnosticsPage()
                     Page.Labs -> {
                         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                             Label(stringResource(R.string.labs_output), muted = true, size = 14,
@@ -341,11 +353,33 @@ internal fun HexSettings(setup: Setup, speech: SpeechPreferences, typing: Typing
                                 Toggle(stringResource(R.string.number_row), stringResource(R.string.number_row_detail),
                                     numberRow) { typing.numberRow = it }
                                 Rule()
+                                Toggle(stringResource(R.string.local_currency), stringResource(R.string.local_currency_detail),
+                                    localCurrency) { typing.localCurrency = it }
+                                Rule()
                                 Toggle(stringResource(R.string.emoji_suggestions), stringResource(R.string.emoji_suggestions_detail),
                                     emojiSuggestions) { typing.emojiSuggestions = it }
                                 Rule()
                                 Toggle(stringResource(R.string.keyboard_tools), stringResource(R.string.keyboard_tools_detail),
                                     keyboardTools) { typing.keyboardTools = it }
+                                Rule()
+                                Toggle(stringResource(R.string.smart_quotes), stringResource(R.string.smart_quotes_detail),
+                                    smartQuotes) { typing.smartQuotes = it }
+                                Rule()
+                                Toggle(stringResource(R.string.password_manager_suggestions),
+                                    stringResource(R.string.password_manager_suggestions_detail),
+                                    passwordManager) { typing.passwordManagerSuggestions = it }
+                                Rule()
+                                Toggle(stringResource(R.string.voice_only_mode), stringResource(R.string.voice_only_detail),
+                                    voiceOnly) { typing.voiceOnly = it; VoiceOnly.setEnabledFromSettings(context, it) }
+                            }
+                            // Hex Preview and debug builds only.
+                            if (BuildConfig.DIAGNOSTICS) {
+                                Label(stringResource(R.string.labs_troubleshooting), muted = true, size = 14,
+                                    mod = Modifier.padding(start = 16.dp))
+                                Card {
+                                    Entry(stringResource(R.string.diagnostics), stringResource(R.string.diagnostics_detail),
+                                        action = { open(Page.Diagnostics) })
+                                }
                             }
                         }
                     }

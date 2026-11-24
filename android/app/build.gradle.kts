@@ -96,6 +96,8 @@ android {
         versionCode = 5
         versionName = "0.2.2"
         buildConfigField("String", "FEEDBACK_KEY", "\"$feedbackKey\"")
+        // Labs › Diagnostics: Hex Preview and debug builds (below), never the Play release.
+        buildConfigField("boolean", "DIAGNOSTICS", "false")
         ndk { abiFilters += "arm64-v8a" }
         externalNativeBuild.cmake {
             arguments += listOf("-DANDROID_STL=c++_static", "-DANDROID_SUPPORT_FLEXIBLE_PAGE_SIZES=ON")
@@ -121,6 +123,7 @@ android {
         }
     }
     buildTypes {
+        debug { buildConfigField("boolean", "DIAGNOSTICS", "true") }
         release {
             isDebuggable = false
             isJniDebuggable = false
@@ -137,10 +140,14 @@ android {
             signingConfig = signingConfigs.getByName("preview")
             matchingFallbacks += "release"
             resValue("string", "update_channel", previewChannel)
+            buildConfigField("boolean", "DIAGNOSTICS", "true")
         }
     }
     sourceSets["debug"].java.srcDir("src/play/java")
     sourceSets["release"].java.srcDir("src/play/java")
+    // Labs › Diagnostics' speed-test clip ships only where the page does.
+    sourceSets["debug"].assets.srcDir("src/diagnostics/assets")
+    sourceSets["preview"].assets.srcDir("src/diagnostics/assets")
     packaging.resources.excludes += "DebugProbesKt.bin"
     buildFeatures { compose = true; buildConfig = true }
     androidResources { noCompress += listOf("bin", "hextm", "valid", "capitals") }
@@ -194,6 +201,8 @@ tasks.named("preBuild").configure { dependsOn(prepareSpeechModel, verifyInter, v
 
 dependencies {
     implementation("androidx.activity:activity-compose:1.10.1")
+    // The style bundle Android's password managers require to render inline suggestions in the strip.
+    implementation("androidx.autofill:autofill:1.1.0")
     implementation(platform("androidx.compose:compose-bom:2025.05.01"))
     implementation("androidx.compose.material3:material3")
     // The keyboard's emoji panel (Apache 2.0): categories, recents and skin tones, all kept on the device.
