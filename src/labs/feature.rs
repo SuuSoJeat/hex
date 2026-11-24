@@ -199,6 +199,7 @@ define_features! {
     Screenshots => labs(screenshots), "screenshots", Annotate, Everyone, MACOS, 20261104;
     AnnotateReplay => labs(annotate_replay), "annotate-replay", Annotate, Everyone, MACOS, 20261104, extra: ["capture.replay_hotkey"];
     MeetingImport => labs(meeting_import), "meeting-import", Meetings, Everyone, MACOS, 20261106;
+    TranscriptEdits => labs(transcript_edits), "transcript-edits", Meetings, Everyone, EVERY, 20261123;
     CapsLockDictation => labs(caps_lock_dictation), "caps-lock-dictation", Shortcuts, Everyone, MACOS, 20261107, extra: ["labs.caps_lock_light"];
     OpenCodeInWsl => labs(opencode_in_wsl), "opencode-in-wsl", Output, Everyone, WINDOWS, 20261108;
     ApiProcessing => labs(api_processing), "api-processing", Output, Everyone, EVERY, 20261109;
@@ -219,6 +220,7 @@ define_features! {
     DropTranscribe => labs(drop_transcribe), "drop-transcribe", Models, Everyone, EVERY, 20261113;
     PasteLastPicker => labs(paste_last_picker), "paste-last-picker", History, Dev, MACOS, 20261119;
     VocabularyFiles => labs(vocabulary_files), "vocabulary-files", Dictation, Everyone, EVERY, 20261120;
+    VocabularyMenu => labs(vocabulary_menu), "vocabulary-menu", Dictation, Everyone, MACOS, 20261123;
     AnnotateAgentTools => labs(annotate_agent_tools), "annotate-agent-tools", Annotate, Everyone, EVERY, 20261121;
     AnnotateAgentInstall => labs(annotate_agent_install), "annotate-agent-install", Annotate, Everyone, EVERY, 20261121;
     Signature => labs(signature), "signature", Output, Everyone, EVERY, 20261121, extra: ["labs.signature_text"];
@@ -226,6 +228,7 @@ define_features! {
     HudHeight => labs(hud_height), "hud-height", Dictation, Everyone, MACOS, 20261122, extra: ["labs.hud_bottom_gap"];
     VoiceIsolation => labs(voice_isolation), "voice-isolation", Dictation, Everyone, MACOS, 20261122;
     DictateWhileAnnotating => labs(dictate_while_annotating), "dictate-while-annotating", Annotate, Everyone, EVERY, 20261122;
+    StopAnyCallRecording => labs(stop_any_call_recording), "stop-any-call-recording", Meetings, Everyone, EVERY, 20261123;
 }
 
 impl Feature {

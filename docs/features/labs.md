@@ -274,6 +274,25 @@ Feature             Pane  Toggle (settings.json, hex settings)   On: what it doe
 ├── Import audio    no    labs.meeting_import           (macOS)   Meetings offers Import audio…: a WAV, M4A, MP3, AIFF, or CAF
 │                                        file is decoded locally, transcribed with the selected model, saved as a normal
 │                                        meeting (Speaker turns), exported as Markdown, and given notes as a finished recording
+├── Delete transcript lines no labs.transcript_edits (every OS) a finished meeting's detail puts Select lines beside Copy; turns become
+│                                        checkable (You and Them together), and Delete lines… asks once before removing every line under
+│                                        the selected turns from transcript.ndjson and transcript.md, dropping matching rolling-draft
+│                                        entries too. The old summary, provisional title, and chapters go with them; Regenerate
+│                                        summary reads the edited file and the user Markdown copy is rewritten only while Hex still
+│                                        wrote it (see meetings.md)
+├── Stop every call recording when the call ends no labs.stop_any_call_recording (every OS, with Meetings on) an
+│                                        offered, calendar (macOS; Zoom, Teams, or Slack link), or by-hand call recording
+│                                        stops 3 s after its call app leaves the microphone, then 30 s of grace, even with
+│                                        Stop when the call ends off; a recording started by hand watches the one native
+│                                        call app on the microphone when it starts (Windows and Linux map the executable
+│                                        name to the same keys), and an on-request recording counts no absence until it
+│                                        has seen that app on the microphone
+│                                        // checks: the_lab_stops_on_request_recordings_and_the_setting_keeps_always_record,
+│                                        // a_calendar_recording_counts_no_absence_until_its_app_joins,
+│                                        // a_recording_kind_knows_whether_it_watches_a_call_app,
+│                                        // one_native_call_app_is_watched_and_a_browser_or_two_are_not,
+│                                        // windows_and_linux_executables_link_to_their_canonical_call_app
+│                                        // (meeting/watcher/call_end.rs); not observed on a real Mac, Windows, or Linux call
 ├── Restore clipboard on GNOME no labs.gnome_clipboard_restore (Linux) on a Wayland desktop without data-control (GNOME), a paste snapshots and restores
 │                                        the clipboard through XWayland, only while this user's Xwayland already runs; never starts it (#1111)
 ├── Transform typed text no labs.typed_text + typed_text_hotkey (Linux) Settings › Output shows a Typed text section whose shortcut is unbound by
@@ -408,6 +427,14 @@ Feature             Pane  Toggle (settings.json, hex settings)   On: what it doe
 │                                        // the_vocabulary_sheet_offers_files_only_with_its_lab_on (rune_ui/tests.rs),
 │                                        // vocabulary_files_is_its_own_switch_and_everywhere (labs.rs); the native
 │                                        // dialogs were not opened in a desktop session
+├── Vocabulary menu no  labs.vocabulary_menu             (macOS) the menu bar's Vocabulary ▸ submenu, right under
+│                                        Speech Model ▸, offers Add term… and Open vocabulary… and lists the last five
+│                                        saved terms newest first; off, the row is hidden and the menu is exactly as
+│                                        before (#2540)
+│                                        // checks: vocabulary_lists_the_last_five_terms_newest_first (status_item.rs,
+│                                        // macOS only), the_vocabulary_menu_is_a_macos_dictation_lab_off_by_default
+│                                        // (labs.rs), adding_a_term_from_the_menu_opens_the_sheet_with_one_blank_row_last
+│                                        // (rune_ui/vocabulary.rs); the native menu was not opened on a Mac
 └── Only on speakers no   labs.speakers_only            (every OS) While dictating (Mute, Lower audio, Pause
                                          media) applies only while the default output is speakers; wired or Bluetooth
                                          headphones leave the output and media alone for that recording or capture, and
@@ -3834,6 +3861,31 @@ vocabulary list itself (rewriting and search), and Linux's Terminal paste.
   no new dependency; the save dialog is the same native
   `desktop::file_dialog` wrapper as open, over Rune's
   `FileDialogs::save`.
+- Vocabulary menu: the menu-bar menu gains **Vocabulary ▸** right under
+  **Speech Model ▸** (macOS; off by default, `labs.vocabulary_menu`, in the
+  Dictation group). Off, the row is hidden and the menu is exactly as before.
+  **Add term…** opens Settings on the Vocabulary sheet with a new focused term
+  row at its end, which the list glides to, autosaved through the sheet's own
+  draft path like Add term; a list that is empty already opens with one focused
+  blank row, so no second row is made. **Open vocabulary…** opens the sheet
+  alone. Between them, up to the last five saved terms, newest first, as
+  disabled informational rows on one line each (whitespace collapsed and cut
+  like a meeting title); the separator and the rows are left out while the list
+  is empty. The saved list is read only as the menu opens, and only with
+  `labs::vocabulary_menu()` on, from
+  `dictation::vocabulary::entries()`; the row, submenu, and actions
+  (`StatusItemAction::AddVocabularyTerm`, `OpenVocabulary`,
+  `refresh_vocabulary`) are in
+  [macos_rune/status_item.rs](../../src/macos_rune/status_item.rs), and the
+  sheet opens through `rune_ui::vocabulary::open` / `open_new_term` from
+  `Pump::status_action`. Checks:
+  `vocabulary_lists_the_last_five_terms_newest_first`
+  ([macos_rune/status_item.rs](../../src/macos_rune/status_item.rs), macOS
+  only), `the_vocabulary_menu_is_a_macos_dictation_lab_off_by_default`
+  ([labs.rs](../../src/labs.rs)), and
+  `adding_a_term_from_the_menu_opens_the_sheet_with_one_blank_row_last`
+  ([rune_ui/vocabulary.rs](../../src/rune_ui/vocabulary.rs)). Not yet observed:
+  the submenu on a real Mac; the menu-bar row exists only in macOS builds.
 - Paste Last picker: tapping Paste Last pastes the newest ready dictation or
   finished annotation, and holding it (⌥⇧V) opens a picker of recent rows, or
   all of History; History then lists dictations, annotations, screenshots and
@@ -4105,6 +4157,44 @@ vocabulary list itself (rewriting and search), and Linux's Terminal paste.
 - Meetings (beta): see [Meetings](meetings.md). Its toggle is
   `meetings.enabled`; on, Meetings is a top-level sidebar item (debug builds
   keep it available regardless).
+- Stop every call recording when the call ends (every OS, with Meetings on):
+  the recorders Hex did not start on its own stop the way Always record's do
+  under Stop when the call ends. Its toggle is
+  `labs.stop_any_call_recording` (off by default), and it needs nothing from
+  `meetings.stop_when_call_ends`: that switch keeps governing Always record,
+  and this one governs everything else. On, a recording accepted from a
+  detection offer and a recording started from a calendar reminder stop 3 s
+  after the call app it watches leaves the microphone and goes quiet, then
+  30 s of grace, with the same Keep recording and call-comes-back logic
+  ([Meetings › Stop Other Call Recordings](meetings.md#stop-other-call-recordings-labs)).
+  A calendar link is watched only when it names a desktop app: Zoom, Teams, or
+  Slack (`CallProvider::application` in
+  [calendar.rs](../../src/calendar.rs)), never Google Meet or Webex; a
+  calendar reminder is macOS only, so Windows and Linux stop only offered and
+  by-hand recordings.
+  A recording Hex started on request counts no absence until a successful
+  microphone read has found its app on the input at least once; playback and a
+  failed read never count, so a calendar recording started before the call is
+  answered, or while a waiting room holds, never arms a stop on its own. A recording started by hand (Meetings' Start recording, the menu bar,
+  `hex meetings record`) takes its call app from the microphone at start: the
+  one native call app holding it right then, by the canonical bundles
+  detection uses (Windows and Linux map the executable name, such as
+  ms-teams.exe, teams-for-linux, or zoom, to the same keys), with browsers
+  left out so no page is read and none or several leaving the recording
+  unwatched. The recording keeps its own title,
+  app, and capture; only its stop is associated. The absence rule is all it
+  adds: a browser that never releases the microphone between calls (Arc) is
+  still ended only for a recording Hex started itself. Turning the lab off
+  while a stop counts drops it. Checks:
+  `the_lab_stops_on_request_recordings_and_the_setting_keeps_always_record`,
+  `a_calendar_recording_counts_no_absence_until_its_app_joins`,
+  `a_recording_kind_knows_whether_it_watches_a_call_app`,
+  `one_native_call_app_is_watched_and_a_browser_or_two_are_not`, and
+  `windows_and_linux_executables_link_to_their_canonical_call_app`
+  ([meeting/watcher/call_end.rs](../../src/meeting/watcher/call_end.rs));
+  `only_an_automatic_browser_call_with_a_code_keeps_reading_its_page`
+  ([meeting/watcher.rs](../../src/meeting/watcher.rs)). Not observed on a real
+  Mac, Windows, or Linux call, or a real Slack huddle.
 - Import audio (macOS): Meetings offers **Import audio…** beside Start
   recording. A local WAV, M4A, MP3, AIFF, or CAF file is decoded to 16 kHz
   mono float WAV by the AVFoundation bridge, then transcribed with the

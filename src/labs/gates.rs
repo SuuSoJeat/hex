@@ -34,6 +34,13 @@ pub fn live_chapters() -> bool {
     feature_on(Feature::LiveChapters)
 }
 
+/// Stop an offered, calendar, or by-hand call recording once its call app
+/// leaves the microphone (read as each recording's start and every
+/// controller pass while it runs).
+pub fn stop_any_call_recording() -> bool {
+    feature_on(Feature::StopAnyCallRecording)
+}
+
 /// The playground in the window.
 pub fn playground() -> bool {
     feature_on(Feature::Playground)
@@ -261,6 +268,14 @@ pub fn recent_dictations() -> bool {
     feature_on(Feature::RecentDictations)
 }
 
+/// The menu bar's Vocabulary submenu: Add term…, the last saved terms, and
+/// Open vocabulary… (macOS; read each time the status item refreshes, as the
+/// menu opens, and by the menu's actions).
+#[cfg_attr(not(target_os = "macos"), allow(dead_code))]
+pub fn vocabulary_menu() -> bool {
+    feature_on(Feature::VocabularyMenu)
+}
+
 /// A whole-clip dictation transcription hears only the head and tail of
 /// each long pause (Linux and Windows; read as each whole-clip run starts).
 #[cfg_attr(target_os = "macos", allow(dead_code))]
@@ -376,6 +391,12 @@ pub fn annotate_replay() -> bool {
 #[cfg_attr(not(target_os = "macos"), allow(dead_code))]
 pub fn meeting_import() -> bool {
     feature_on(Feature::MeetingImport)
+}
+
+/// A saved meeting's transcript lines may be deleted (read where the pane
+/// offers selection and where the controller starts an edit).
+pub fn transcript_edits() -> bool {
+    feature_on(Feature::TranscriptEdits)
 }
 
 /// "While dictating" applies only while the default output is speakers

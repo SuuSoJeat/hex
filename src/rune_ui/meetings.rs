@@ -12,7 +12,9 @@
 //! [`MeetingRequest`]s back. Scenes feed [`MeetingsPane::fixture`].
 
 use rune::{El, TextEdit, Tx, col, row, text};
-use rune_kit::{IconButton, IconButtonVariant, Menu as KitMenu, MenuItem, Placement, TextInput};
+use rune_kit::{
+    IconButton, IconButtonVariant, Loader, Menu as KitMenu, MenuItem, Placement, TextInput,
+};
 
 use super::controls::{
     ButtonKind, DESCRIPTION, Paint, button, card, page, pulsing_dot, segmented_tx,
@@ -26,6 +28,7 @@ use crate::desktop::file_dialog::{Dialog, Filter, Pending, Target};
 use crate::desktop::i18n::{tr, tr_fill, tr_named};
 
 mod fixture;
+mod selection;
 
 pub(super) static MORE_ICON: rune::Icon = rune::Icon {
     name: "hex-more",
@@ -59,6 +62,10 @@ pub(super) struct Turn {
     pub(super) text: String,
     /// A silence of 30 s or more before this turn.
     pub(super) pause_before_ms: Option<u64>,
+    /// The published lines this displayed turn covers. Adjacent same-speaker
+    /// entries within three seconds coalesce here, so deleting the turn
+    /// deletes every line under it.
+    pub(super) entries: Vec<crate::meeting::TranscriptEntryKey>,
 }
 
 /// One topic of a meeting (Labs), from `start_ms` to
@@ -190,7 +197,11 @@ pub(super) struct MeetingsPane {
     pub(super) renaming: Option<String>,
     pub(super) rename: TextEdit,
     pub(super) delete_armed: Option<String>,
+    /// The selected transcript lines (Labs › Delete transcript lines).
+    pub(super) selection: selection::Selection,
     action_error: Option<String>,
+    /// The last transcript edit that failed.
+    pub(super) edit_error: Option<String>,
     /// What was last copied, for the button's "Copied".
     copied: Option<(String, String)>,
     pub(super) start_pending: bool,
@@ -275,6 +286,7 @@ impl MeetingsPane {
             && !meetings.iter().any(|meeting| &meeting.id == selected)
         {
             self.selected = None;
+            self.selection.stop();
         }
         self.meetings = meetings;
         self.error = None;
@@ -285,6 +297,7 @@ impl MeetingsPane {
             self.renaming = None;
             self.delete_armed = None;
             self.action_error = None;
+            self.selection.stop();
         }
         self.selected = Some(id);
     }
@@ -292,7 +305,7 @@ impl MeetingsPane {
 
 /// Sends `request` where it is carried out (on Linux and Windows, the
 /// window's own meetings, not the OS host, which ignores meeting requests).
-fn ask(ui: &mut Ui, request: MeetingRequest) -> bool {
+pub(super) fn ask(ui: &mut Ui, request: MeetingRequest) -> bool {
     match ui.send_meeting(request) {
         Ok(()) => true,
         Err(error) => {
@@ -372,6 +385,18 @@ pub(super) fn status_tag(p: Paint, status: Status, stop_pending: bool) -> Option
         Status::Failed => (tr("Failed"), Tone::Danger),
     };
     Some(tone_tag(p, "status", label, tone))
+}
+
+/// Escape in the Meetings pane: the selection's confirmation or selection
+/// itself, a rename, or a meeting delete's confirmation. False when none is
+/// waiting.
+pub(super) fn cancel_edit(ui: &mut Ui) -> bool {
+    if ui.meetings.selection.escape() {
+        return true;
+    }
+    let renaming = ui.meetings.renaming.take().is_some();
+    let deleting = ui.meetings.delete_armed.take().is_some();
+    renaming || deleting
 }
 
 /// The opt-in card while Meetings is off; otherwise the header's view
@@ -563,6 +588,7 @@ fn row_meta(pane: &MeetingsPane, meeting: &Meeting, p: Paint) -> (String, Option
         Status::Transcribing => (Some(tr("Transcribing")), None),
         Status::Failed => (Some(tr("Failed")), Some(p.danger())),
         Status::Interrupted => (Some(tr("Interrupted")), None),
+        Status::Complete if meeting.notes_running => (Some(tr("Summarizing…")), None),
         Status::Complete => (None, None),
     };
     let mut parts: Vec<String> = state.map(String::from).into_iter().collect();
@@ -650,6 +676,15 @@ fn recordings(ui: &Ui, p: Paint, layer: &mut Vec<El>, action: El) -> (Vec<El>, E
             |ui: &mut Ui| ui.meetings.import_error = None,
         ));
     }
+    if let Some(error) = &pane.edit_error {
+        notices.push(dismissible_error_panel(
+            p,
+            "meeting-edit-error",
+            tr("Lines could not be deleted."),
+            error,
+            |ui: &mut Ui| ui.meetings.edit_error = None,
+        ));
+    }
     let body = if pane.meetings.is_empty() {
         ld::empty_state(
             p,
@@ -728,6 +763,37 @@ fn recordings(ui: &Ui, p: Paint, layer: &mut Vec<El>, action: El) -> (Vec<El>, E
     )
 }
 
+/// Whether the pane offers selection for this meeting: the lab is on, and
+/// the meeting is a finished transcript with turns and no summary running.
+fn selectable(ui: &Ui, meeting: &Meeting) -> bool {
+    available(ui)
+        && crate::labs::Feature::TranscriptEdits.on(&ui.settings)
+        && crate::labs::Feature::TranscriptEdits.managed().is_none()
+        && meeting.status == Status::Complete
+        && !meeting.notes_running
+        && !meeting.turns().is_empty()
+}
+
+/// Drops a selection the pane no longer offers, before it is drawn: the lab
+/// went off, the selected meeting left Complete, or its notes started
+/// running. Returns whether anything was dropped.
+pub(super) fn settle_selection(ui: &mut Ui) -> bool {
+    if !ui.meetings.selection.active() {
+        return false;
+    }
+    let offered = ui
+        .meetings
+        .selected
+        .as_deref()
+        .and_then(|id| ui.meetings.meeting(id))
+        .is_some_and(|meeting| selectable(ui, meeting));
+    if offered {
+        return false;
+    }
+    ui.meetings.selection.stop();
+    true
+}
+
 fn day_label(day: &str) -> &str {
     match day {
         "Today" => tr("Today"),
@@ -746,6 +812,8 @@ fn detail(ui: &Ui, p: Paint, meeting: &Meeting, layer: &mut Vec<El>) -> El {
     };
     let armed = pane.delete_armed.as_deref() == Some(meeting.id.as_str());
     let renaming = pane.renaming.as_deref() == Some(meeting.id.as_str());
+    let can_select = selectable(ui, meeting);
+    let selecting = can_select && pane.selection.active();
     let mut actions = Vec::new();
     let mut confirm = None;
     if armed && !active && !meeting.notes_running {
@@ -778,8 +846,11 @@ fn detail(ui: &Ui, p: Paint, meeting: &Meeting, layer: &mut Vec<El>) -> El {
                     |ui: &mut Ui, _| ui.meetings.delete_armed = None,
                 )),
         );
-    } else if !renaming {
+    } else if !renaming && !selecting {
         // The title field brings its own Save and Cancel.
+        if can_select {
+            actions.push(selection::action(p));
+        }
         if !meeting.turns().is_empty() {
             actions.push(copy_action(p, pane, meeting, "transcript"));
         }
@@ -879,36 +950,47 @@ fn detail(ui: &Ui, p: Paint, meeting: &Meeting, layer: &mut Vec<El>) -> El {
             Tone::Warning,
         ));
     }
-    if let Some(summary) = &meeting.summary {
-        let summary = summary.trim();
-        body = body.child(
+    if meeting.notes_running || meeting.summary.is_some() {
+        let mut notes =
             col()
                 .key("notes")
                 .gap(6.0)
-                .child(section_label(p, "summary-label", tr("Summary")))
-                .child(
-                    text(if summary.is_empty() {
-                        tr("Nothing to summarize.")
-                    } else {
-                        summary
-                    })
-                    .key("summary")
-                    .font(p.k.ty.body)
-                    .color(if summary.is_empty() {
-                        p.faint()
-                    } else {
-                        p.text()
-                    })
-                    .wrap(),
-                ),
-        );
-    } else if meeting.notes_running {
-        body = body.child(
-            text(notes_running_label(ui))
-                .key("notes-running")
-                .font(DESCRIPTION)
-                .color(p.faint()),
-        );
+                .child(section_label(p, "summary-label", tr("Summary")));
+        if meeting.notes_running {
+            // Writing or regenerating: the spinner and the writer's line
+            // above whatever summary is already shown (#2556).
+            notes = notes.child(
+                row()
+                    .key("notes-running")
+                    .gap(8.0)
+                    .center_y()
+                    .child(Loader::new().build(p.k))
+                    .child(
+                        text(notes_running_label(ui))
+                            .font(DESCRIPTION)
+                            .color(p.faint()),
+                    ),
+            );
+        }
+        if let Some(summary) = &meeting.summary {
+            let summary = summary.trim();
+            notes = notes.child(
+                text(if summary.is_empty() {
+                    tr("Nothing to summarize.")
+                } else {
+                    summary
+                })
+                .key("summary")
+                .font(p.k.ty.body)
+                .color(if summary.is_empty() {
+                    p.faint()
+                } else {
+                    p.text()
+                })
+                .wrap(),
+            );
+        }
+        body = body.child(notes);
     }
     if !meeting.chapters.is_empty() {
         body = body.child(chapters(p, meeting, &copied));
@@ -924,7 +1006,8 @@ fn detail(ui: &Ui, p: Paint, meeting: &Meeting, layer: &mut Vec<El>) -> El {
             .key("transcript-block")
             .gap(10.0)
             .child(section_label(p, "transcript-label", transcript_label))
-            .child(transcript(p, meeting, pane.stop_pending)),
+            .children(selecting.then(|| selection::bar(ui, p, meeting)))
+            .child(transcript(ui, p, meeting, pane.stop_pending, selecting)),
     );
     col()
         .key("meeting-detail")
@@ -1113,7 +1196,7 @@ fn overflow(ui: &Ui, p: Paint, meeting: &Meeting, layer: &mut Vec<El>) -> Option
     Some(menu.trigger(trigger).build(p.k, layer))
 }
 
-fn transcript(p: Paint, meeting: &Meeting, stop_pending: bool) -> El {
+fn transcript(ui: &Ui, p: Paint, meeting: &Meeting, stop_pending: bool, selecting: bool) -> El {
     let empty = |copy: &str| {
         text(copy)
             .key("transcript-empty")
@@ -1148,7 +1231,17 @@ fn transcript(p: Paint, meeting: &Meeting, stop_pending: bool) -> El {
     }
     let mut lines = col().key("turns").gap(14.0);
     for (index, turn) in turns.iter().enumerate() {
-        lines = lines.children(turn_line(p, index, turn, meeting.imported));
+        if selecting {
+            lines = lines.child(selection::turn_row(
+                p,
+                index,
+                turn,
+                meeting.imported,
+                ui.meetings.selection.contains(turn),
+            ));
+        } else {
+            lines = lines.children(turn_line(p, index, turn, meeting.imported));
+        }
     }
     if meeting.status == Status::Recording && !stop_pending {
         lines = lines.child(
@@ -1229,6 +1322,7 @@ mod tests {
             start_ms: 1_000,
             text: "Hi.".into(),
             pause_before_ms: None,
+            entries: Vec::new(),
         };
         assert!(transcript_markdown(&[turn(false)], true).contains("**Speaker** · 00:01"));
         assert!(transcript_markdown(&[turn(true)], true).contains("**Speaker**"));
