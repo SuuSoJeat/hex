@@ -12,6 +12,23 @@ final class KhmerAutocompleteTests: XCTestCase {
     កម្ពុជា\t90
     """)
 
+    func testBundledEnglishSuggestionsIncludeAppNamesAndTechLoanwords() throws {
+        let bundled = try XCTUnwrap(KhmerAutocomplete.bundled)
+        for (typed, english) in [
+            ("អេប៊ីអេ", "ABA Mobile"),
+            ("បាគង", "Bakong"),
+            ("ហ្គូហ្គលម៉េប", "Google Maps"),
+            ("ហ្គូហ្គលម៉ែប", "Google Maps"),
+            ("ដោនឡូត", "download"),
+            ("ដោនឡូដ", "download"),
+        ] {
+            XCTAssertEqual(bundled.englishMatch(in: typed, personalWords: [])?.english, english)
+        }
+        let partial = bundled.englishMatch(in: "តេឡេក្", personalWords: [])
+        XCTAssertEqual(partial?.khmer, "តេឡេក្រាម")
+        XCTAssertEqual(partial?.english, "Telegram")
+    }
+
     func testRanksCompletionsAndAppendsTheExactScalarsAfterCoeng() {
         let prefix = "កម្"
         let results = model.suggestions(beforeInput: prefix, limit: 2)

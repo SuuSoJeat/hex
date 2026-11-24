@@ -2974,6 +2974,7 @@ iOS prototype (`HEXMobile`) -> Record/transcribe/copy and keyboard handoff
 │   │   A matched loanword or app name can occupy one slot on either layout.
 │   │   Type តេឡេក្ → តេឡេក្រាម and Telegram, including in search fields with autocorrection off.
 │   │   Tap a spelling to use it. Space keeps what you typed. Matching runs locally.
+│   │   The bundled lexicon covers app names, Cambodian services, and digital loanwords.
 │   ├── Khmerism → hold for corner characters; coeng brings subscript consonants onto the keys
 │   ├── Autocorrect → smart typing; Swipe typing → trace a word (both on by default)
 │   ├── Swipe in emoji search → only the query changes; Backspace on an uncommitted

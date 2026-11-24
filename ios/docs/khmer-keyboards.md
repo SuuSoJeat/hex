@@ -168,6 +168,11 @@ identifies one entry in the bundled list, you can tap either spelling to use
 it. Search fields can show these choices with autocorrection off. Space keeps
 what you typed. Matching works offline and offers at most one English choice.
 
+The [Khmer-to-English transliteration lexicon](../HEXKeyboard/TypingModel/km-english-suggestions.tsv)
+contains app names, Cambodian services, and everyday digital loanwords. Each
+row pairs one Khmer spelling with the English text Hex inserts. Spellings
+that should insert the same text share that English spelling.
+
 ## Acceptance examples
 
 | Try this in the Full keyboard | Expected result |

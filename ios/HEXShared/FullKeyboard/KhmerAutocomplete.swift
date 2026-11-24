@@ -68,6 +68,8 @@ struct KhmerAutocomplete: Sendable {
     private let entries: [Entry]
     private let longestWord: Int
     let expandedWords: TypingDecoderModel?
+    private let englishSpellings: [String: String]
+    private let englishPrefixes: [String: (khmer: String, english: String)]
 
     static let bundled: KhmerAutocomplete? = {
         var url = Bundle.main.url(forResource: "km-autocomplete", withExtension: "tsv")
@@ -76,16 +78,25 @@ struct KhmerAutocomplete: Sendable {
             url = keyboard.url(forResource: "km-autocomplete", withExtension: "tsv")
         }
         guard let url, let wordlist = try? String(contentsOf: url, encoding: .utf8) else { return nil }
-        let supplementURL = url.deletingLastPathComponent().appendingPathComponent("km-buddhist.txt")
+        let resources = url.deletingLastPathComponent()
+        let supplementURL = resources.appendingPathComponent("km-buddhist.txt")
         let supplement = (try? String(contentsOf: supplementURL, encoding: .utf8)) ?? ""
-        let expandedURL = url.deletingLastPathComponent().appendingPathComponent("km-expanded.hextm")
+        let expandedURL = resources.appendingPathComponent("km-expanded.hextm")
+        let englishURL = resources.appendingPathComponent("km-english-suggestions.tsv")
+        let english = (try? String(contentsOf: englishURL, encoding: .utf8)) ?? ""
         let model = KhmerAutocomplete(wordlist: wordlist, supplementalWords: supplement,
-                                     expandedWords: TypingDecoderModel(url: expandedURL))
+                                     expandedWords: TypingDecoderModel(url: expandedURL), englishWordlist: english)
         return model.entries.isEmpty ? nil : model
     }()
 
-    init(wordlist: String, supplementalWords: String = "", expandedWords: TypingDecoderModel? = nil) {
+    init(
+        wordlist: String, supplementalWords: String = "", expandedWords: TypingDecoderModel? = nil,
+        englishWordlist: String = ""
+    ) {
         self.expandedWords = expandedWords?.language == "km" ? expandedWords : nil
+        let spellings = Self.readEnglishSpellings(englishWordlist)
+        englishSpellings = spellings
+        englishPrefixes = Self.makeEnglishPrefixes(spellings)
         var entries = wordlist.split(whereSeparator: \.isNewline).compactMap { line -> Entry? in
             let fields = line.split(separator: "\t")
             guard fields.count == 2, let frequency = Int(fields[1]), frequency > 0 else { return nil }
@@ -159,55 +170,26 @@ struct KhmerAutocomplete: Sendable {
         return nil
     }
 
-    /// The experiment's offline list. Each Khmer spelling has one English suggestion.
-    private static let englishSpellings = [
-        "ណូត": "note",
-        "ឆាត": "chat",
-        "លីង": "link",
-        "កូដ": "code",
-        "ស្កេន": "scan",
-        "អេប": "app",
-        "អ៊ីមែល": "email",
-        "អ៊ីម៉ែល": "email",
-        "វ៉ាយហ្វាយ": "Wi-Fi",
-        "វ៉ាយហ្វៃ": "Wi-Fi",
-        "ប៊្លូធូស": "Bluetooth",
-        "អាប់ដេត": "update",
-        "កុំព្យូទ័រ": "computer",
-        "អ៊ីនធឺណិត": "internet",
-        "អ៊ីនធើណែត": "internet",
-        "ម៉ៅស៍": "mouse",
-        "ម៉ូនីទ័រ": "monitor",
-        "កាមេរ៉ា": "camera",
-        "ម៉ៃក្រូហ្វូន": "microphone",
-        "មីក្រូហ្វូន": "microphone",
-        "ស្កេនន័រ": "scanner",
-        "ម៉ាស៊ីនព្រីន": "printer",
-        "វេបខេម": "webcam",
-        "ម៉ូដឹម": "modem",
-        "សូហ្វវែរ": "software",
-        "ហាតវែរ": "hardware",
-        "ហ្វេសប៊ុក": "Facebook",
-        "តេឡេក្រាម": "Telegram",
-        "យូធូប": "YouTube",
-        "ហ្សូម": "Zoom",
-        "ហ្គូហ្គល": "Google",
-        "ជីម៉ែល": "Gmail",
-        "មេសិនជ័រ": "Messenger",
-        "អ៊ីនស្តាក្រាម": "Instagram",
-        "ធីកថុក": "TikTok",
-        "វ៉ាត់ស្អាប់": "WhatsApp",
-        "អិចសែល": "Excel",
-        "ផៅវ័រផយន៍": "PowerPoint",
-    ]
-
     struct EnglishMatch {
         let typed: String
         let khmer: String
         let english: String
     }
 
-    private static let englishPrefixes: [String: (khmer: String, english: String)] = {
+    private static func readEnglishSpellings(_ wordlist: String) -> [String: String] {
+        var spellings: [String: String] = [:]
+        for line in wordlist.split(whereSeparator: \.isNewline) where !line.hasPrefix("#") {
+            let fields = line.split(separator: "\t", omittingEmptySubsequences: false)
+            guard fields.count == 2, !fields[1].isEmpty else { continue }
+            let units = Array(fields[0].utf16)
+            guard let first = units.first, beginsWord(first), units.allSatisfy(isWordUnit),
+                  hasCompleteClusters(units[...]) else { continue }
+            spellings[String(fields[0])] = String(fields[1])
+        }
+        return spellings
+    }
+
+    private static func makeEnglishPrefixes(_ englishSpellings: [String: String]) -> [String: (khmer: String, english: String)] {
         var prefixes: [String: (khmer: String, english: String)] = [:]
         var ambiguous: Set<String> = []
         // UTF-16 prefixes can stop at coeng or inside a Swift Character.
@@ -226,14 +208,14 @@ struct KhmerAutocomplete: Sendable {
         }
         for prefix in ambiguous { prefixes.removeValue(forKey: prefix) }
         return prefixes
-    }()
+    }
 
     func englishMatch(in before: String, personalWords: [String]) -> EnglishMatch? {
         var match: EnglishMatch?
         _ = wordSuffix(in: before[...], personalWords: personalWords, matching: { typed in
-            if let english = Self.englishSpellings[typed] {
+            if let english = englishSpellings[typed] {
                 match = EnglishMatch(typed: typed, khmer: typed, english: english)
-            } else if let completion = Self.englishPrefixes[typed] {
+            } else if let completion = englishPrefixes[typed] {
                 match = EnglishMatch(typed: typed, khmer: completion.khmer, english: completion.english)
             }
             return match != nil
