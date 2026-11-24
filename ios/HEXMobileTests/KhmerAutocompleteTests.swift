@@ -8,6 +8,24 @@ final class KhmerAutocompleteTests: XCTestCase {
         XCTAssertEqual(index.wordsForLearning(in: "កា្", vocabulary: [], allowsNewWord: true), [])
     }
 
+    func testJoinedLearningSkipsCompetingUnknownBoundaries() {
+        let index = KhmerAutocomplete(wordlist: "ក\t10\nកខ\t10\nឃង\t10\nង\t10")
+        XCTAssertNil(index.learningReading(
+            in: "កខចឃង", vocabulary: [], allowsNewWord: true, inferJoinedWord: true
+        ))
+    }
+
+    func testJoinedLearningUsesTheBundledDictionaryWithoutTrimmingAName() throws {
+        let index = try XCTUnwrap(KhmerAutocomplete.bundled)
+        for sentence in ["ខ្ញុំចូលចិត្តហេក្សណាស់", "ខ្ញុំបានជួបហេក្សម្សិលមិញ"] {
+            let reading = try XCTUnwrap(index.learningReading(
+                in: sentence, vocabulary: [], allowsNewWord: true, inferJoinedWord: true
+            ))
+            let inferred = try XCTUnwrap(reading.inferredIndex)
+            XCTAssertEqual(reading.words[inferred], "ហេក្ស")
+        }
+    }
+
     private let model = KhmerAutocomplete(wordlist: """
     ខ្ញុំ\t100
     ស្រ\t90

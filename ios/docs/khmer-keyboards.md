@@ -140,19 +140,24 @@ After two uses, a word can rank higher in prefix completions, and a word
 pair can rank higher after its first word. Suggestions still require a tap.
 
 Hex counts words you pick from the strip and words you type and finish with
-a space, punctuation, or Return. To teach a new spelling, type it twice as a
-separate word. A short unfamiliar spelling can become a personal completion
-and take part in next-word predictions. Joined text teaches word pairs when
-Hex can find an unambiguous reading. Use spaces when entering new words amid
-joined text so Hex can tell where the new word starts and ends. Pasted text
-alone and secure fields teach nothing.
-Only bounded word and pair counts are stored on the iPhone. Turning the
+a space, punctuation, or Return. A short new spelling can become a personal
+completion after two uses as a separate word, or after Hex identifies it
+between known words in two different contexts in joined text. Hex waits when
+the word boundaries are ambiguous. Pasted text alone and secure fields teach
+nothing.
+
+The built-in keyboard puts `គោ` first after `ប្រហិតសាច់`. With
+personal suggestions enabled, Hex also learns which word you use after
+two particular words and uses that longer context in next-word ranking.
+
+Bounded learning data is stored on the iPhone. Turning the
 experiment off pauses learning and restores the usual suggestions.
 When counts exist, **Settings › Privacy › Export Khmer learning data** saves
 `hex-khmer-learning.json` to a location you choose. `words` maps each retained
 word to its count. `pairs` maps each preceding word to its following words
-and their counts. The file includes counts of one and contains only Khmer
-suggestion data. You can export saved counts while learning is paused.
+and their counts. When available, `triples` does the same for two preceding
+words separated by a space. The file includes counts of one. You can export
+saved counts while learning is paused.
 **Settings › Privacy › Learn how I type › Delete what Hex learned** clears
 the on-device counts. Saved exports are separate files.
 
