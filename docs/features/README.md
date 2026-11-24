@@ -2972,8 +2972,8 @@ iOS prototype (`HEXMobile`) -> Record/transcribe/copy and keyboard handoff
 │   ├── Khmer-script Pali and Sanskrit terms complete from a prefix and stay as typed
 │   ├── Experiments → Languages → English suggestions in Khmer (off by default)
 │   │   A matched loanword or app name can occupy one slot on either layout.
-│   │   Tap note after typing ណូត to replace it. Space keeps the Khmer spelling.
-│   │   The spellings are bundled and matched locally at a Khmer word boundary.
+│   │   Type តេឡេក្ → តេឡេក្រាម and Telegram, including in search fields with autocorrection off.
+│   │   Tap a spelling to use it. Space keeps what you typed. Matching runs locally.
 │   ├── Khmerism → hold for corner characters; coeng brings subscript consonants onto the keys
 │   ├── Autocorrect → smart typing; Swipe typing → trace a word (both on by default)
 │   ├── Swipe in emoji search → only the query changes; Backspace on an uncommitted

@@ -66,26 +66,66 @@ extension FullKeyboardEngineTests {
         }
     }
 
-    func testKhmerEnglishExperimentMatchesWholeSpellingsAndRejectsStaleField() async throws {
+    func testKhmerEnglishExperimentSkipsAmbiguousPrefixesAndRejectsStaleField() async throws {
         smartField(language: .khmer)
         target.documentIdentifier = UUID()
         await engine.khmerAutocompleteLoad?.value
         engine.khmerEnglishSuggestions = true
 
-        target.insertText("វ៉ាយហ្វ")
+        target.insertText("ស្កេ")
         engine.textDidChange()
-        XCTAssertFalse(engine.suggestions.contains { $0.displayText == "Wi-Fi" })
-        target.insertText("ៃ")
+        XCTAssertFalse(engine.suggestions.contains { $0.displayText == "scan" || $0.displayText == "scanner" })
+        target.insertText(" វ៉ាយហ្វ")
         engine.textDidChange()
         let wifi = try XCTUnwrap(engine.suggestions.first { $0.displayText == "Wi-Fi" })
         target.documentIdentifier = UUID()
         engine.acceptSuggestion(wifi)
-        XCTAssertEqual(target.text, "វ៉ាយហ្វៃ")
+        XCTAssertEqual(target.text, "ស្កេ វ៉ាយហ្វ")
 
         target.insertText(" តេឡេក្រាម")
         engine.textDidChange()
         engine.acceptSuggestion(try XCTUnwrap(engine.suggestions.first { $0.displayText == "Telegram" }))
-        XCTAssertEqual(target.text, "វ៉ាយហ្វៃ Telegram")
+        XCTAssertEqual(target.text, "ស្កេ វ៉ាយហ្វ Telegram")
+    }
+
+    func testKhmerEnglishExperimentOffersBothSpellingsInSearchWithAutocorrectionDisabled() async throws {
+        for (layout, keyboardType, choice) in [
+            (KeyboardLetterLayout.khmer, UIKeyboardType.default, "Telegram"),
+            (.khmerism, .webSearch, "តេឡេក្រាម"),
+        ] {
+            smartField(language: .khmer)
+            engine.letterLayout = layout
+            target.documentIdentifier = UUID()
+            target.keyboardType = keyboardType
+            target.returnKeyType = .search
+            target.autocorrectionType = .no
+            engine.configureForField()
+            await engine.khmerAutocompleteLoad?.value
+            engine.khmerEnglishSuggestions = true
+
+            target.insertText("តេឡេក្")
+            engine.textDidChange()
+            XCTAssertEqual(engine.suggestions.map(\.displayText), ["តេឡេក្រាម", "Telegram"])
+            XCTAssertTrue(engine.suggestions.allSatisfy { !$0.willAutoReplace })
+            engine.acceptSuggestion(try XCTUnwrap(engine.suggestions.first { $0.displayText == choice }))
+            XCTAssertEqual(target.text, choice)
+            XCTAssertEqual(engine.letterLayout, layout)
+        }
+    }
+
+    func testKhmerEnglishExperimentStaysHiddenInRestrictedFields() async {
+        smartField(language: .khmer)
+        target.documentIdentifier = UUID()
+        await engine.khmerAutocompleteLoad?.value
+        engine.khmerEnglishSuggestions = true
+        target.insertText("តេឡេក្")
+        target.textContentType = .username
+        engine.textDidChange()
+        XCTAssertTrue(engine.suggestions.isEmpty)
+        target.textContentType = nil
+        target.isSecureTextEntry = true
+        engine.textDidChange()
+        XCTAssertTrue(engine.suggestions.isEmpty)
     }
 
     func testKhmerWordPairsAfterJoinedPicksOnBothLayouts() async throws {

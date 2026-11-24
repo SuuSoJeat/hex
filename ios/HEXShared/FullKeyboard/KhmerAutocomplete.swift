@@ -140,7 +140,8 @@ struct KhmerAutocomplete: Sendable {
         let tail = before.utf16.reversed().prefix(Self.contextLength + 1)
         let run = Array(tail.prefix(while: Self.isWordUnit).reversed())
         guard let first = run.first, Self.beginsWord(first),
-              run.count <= Self.contextLength, Self.hasCompleteClusters(run[...]) else { return nil }
+              run.count <= Self.contextLength,
+              Self.hasCompleteClusters(run[...], allowsTrailingCoeng: matching != nil) else { return nil }
         let personal = PersonalLexicon(personalWords)
         var wordStarts = Array(repeating: false, count: run.count + 1)
         wordStarts[0] = true
@@ -200,11 +201,44 @@ struct KhmerAutocomplete: Sendable {
         "ផៅវ័រផយន៍": "PowerPoint",
     ]
 
-    func englishMatch(in before: String, personalWords: [String]) -> (typed: String, english: String)? {
-        guard let typed = wordSuffix(in: before[...], personalWords: personalWords, matching: {
-            Self.englishSpellings[$0] != nil
-        }), let english = Self.englishSpellings[typed] else { return nil }
-        return (typed, english)
+    struct EnglishMatch {
+        let typed: String
+        let khmer: String
+        let english: String
+    }
+
+    private static let englishPrefixes: [String: (khmer: String, english: String)] = {
+        var prefixes: [String: (khmer: String, english: String)] = [:]
+        var ambiguous: Set<String> = []
+        // UTF-16 prefixes can stop at coeng or inside a Swift Character.
+        for khmer in englishSpellings.keys.sorted() {
+            guard let english = englishSpellings[khmer] else { continue }
+            let units = khmer.utf16
+            guard units.count > 4 else { continue }
+            for count in 4..<units.count {
+                let prefix = String(decoding: units.prefix(count), as: UTF16.self)
+                if let existing = prefixes[prefix] {
+                    if existing.english != english { ambiguous.insert(prefix) }
+                } else {
+                    prefixes[prefix] = (khmer, english)
+                }
+            }
+        }
+        for prefix in ambiguous { prefixes.removeValue(forKey: prefix) }
+        return prefixes
+    }()
+
+    func englishMatch(in before: String, personalWords: [String]) -> EnglishMatch? {
+        var match: EnglishMatch?
+        _ = wordSuffix(in: before[...], personalWords: personalWords, matching: { typed in
+            if let english = Self.englishSpellings[typed] {
+                match = EnglishMatch(typed: typed, khmer: typed, english: english)
+            } else if let completion = Self.englishPrefixes[typed] {
+                match = EnglishMatch(typed: typed, khmer: completion.khmer, english: completion.english)
+            }
+            return match != nil
+        })
+        return match
     }
 
     func suggestions(
@@ -334,7 +368,7 @@ struct KhmerAutocomplete: Sendable {
                               automaticallyApplies: allowsAutomaticRepair())
         }
 
-        let complete = eligible.filter(Self.hasCompleteClusters)
+        let complete = eligible.filter { Self.hasCompleteClusters($0) }
         for (index, spelling) in complete.enumerated() where spelling.count >= Self.minimumSpellingLength {
             guard let edit = bestSingleEdit(to: spelling, gain: substitutionGain, mayOffer: mayOffer) else { continue }
             let typed = String(decoding: spelling, as: UTF16.self)
@@ -520,8 +554,8 @@ struct KhmerAutocomplete: Sendable {
         (0x1780...0x17D3).contains(unit) || unit == 0x17DD || unit == 0x200C || unit == 0x200D
     }
 
-    private static func hasCompleteClusters(_ spelling: ArraySlice<UInt16>) -> Bool {
-        spelling.last != coeng && !spelling.contains(0x200C) && !spelling.contains(0x200D)
+    private static func hasCompleteClusters(_ spelling: ArraySlice<UInt16>, allowsTrailingCoeng: Bool = false) -> Bool {
+        (allowsTrailingCoeng || spelling.last != coeng) && !spelling.contains(0x200C) && !spelling.contains(0x200D)
             && spelling.indices.dropLast().allSatisfy { spelling[$0] != coeng || beginsWord(spelling[$0 + 1]) }
     }
 

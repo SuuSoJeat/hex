@@ -163,10 +163,10 @@ Both layouts use the existing **Autocorrect** and **Swipe typing** switches in
 
 Turn on **Settings › Experiments › Languages › English suggestions in Khmer**
 to see English spellings for matched loanwords and app names on either layout.
-Typing **ណូត**, **កុំព្យូទ័រ**, or **តេឡេក្រាម** can offer **note**, **computer**,
-or **Telegram**. Tap the suggestion to replace that word without switching
-keyboards, or press Space to keep the Khmer spelling. The bundled list works
-offline and uses at most one suggestion slot.
+Type **តេឡេក្** to see both **តេឡេក្រាម** and **Telegram**. Once a prefix
+identifies one entry in the bundled list, you can tap either spelling to use
+it. Search fields can show these choices with autocorrection off. Space keeps
+what you typed. Matching works offline and offers at most one English choice.
 
 ## Acceptance examples
 
