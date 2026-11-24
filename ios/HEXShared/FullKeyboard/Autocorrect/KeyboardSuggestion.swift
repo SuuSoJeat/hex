@@ -14,6 +14,8 @@ nonisolated struct KeyboardSuggestion: Equatable, Sendable {
         /// The Khmer spelling as typed, and a replacement that may apply on a word boundary.
         case khmerKeepLiteral
         case khmerCorrection(autoReplace: Bool)
+        /// An English spelling that replaces the matched Khmer word on tap.
+        case khmerEnglish(typed: String)
         /// A word that can follow the one just finished. Only an explicit pick inserts it.
         case nextWord
         /// An emoji for the word just finished (Settings › Keyboard › Emoji), offered after a space,

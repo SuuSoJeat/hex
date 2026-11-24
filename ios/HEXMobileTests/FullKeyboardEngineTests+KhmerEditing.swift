@@ -36,6 +36,222 @@ extension FullKeyboardEngineTests {
         }
     }
 
+    func testKhmerEnglishExperimentOffersOneTapOnlySuggestionOnBothLayouts() async throws {
+        XCTAssertFalse(FullKeyboardSettings(defaults: defaults).khmerEnglishSuggestions)
+        for letters in [KeyboardLetterLayout.khmer, .khmerism] {
+            smartField(language: .khmer)
+            engine.letterLayout = letters
+            target.documentIdentifier = UUID()
+            await engine.khmerAutocompleteLoad?.value
+
+            target.insertText("ណូត")
+            engine.textDidChange()
+            XCTAssertFalse(engine.suggestions.contains { $0.displayText == "note" })
+            engine.khmerEnglishSuggestions = true
+            let note = try XCTUnwrap(engine.suggestions.first { $0.displayText == "note" })
+            XCTAssertEqual(note.kind, .khmerEnglish(typed: "ណូត"))
+            XCTAssertFalse(note.willAutoReplace)
+            tap(.space)
+            XCTAssertEqual(target.text, "ណូត ")
+            engine.acceptSuggestion(note)
+            XCTAssertEqual(target.text, "ណូត ")
+
+            target.insertText("កុំព្យូទ័រ")
+            engine.textDidChange()
+            let computer = try XCTUnwrap(engine.suggestions.first { $0.displayText == "computer" })
+            XCTAssertLessThanOrEqual(engine.suggestions.count, 3)
+            engine.acceptSuggestion(computer)
+            XCTAssertEqual(target.text, "ណូត computer")
+            XCTAssertEqual(engine.layout.language, .khmer)
+        }
+    }
+
+    func testKhmerEnglishExperimentSkipsAmbiguousPrefixesAndRejectsStaleField() async throws {
+        smartField(language: .khmer)
+        target.documentIdentifier = UUID()
+        await engine.khmerAutocompleteLoad?.value
+        engine.khmerEnglishSuggestions = true
+
+        target.insertText("ស្កេ")
+        engine.textDidChange()
+        XCTAssertFalse(engine.suggestions.contains { $0.displayText == "scan" || $0.displayText == "scanner" })
+        target.insertText(" វ៉ាយហ្វ")
+        engine.textDidChange()
+        let wifi = try XCTUnwrap(engine.suggestions.first { $0.displayText == "Wi-Fi" })
+        target.documentIdentifier = UUID()
+        engine.acceptSuggestion(wifi)
+        XCTAssertEqual(target.text, "ស្កេ វ៉ាយហ្វ")
+
+        target.insertText(" តេឡេក្រាម")
+        engine.textDidChange()
+        engine.acceptSuggestion(try XCTUnwrap(engine.suggestions.first { $0.displayText == "Telegram" }))
+        XCTAssertEqual(target.text, "ស្កេ វ៉ាយហ្វ Telegram")
+    }
+
+    func testKhmerEnglishExperimentOffersBothSpellingsInSearchWithAutocorrectionDisabled() async throws {
+        for (layout, keyboardType, choice) in [
+            (KeyboardLetterLayout.khmer, UIKeyboardType.default, "Telegram"),
+            (.khmerism, .webSearch, "តេឡេក្រាម"),
+        ] {
+            smartField(language: .khmer)
+            engine.letterLayout = layout
+            target.documentIdentifier = UUID()
+            target.keyboardType = keyboardType
+            target.returnKeyType = .search
+            target.autocorrectionType = .no
+            engine.configureForField()
+            await engine.khmerAutocompleteLoad?.value
+            engine.khmerEnglishSuggestions = true
+
+            target.insertText("តេឡេក្")
+            engine.textDidChange()
+            XCTAssertEqual(engine.suggestions.map(\.displayText), ["តេឡេក្រាម", "Telegram"])
+            XCTAssertTrue(engine.suggestions.allSatisfy { !$0.willAutoReplace })
+            engine.acceptSuggestion(try XCTUnwrap(engine.suggestions.first { $0.displayText == choice }))
+            XCTAssertEqual(target.text, choice)
+            XCTAssertEqual(engine.letterLayout, layout)
+        }
+    }
+
+    func testEnglishPickPreservesTextRevealedByABoundedCaretWindow() async throws {
+        for prefix in ["a", "abc", "🙂"] {
+            let field = KhmerBoundedCaretTarget(text: prefix + "ណូត!")
+            field.documentIdentifier = UUID()
+            field.adjustTextPosition(byCharacterOffset: -1)
+            await loadKhmerKeyboard(for: field)
+            engine.khmerEnglishSuggestions = true
+            let note = try XCTUnwrap(engine.suggestions.first { $0.displayText == "note" })
+            engine.acceptSuggestion(note)
+            await engine.khmerDeleteRecovery?.task.value
+            XCTAssertEqual(field.text, prefix + "note!")
+            XCTAssertEqual(field.cursorIndex, prefix.count + "note".count)
+        }
+    }
+
+    func testEnglishPickOnlyReplacesTheLastJoinedLoanword() async throws {
+        let field = FixtureTextTarget(text: "ម៉ៅស៍កុំព្យូទ័រ!")
+        field.documentIdentifier = UUID()
+        field.adjustTextPosition(byCharacterOffset: -1)
+        await loadKhmerKeyboard(for: field)
+        engine.khmerEnglishSuggestions = true
+        engine.acceptSuggestion(try XCTUnwrap(engine.suggestions.first { $0.displayText == "computer" }))
+        XCTAssertEqual(field.text, "ម៉ៅស៍computer!")
+    }
+
+    func testEnglishAppCompletionKeepsTheLeadingKhmerChoice() async throws {
+        for layout in [KeyboardLetterLayout.khmer, .khmerism] {
+            smartField(language: .khmer)
+            engine.letterLayout = layout
+            target.documentIdentifier = UUID()
+            await engine.khmerAutocompleteLoad?.value
+            target.insertText("ស្លា")
+            engine.textDidChange()
+            let ordinary = try XCTUnwrap(engine.suggestions.first)
+
+            engine.khmerEnglishSuggestions = true
+            XCTAssertTrue(engine.suggestions.contains(ordinary))
+            XCTAssertTrue(engine.suggestions.contains { $0.displayText == "ស្លាក់" })
+            XCTAssertTrue(engine.suggestions.contains { $0.displayText == "Slack" })
+            engine.acceptSuggestion(ordinary)
+            XCTAssertEqual(target.text, ordinary.displayText)
+        }
+    }
+
+    func testEnglishPickBeforePunctuationPreservesTheFollowingText() async throws {
+        let tail = ". Next"
+        for field in [FixtureTextTarget(), KhmerNilBeforeStartTarget()] {
+            field.documentIdentifier = UUID()
+            await loadKhmerKeyboard(for: field)
+            engine.khmerEnglishSuggestions = true
+            field.insertText("ណូត" + tail)
+            field.adjustTextPosition(byCharacterOffset: -tail.count)
+            engine.textDidChange()
+            engine.acceptSuggestion(try XCTUnwrap(engine.suggestions.first { $0.displayText == "note" }))
+            await engine.khmerDeleteRecovery?.task.value
+            XCTAssertEqual(field.documentContextBeforeInput, "note")
+            XCTAssertEqual(field.documentContextAfterInput, tail)
+        }
+    }
+
+    func testEnglishPickChecksForCursorMovementBeforeDeleting() async throws {
+        for (tail, ignoresForward) in [("!", true), ("👩🏽‍💻 tonight", false), ("e\u{301} later", false)] {
+            let field = KhmerBoundedCaretTarget(text: "ណូត" + tail)
+            field.documentIdentifier = UUID()
+            field.adjustTextPosition(byCharacterOffset: -tail.count)
+            field.ignoresForward = ignoresForward
+            await loadKhmerKeyboard(for: field)
+            engine.khmerEnglishSuggestions = true
+            let pick = try XCTUnwrap(engine.suggestions.first { $0.displayText == "note" })
+            engine.acceptSuggestion(pick)
+            if ignoresForward {
+                tap(.character("ក"))
+                XCTAssertEqual(engine.khmerDeleteRecovery?.input, "ក")
+            }
+            await engine.khmerDeleteRecovery?.task.value
+
+            let prefix = ignoresForward ? "ណូតក" : "note"
+            XCTAssertEqual(field.text, prefix + tail)
+            XCTAssertEqual(field.cursorIndex, prefix.count)
+        }
+    }
+
+    func testEnglishPickReturnsFromAProbeThatHidesTheWholePrefix() async throws {
+        let field = KhmerBoundedCaretTarget(text: "ផៅ!")
+        field.leftWindow = 1
+        field.documentIdentifier = UUID()
+        field.adjustTextPosition(byCharacterOffset: -1)
+        await loadKhmerKeyboard(for: field)
+        engine.khmerEnglishSuggestions = true
+        engine.acceptSuggestion(try XCTUnwrap(engine.suggestions.first { $0.displayText == "PowerPoint" }))
+        let pending = try XCTUnwrap(engine.khmerDeleteRecovery)
+        tap(.character("ក"))
+        await pending.task.value
+        XCTAssertEqual(field.text, "ផៅក!")
+        XCTAssertEqual(field.cursorIndex, "ផៅក".count)
+    }
+
+    func testEnglishPickCompletesDelayedCaretProbesBeforeReplayingKeys() async throws {
+        for delayedProbe in [1, 2] { // Before deleting, or verifying the last delete.
+            for hidesContext in [false, true] {
+                let field = KhmerDeferredCaretTarget(text: "ណូត. Next")
+                field.documentIdentifier = UUID()
+                field.adjustTextPosition(byCharacterOffset: -". Next".count)
+                field.delayedProbe = delayedProbe
+                field.hidesContext = hidesContext
+                await loadKhmerKeyboard(for: field)
+                engine.khmerEnglishSuggestions = true
+                field.onDelayedForward = {
+                    self.tap(.character("ក"))
+                    XCTAssertEqual(self.engine.khmerDeleteRecovery?.input, "ក")
+                }
+
+                engine.acceptSuggestion(try XCTUnwrap(engine.suggestions.first { $0.displayText == "note" }))
+                let pending = try XCTUnwrap(engine.khmerDeleteRecovery)
+                await pending.task.value
+
+                XCTAssertNil(engine.khmerDeleteRecovery)
+                XCTAssertEqual(field.documentContextBeforeInput, "noteក")
+                XCTAssertEqual(field.documentContextAfterInput, ". Next")
+                XCTAssertEqual(field.probeMoves, [1, -1, 1, -1])
+            }
+        }
+    }
+
+    func testKhmerEnglishExperimentStaysHiddenInRestrictedFields() async {
+        smartField(language: .khmer)
+        target.documentIdentifier = UUID()
+        await engine.khmerAutocompleteLoad?.value
+        engine.khmerEnglishSuggestions = true
+        target.insertText("តេឡេក្")
+        target.textContentType = .username
+        engine.textDidChange()
+        XCTAssertTrue(engine.suggestions.isEmpty)
+        target.textContentType = nil
+        target.isSecureTextEntry = true
+        engine.textDidChange()
+        XCTAssertTrue(engine.suggestions.isEmpty)
+    }
+
     func testKhmerWordPairsAfterJoinedPicksOnBothLayouts() async throws {
         for letters in [KeyboardLetterLayout.khmer, .khmerism] {
             smartField(language: .khmer)
@@ -802,6 +1018,56 @@ extension FullKeyboardEngineTests {
         XCTAssertFalse(engine.suggestions.contains(where: \.willAutoReplace))
         tap(.space)
         XCTAssertEqual(target.text, "កមពុជា កមពុជា ")
+    }
+}
+
+@MainActor
+private final class KhmerDeferredCaretTarget: FixtureTextTarget {
+    var delayedProbe: Int?
+    var hidesContext = false
+    var onDelayedForward: (() -> Void)?
+    private(set) var probeMoves: [Int] = []
+    private var forwards = 0
+    private var stale: (before: String?, after: String?)?
+
+    override var documentContextBeforeInput: String? {
+        if let stale { return hidesContext ? nil : stale.before }
+        return cursorIndex == 0 ? nil : super.documentContextBeforeInput
+    }
+
+    override var documentContextAfterInput: String? {
+        if let stale { return hidesContext ? nil : stale.after }
+        return super.documentContextAfterInput
+    }
+
+    override func adjustTextPosition(byCharacterOffset offset: Int) {
+        let previous = (documentContextBeforeInput, documentContextAfterInput)
+        super.adjustTextPosition(byCharacterOffset: offset)
+        guard let delayedProbe else { return }
+        probeMoves.append(offset)
+        if offset == 1 { forwards += 1 }
+        if forwards == delayedProbe {
+            stale = previous
+            if offset == 1 { onDelayedForward?() }
+            Task { @MainActor in self.stale = nil }
+        }
+    }
+}
+
+@MainActor
+private final class KhmerBoundedCaretTarget: FixtureTextTarget {
+    var leftWindow = 2
+    var ignoresForward = false
+
+    override var documentContextBeforeInput: String? {
+        guard let before = super.documentContextBeforeInput, !before.isEmpty else { return nil }
+        return String(before.suffix(leftWindow))
+    }
+
+    override var documentContextAfterInput: String? { super.documentContextAfterInput.map { String($0.prefix(2)) } }
+
+    override func adjustTextPosition(byCharacterOffset offset: Int) {
+        if !ignoresForward || offset <= 0 { super.adjustTextPosition(byCharacterOffset: offset) }
     }
 }
 

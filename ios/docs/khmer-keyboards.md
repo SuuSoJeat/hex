@@ -159,6 +159,29 @@ Both layouts use the existing **Autocorrect** and **Swipe typing** switches in
   In an identified field, Backspace can take back the last swipe as one word
   according to Hex's existing letter-by-letter deletion setting.
 
+## English suggestions
+
+Turn on **Settings › Experiments › Languages › English suggestions in Khmer**
+to see English spellings for matched loanwords and app names on either layout.
+Type **តេឡេក្** to see both **តេឡេក្រាម** and **Telegram**. A partial spelling
+can qualify as soon as it identifies one English result. For example, **ម៉ៃក្រូ**
+still fits both Microsoft and microphone, so the keyboard waits for more input.
+When an ordinary Khmer completion also fits, it can appear alongside the two
+spellings. Search fields can offer both spellings with autocorrection off.
+
+Matching works offline, including in joined Khmer text. For example, tapping
+**computer** after **ម៉ៅស៍កុំព្យូទ័រ** keeps **ម៉ៅស៍** and replaces **កុំព្យូទ័រ**.
+Following punctuation stays in place. Space keeps what you typed.
+
+The [Khmer-to-English transliteration lexicon](../HEXKeyboard/TypingModel/km-english-suggestions.tsv)
+contains app names, Cambodian services, and everyday digital loanwords. Each
+row pairs one Khmer spelling with the English text Hex inserts. Spellings
+that should insert the same text share that English spelling.
+
+Hex maintains this list, including informal Khmer spellings. References for
+loanwords and terminology include [Wiktionary’s Khmer loanword category](https://en.wiktionary.org/wiki/Category:Khmer_terms_borrowed_from_English)
+and the [Cambodian Ministry of Posts and Telecommunications digital glossary](https://mptc.gov.kh/lexicon/).
+
 ## Acceptance examples
 
 | Try this in the Full keyboard | Expected result |

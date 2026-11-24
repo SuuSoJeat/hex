@@ -2970,6 +2970,13 @@ iOS prototype (`HEXMobile`) -> Record/transcribe/copy and keyboard handoff
 │   ├── Choose សូម → អរគុណ → ច្រើន to write សូមអរគុណច្រើន without inserting spaces.
 │   │   The offline word-pair model also ranks completions after a space or zero-width space.
 │   ├── Khmer-script Pali and Sanskrit terms complete from a prefix and stay as typed
+│   ├── Experiments → Languages → English suggestions in Khmer (off by default)
+│   │   A matched loanword or app name can occupy one slot on either layout.
+│   │   Type តេឡេក្ → តេឡេក្រាម and Telegram, including in search fields with autocorrection off.
+│   │   A unique prefix offers both spellings and keeps the leading distinct Khmer choice.
+│   │   An ambiguous prefix waits for more input. Matching also works in long joined Khmer text.
+│   │   Tap to replace the matched text at the caret. Space keeps what you typed.
+│   │   The bundled lexicon covers app names, Cambodian services, and digital loanwords.
 │   ├── Khmerism → hold for corner characters; coeng brings subscript consonants onto the keys
 │   ├── Autocorrect → smart typing; Swipe typing → trace a word (both on by default)
 │   ├── Swipe in emoji search → only the query changes; Backspace on an uncommitted

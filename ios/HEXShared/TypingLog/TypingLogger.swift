@@ -351,6 +351,8 @@ final class TypingLogger {
                 fields.append(TypingLogField("kind", .string("secondary")))
             case .khmerCompletion:
                 fields.append(TypingLogField("kind", .string("khmer_completion")))
+            case .khmerEnglish:
+                fields.append(TypingLogField("kind", .string("khmer_english")))
             case .khmerKeepLiteral:
                 fields.append(TypingLogField("kind", .string("literal")))
             case .khmerPrediction, .nextWord:
