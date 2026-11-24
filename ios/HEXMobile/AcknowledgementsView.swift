@@ -8,7 +8,7 @@ struct AcknowledgementsView: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 20) {
-                    ForEach(Self.entries, id: \.title) { entry in
+                    ForEach(Self.shown, id: \.title) { entry in
                         VStack(alignment: .leading, spacing: 6) {
                             Text(entry.title)
                                 .font(.system(size: 15, weight: .medium))
@@ -39,15 +39,14 @@ struct AcknowledgementsView: View {
         let body: String
     }
 
-    /// Spatial autocorrect's word lists (`scripts/build-typing-model.py`), the keyboard's
-    /// never-suggest list (`OffensiveWords`), and the speech models Hex downloads (Parakeet V2,
-    /// and Parakeet Ultra for Experiments › Multilingual model); keep in step with ios/README.md.
+    /// Typing data, keyboard layout credits and downloaded speech models. Keep in step with
+    /// ios/docs/acknowledgements.md.
     static let entries: [Entry] = [
         Entry(
             title: "Google Books Ngram data",
             body: """
-            Spatial autocorrect's word and word-pair frequencies, and German's capitalisation \
-            shares, come from the Google Books Ngram Viewer data, version 3 (2020), by Google, \
+            Spatial autocorrect's word and word-pair frequencies, German's capitalisation \
+            shares and French's list of words outside its model come from the Google Books Ngram Viewer data, version 3 (2020), by Google, \
             licensed under Creative Commons Attribution 3.0 (creativecommons.org/licenses/by/3.0). \
             Hex sums the counts from 1980 to 2019 and keeps only words in the lists below.
             """
@@ -125,6 +124,120 @@ struct AcknowledgementsView: View {
             Spanish words are checked against RLA-ES, the Spanish spelling dictionaries for \
             LibreOffice by Santiago Bosio and contributors (Spain and Mexico), used under the \
             Mozilla Public License 1.1 (github.com/sbosio/rla-es).
+            """
+        ),
+        Entry(
+            title: "SIL/Keyman Khmer lexical model",
+            body: """
+            Khmer completions and spelling suggestions use the unchanged word frequency list \
+            from SIL International's sil.km.ggc model (github.com/keymanapp/lexical-models, \
+            revision e3918e6963c6). Hex also builds its Khmer swipe model from that list. \
+            Copyright © 2024 SIL International. The keyboard includes the MIT licence notice.
+            """
+        ),
+        Entry(
+            title: "Khmer Wikipedia and Wiktionary contributors",
+            body: """
+            Hex counted word pairs in the November 2023 Khmer Wikipedia snapshot \
+            (huggingface.co/datasets/wikimedia/wikipedia). It keeps aggregate counts across \
+            articles and gives common conversational phrases priority. Article histories at \
+            km.wikipedia.org credit individual contributors. The Khmer-script supplement \
+            includes Pali and Sanskrit headwords from English Wiktionary (en.wiktionary.org), \
+            whose entry histories credit the contributors. The adapted Wikimedia data is \
+            available under Creative Commons Attribution-ShareAlike 4.0 \
+            (creativecommons.org/licenses/by-sa/4.0/).
+            """
+        ),
+        Entry(
+            title: "Expanded Khmer typing dictionary",
+            body: """
+            Hex adds Khmer spellings from the ICU Khmer break dictionary (Unicode and \
+            contributors, Unicode License V3), Google's Khmer pronunciation dictionary \
+            (© 2018 Google Inc., CC BY 4.0), and English Wiktionary contributors via \
+            Kaikki (CC BY-SA 4.0). Hex selects spellings and ranks continuations using \
+            Khmer Wikipedia. Source links, licences and changes are included in the \
+            keyboard's km-expanded-license.txt.
+            """
+        ),
+        Entry(
+            title: "Khmerism keyboard layout",
+            body: """
+            Hex's Khmerism layout builds on the original Khmerism Keyboard Project by \
+            Lyheng Phuoy (solve.mit.edu/solutions/2452).
+            """
+        ),
+    ]
+
+    /// The entries the app shows: Polish's once the keyboard bundles its model (`pl.hextm`).
+    static var shown: [Entry] {
+        entries + (keyboardBundles("pl.hextm") ? polishEntries : [])
+    }
+
+    private static func keyboardBundles(_ file: String) -> Bool {
+        guard let plugins = Bundle.main.builtInPlugInsURL else { return false }
+        let path = plugins.appendingPathComponent("HEXKeyboard.appex").appendingPathComponent(file).path
+        return FileManager.default.fileExists(atPath: path)
+    }
+
+    /// Polish's typing model (`scripts/build-typing-model.py pl`, its inputs in
+    /// `POLISH_INPUTS`); keep in step with ios/README.md.
+    static let polishEntries: [Entry] = [
+        Entry(
+            title: "National Corpus of Polish n-grams",
+            body: """
+            Polish word and word-pair frequencies come from the n-grams of the National Corpus \
+            of Polish's balanced subcorpus (NKJP; Institute of Computer Science, Polish Academy \
+            of Sciences; zil.ipipan.waw.pl/NKJPNGrams), made available by its authors under a \
+            Creative Commons Attribution licence (creativecommons.org/licenses/by/; the page \
+            names no version). Hex keeps the words PoliMorf \
+            lists, leaves out spellings typed without their marks, and stores the frequencies \
+            rounded.
+            """
+        ),
+        Entry(
+            title: "ParlaMint",
+            body: """
+            Which Polish spellings are missing their marks, and which words are names, is checked \
+            against the Polish part of \
+            ParlaMint 5.0, the Sejm and Senate transcripts 2015-2022 (Erjavec et al., \
+            Multilingual comparable corpora of parliamentary debates ParlaMint 5.0, CLARIN.SI, \
+            hdl.handle.net/11356/2004), licensed under Creative Commons Attribution 4.0 \
+            International (creativecommons.org/licenses/by/4.0).
+            """
+        ),
+        Entry(
+            title: "PoliMorf",
+            body: """
+            Polish words are checked against PoliMorf (2018-07-23; Woliński, Miłkowski, \
+            Ogrodniczuk, Przepiórkowski, Szałkiewicz; hdl.handle.net/11321/577).
+
+            Portions copyright © 2011 Marek Futrega, Piotr Gackiewicz, Mirosław Prywata, \
+            Włodzimierz Macewicz, Marcin Miłkowski
+            Portions copyright © 2007–2018 Zygmunt Saloni, Włodzimierz Gruszczyński, \
+            Marcin Woliński, Robert Wołosz, Danuta Skowrońska
+            Portions copyright © 2011–2018 Institute of Computer Science, Polish Academy of Sciences
+
+            All rights reserved.
+
+            Redistribution and use in source and binary forms, with or without modification, \
+            are permitted provided that the following conditions are met:
+
+            Redistributions of source code must retain the above copyright notice, this list \
+            of conditions and the following disclaimer.
+            Redistributions in binary form must reproduce the above copyright notice, this \
+            list of conditions and the following disclaimer in the documentation and/or other \
+            materials provided with the distribution.
+
+            THIS SOFTWARE IS PROVIDED BY COPYRIGHT HOLDERS “AS IS” AND ANY EXPRESS OR IMPLIED \
+            WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF \
+            MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT \
+            SHALL COPYRIGHT HOLDERS OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, \
+            INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT \
+            LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR \
+            PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, \
+            WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR \
+            OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF \
+            THE POSSIBILITY OF SUCH DAMAGE.
             """
         ),
     ]

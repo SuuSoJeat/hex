@@ -1,6 +1,6 @@
 # LDNOOBW (CC BY 4.0), curated by Hex. Attribution and source revision: Settings › Acknowledgements (AcknowledgementsView.swift). Same entries as android/app/src/main/assets/typing/never-suggest.tsv.
 # layout<TAB>slur|swear<TAB>whole spelling (or an exact two-word expression).
-# * = shared loanword with the same restriction in all four layouts.
+# * = shared loanword with the same restriction in every layout.
 *	slur	faggot
 *	slur	faggots
 *	slur	nigga
@@ -654,3 +654,10 @@ nb	swear	ståpikken
 nb	swear	ståpikkene
 nb	swear	ståpikker
 nb	swear	svartheiteste
+# Khmer spellings cross-checked against Chuon Nath (1967) and Headley (1997).
+km	swear	កណ្ដួយ
+km	swear	ក្តិត
+km	swear	ក្ដិត
+km	swear	ចុយ
+km	swear	សំផិង
+km	swear	សំផឹង

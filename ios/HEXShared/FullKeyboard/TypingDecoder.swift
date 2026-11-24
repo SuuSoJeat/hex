@@ -16,6 +16,8 @@ nonisolated final class TypingDecoderModel: @unchecked Sendable {
     let characters: [Character]
     let baseCodes: [UInt8]
     let apostropheCode: UInt8?
+    /// Direct lookup from Khmer UTF-16 units to the codes used in the sorted word list.
+    private let khmerCodes: [UInt8]
     private let base: UnsafeRawPointer
     private let offsetsAt: Int
     private let unigramAt: Int
@@ -67,6 +69,17 @@ nonisolated final class TypingDecoderModel: @unchecked Sendable {
         self.characters = characters
         self.baseCodes = baseCodes
         self.apostropheCode = codes["'"]
+        if self.language == "km" {
+            var table = [UInt8](repeating: 0, count: 128)
+            for (key, code) in codes {
+                if let scalar = key.unicodeScalars.first, (0x1780..<0x1800).contains(scalar.value) {
+                    table[Int(scalar.value) - 0x1780] = code
+                }
+            }
+            khmerCodes = table
+        } else {
+            khmerCodes = []
+        }
         self.wordCount = words
         self.bigramCount = bigrams
         self.offsetsAt = offsetsAt
@@ -106,9 +119,17 @@ nonisolated final class TypingDecoderModel: @unchecked Sendable {
         return body(UnsafeRawBufferPointer(start: base.advanced(by: blobAt + s), count: start(i + 1) - s))
     }
 
-    /// The word's letter codes, or nil when it has a letter the model doesn't.
+    /// The word's codes, or nil when it has a character the model doesn't.
     func encode(_ word: String) -> [UInt8]? {
         var out: [UInt8] = []
+        if language == "km" {
+            // Each Khmer scalar has its own key, even inside a Swift Character.
+            for scalar in word.unicodeScalars {
+                guard let code = codes[Character(scalar)] else { return nil }
+                out.append(code)
+            }
+            return out
+        }
         for c in word {
             guard let code = codes[c] else { return nil }
             out.append(code)
@@ -142,6 +163,23 @@ nonisolated final class TypingDecoderModel: @unchecked Sendable {
         return index(ofCodes: bytes)
     }
 
+    /// The contiguous range that still matches after adding one Khmer keyboard input.
+    func khmerMatches(in range: Range<Int>, depth: Int, unit: UInt16) -> Range<Int> {
+        let offset = Int(unit) - 0x1780
+        guard khmerCodes.indices.contains(offset), khmerCodes[offset] != 0 else { return 0..<0 }
+        let (lo, hi) = narrow(range.lowerBound, range.upperBound, depth: depth, byte: Int(khmerCodes[offset]))
+        return lo..<hi
+    }
+
+    func khmerMatches(_ prefix: ArraySlice<UInt16>) -> Range<Int> {
+        var range = 0..<wordCount
+        for (depth, unit) in prefix.enumerated() {
+            range = khmerMatches(in: range, depth: depth, unit: unit)
+            if range.isEmpty { break }
+        }
+        return range
+    }
+
     /// Whether the model has `second` following `first` as a pair.
     func hasPair(_ first: String, _ second: String) -> Bool {
         guard let a = index(of: first), let b = index(of: second) else { return false }
@@ -159,16 +197,27 @@ nonisolated final class TypingDecoderModel: @unchecked Sendable {
 
     /// The three most probable allowed continuations of a completed word. Scan just its
     /// mapped bigram row and keep three entries, even for a word with thousands of followers.
-    func nextWords(after previous: String, allowing: (String) -> Bool) -> [String] {
+    func nextWords(after previous: String, khmerPrefix: String = "", allowing: (String) -> Bool) -> [String] {
         guard let a = index(of: previous) else { return [] }
         let start = Int(base.loadUnaligned(fromByteOffset: pairRowsAt + 4 * a, as: UInt32.self))
         let end = Int(base.loadUnaligned(fromByteOffset: pairRowsAt + 4 * (a + 1), as: UInt32.self))
         guard start <= end, end <= bigramCount else { return [] }
+        let prefix = Array(khmerPrefix.utf16)
+        let matches = prefix.isEmpty ? 0..<wordCount : khmerMatches(prefix[...])
+        guard !matches.isEmpty else { return [] }
+        // Follower IDs are in dictionary order. Jump to the first possible
+        // match before inspecting weights or decoding candidate strings.
+        var lower = start, upper = end
+        while lower < upper && !prefix.isEmpty {
+            let mid = (lower + upper) / 2
+            if follower(mid) < matches.lowerBound { lower = mid + 1 } else { upper = mid }
+        }
         var best: [(rank: Int, text: String)] = []
-        for i in start..<end {
+        for i in lower..<end {
             let cost = Int(base.load(fromByteOffset: pairCostsAt + i, as: UInt8.self))
             let b = Int(base.loadUnaligned(fromByteOffset: pairWordsAt + 4 * i, as: UInt32.self))
-            guard b < wordCount else { continue }
+            if b >= matches.upperBound { break }
+            if !prefix.isEmpty && length(b) == prefix.count { continue }
             // Prefer the commoner word when two pair probabilities quantize to the same byte.
             let rank = cost * 256 + Int(base.load(fromByteOffset: unigramAt + b, as: UInt8.self))
             if best.count == 3, rank >= best[2].rank { continue }
@@ -404,6 +453,8 @@ nonisolated struct TypingDecoder {
     struct Keys: Equatable, Sendable {
         /// Each letter key's centre, shifted by your tap offsets when there are any.
         var centres: [Character: CGPoint]
+        /// Alternate glyphs that share their main glyph's physical key during a swipe.
+        var swipeAliases: [Character: Character] = [:]
         var pitch: CGSize
         /// The bottom letter row's centre, below which a tap may have been meant for space.
         var bottomRowY: CGFloat
@@ -418,11 +469,30 @@ nonisolated struct TypingDecoder {
             self.space = space
         }
 
+        static func swipeLetter(on key: KeyboardKey, language: KeyboardLanguage) -> Character? {
+            guard !key.isNumberRow, let text = key.character, text.count == 1, let letter = text.first else { return nil }
+            if language == .khmer {
+                return khmerSwipeGlyph(text) != nil || !khmerSwipeAlternates(on: key).isEmpty ? letter : nil
+            }
+            return letter.isLetter ? letter : nil
+        }
+
+        private static func khmerSwipeGlyph(_ text: String) -> Character? {
+            guard text.unicodeScalars.count == 1, let scalar = text.unicodeScalars.first,
+                  (0x1780...0x17D2).contains(scalar.value) || scalar.value == 0x17DD else { return nil }
+            return Character(scalar)
+        }
+
+        private static func khmerSwipeAlternates(on key: KeyboardKey) -> [Character] {
+            [key.shifted, key.alternate, key.shiftedAlternate].compactMap { $0.flatMap(khmerSwipeGlyph) }
+        }
+
         /// The letter keys of `layout` (nil off the letters page). `offsets` (in points, by
         /// letter) moves a centre to where you tend to tap it.
         init?(layout: KeyboardLayout, offsets: [Character: CGVector] = [:]) {
             guard layout.layer == .letters else { return nil }
             var centres: [Character: CGPoint] = [:]
+            var alternates: [(glyph: Character, key: Character)] = []
             var bottom: CGFloat = 0
             var space: CGRect?
             for key in layout.keys where key.kind == .space {
@@ -431,23 +501,30 @@ nonisolated struct TypingDecoder {
                 space = space.map { $0.union(bar) } ?? bar
             }
             for key in layout.keys {
-                guard let c = key.character, c.count == 1, let letter = c.first, letter.isLetter else { continue }
+                guard let letter = Self.swipeLetter(on: key, language: layout.language) else { continue }
                 let shift = offsets[letter] ?? .zero
                 // A split layout's halves are pushed together, so a letter on both halves (G, V)
                 // has one centre, where the unsplit keyboard has it.
                 centres[letter] = CGPoint(x: layout.unsplitX(key.frame.midX) + shift.dx, y: key.frame.midY + shift.dy)
                 bottom = max(bottom, key.frame.midY)
+                if layout.language == .khmer {
+                    for glyph in Self.khmerSwipeAlternates(on: key) { alternates.append((glyph, letter)) }
+                }
             }
             let m = layout.metrics
             self.init(
                 centres: centres,
                 pitch: CGSize(
-                    width: layout.isSplit ? SplitGeometry.pitch : layout.letterWidth + m.gap,
+                    width: layout.swipePitch,
                     height: m.keyHeight + m.rowGap
                 ),
                 bottomRowY: bottom,
                 space: space
             )
+            // The main face is the canonical path for a glyph also offered on another key.
+            for (glyph, key) in alternates where centres[glyph] == nil && swipeAliases[glyph] == nil {
+                swipeAliases[glyph] = key
+            }
         }
     }
 
@@ -625,14 +702,19 @@ nonisolated struct TypingDecoder {
     /// Each letter code's cost for one tap, in nats above the likeliest letter's. An accented
     /// letter costs at most its base letter's plus `accentCost` (é on an English or Spanish
     /// layout, ñ typed with n); one with neither key is impossible (infinity).
+    /// Negative log likelihood of a tap at a key's centre, up to a constant shared by the keys.
+    static func tapCost(_ tap: CGPoint, centre: CGPoint, sigmaX: Double, sigmaY: Double) -> Double {
+        let dx = (Double(tap.x) - Double(centre.x)) / sigmaX
+        let dy = (Double(tap.y) - Double(centre.y)) / sigmaY
+        return 0.5 * (dx * dx + dy * dy)
+    }
+
     private func tapCosts(_ p: CGPoint, centres: [CGPoint?], keys: Keys) -> [Double] {
         let sx = Double(keys.pitch.width) * parameters.sigmaX
         let sy = Double(keys.pitch.height) * parameters.sigmaY
         var out = centres.map { centre -> Double in
             guard let c = centre else { return .infinity }
-            let dx = (Double(p.x) - Double(c.x)) / sx
-            let dy = (Double(p.y) - Double(c.y)) / sy
-            return 0.5 * (dx * dx + dy * dy)
+            return Self.tapCost(p, centre: c, sigmaX: sx, sigmaY: sy)
         }
         // Also from its base key even when it has its own (ñ from n on the Spanish layout):
         // whichever is cheaper.

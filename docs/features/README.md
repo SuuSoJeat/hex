@@ -427,7 +427,8 @@ Choose a supported language              // setup.language-conditioning; macOS +
 │   offers it (#1991)
 ├── Bangla -> Whisper only, with the `bn` hint; Auto lets Whisper guess per clip
 ├── Khmer -> Whisper only, with the `km` hint; Auto lets Whisper guess per clip
-└── Azerbaijani -> Whisper only, with the `az` hint; Auto lets Whisper guess per clip
+├── Azerbaijani -> Whisper only, with the `az` hint; Auto lets Whisper guess per clip
+└── Catalan -> Whisper only, with the `ca` hint; Auto lets Whisper guess per clip
 ```
 
 Whisper and Qwen3-ASR (including QwenCleo) read the shared
@@ -595,6 +596,14 @@ starts on Whisper. `azerbaijani_is_transcribed_by_whisper_with_its_language_hint
 checks the recommendation, the `az` hint, that Whisper's picker offers it, and
 that Qwen3-ASR rejects it. It runs no inference, and Azerbaijani accuracy has
 not been measured.
+
+Catalan (`ca`) is offered because Whisper large-v3-turbo was trained on it and
+no other available catalog model supports it, so Whisper is its only,
+recommended choice and a system whose first preferred language is Catalan
+starts on Whisper. `catalan_is_transcribed_by_whisper_with_its_language_hint`
+checks the recommendation, the `ca` hint, that Whisper's picker offers it, and
+that Qwen3-ASR rejects it. It runs no inference, and Catalan accuracy has not
+been measured.
 
 Checks start in [desktop/onboarding.rs](../../src/desktop/onboarding.rs),
 [transcription.rs](../../src/transcription.rs), and
@@ -916,10 +925,12 @@ Completed output                         // output
     ├── Labs > Copy dictation audio (off) -> copies a kept WAV as a file   // labs.copy-dictation-audio
     │   -> the card's Copy audio beside Play, and the menu bar or tray's Copy last dictation audio
     │   -> needs Keep recordings; it stores no audio itself (labs.md)
-    └── Labs > Dictation stats (off) -> History's Stats dialog and hex history stats   // labs.history-stats
-        -> headline tiles, time saved with a typing-speed slider, the busiest hour, a 30-day chart, top apps
-        -> a 53-week heatmap and all-time totals, from a daily rollup in usage.json with no text or app names
-        -> Clear all history deletes the rollup too (labs.md)
+    ├── Labs > Dictation stats (off) -> History's Stats dialog and hex history stats   // labs.history-stats
+    │   -> headline tiles, time saved with a typing-speed slider, the busiest hour, a 30-day chart, top apps
+    │   -> a 53-week heatmap and all-time totals, from a daily rollup in usage.json with no text or app names
+    │   -> Clear all history deletes the rollup too (labs.md)
+    └── Labs > Stats on History (off) -> one compact strip of those six headline numbers above the list   // labs.history-stats-strip
+        -> needs Dictation stats and its own switch; off, History is exactly as before (labs.md)
 Every entry since #1177 -> "Speech model" fact: the model that made its text (+ language when chosen)
 ```
 
@@ -1277,8 +1288,8 @@ what is playing, so Hex hears the browsers through a private process tap
 (aggregate `anomaly.hex.browser-tap.<pid>`, apart from the meeting tap) and sends
 play only after it saw the browser go silent right after its own pause. The
 browsers are the ones [microphone_activity.rs](../../src/microphone_activity.rs)
-knows: Chrome, Brave, Safari, Firefox, Edge, Arc, Vivaldi, Helium, Ardia, and
-Zen, whose helpers count as their browser. The sequence checks in
+knows: Chrome, Brave, Safari, Firefox, Edge, Arc, Vivaldi, Helium, Ardia,
+Zen, and Aside, whose helpers count as their browser. The sequence checks in
 [audio/browser_media.rs](../../src/audio/browser_media.rs) run on fakes:
 `a_confirmed_pause_is_resumed`, `two_sounding_tabs_never_get_play`,
 `a_browser_already_playing_gets_no_play`, `a_call_is_never_paused`,
@@ -1521,9 +1532,10 @@ other way. Check: `the_page_is_read_only_when_processing_uses_it` in
 browser. On macOS the front window's title is read only by meeting detection
 and while a script transformation is set up (`reads_window_title`). When
 something uses the page, macOS asks the front tab of Safari, Orion, Chrome,
-Brave, Edge, Arc, Vivaldi, Opera, Helium, and Chromium over AppleScript (one
-Automation prompt per browser; a refusal keeps the application context) and
-reads any other app's focused AXWebArea `AXURL` (Firefox, Zen, web views).
+Brave, Edge, Arc, Vivaldi, Opera, Helium, Chromium, and Aside over
+AppleScript (one Automation prompt per browser; a refusal keeps the
+application context) and reads any other app's focused AXWebArea `AXURL`
+(Firefox, Zen, web views).
 That AppleScript read is not part of the 500 ms foreground-context poll: the
 poll reads it once when a scriptable browser becomes the frontmost process
 (caching its address, or no address after a failed read, per pid), so
@@ -1872,6 +1884,10 @@ Hex checks the release service            // maintain.updates
 ├── Direct install -> download (resumable) -> size + SHA-256 -> code signature -> stage
 │   ├── macOS -> unpack beside Hex.app -> Developer ID 5NZ4Q7NXJ4, anomaly.hex, notarized
 │   ├── Windows -> Authenticode valid, signer AUTHENTICODE_SIGNER -> new version directory
+│   │   └── .lnk files in Start Menu, Desktop, and taskbar pins -> retargeted in one PowerShell run
+│   │       // target is versions\<version>\hex.exe; arguments and name stay, an old-version icon is repointed
+│   │       // a Start Menu Hex.lnk that reads as empty (zero-filled) is recreated, but never when it is gone
+│   │       // saves flush updates\shortcut.tmp.lnk; a failed replace saves the retarget in place, the repair copies
 │   ├── Linux -> SHA-256 only -> new version directory, `current` switched
 │   ├── Staged -> checks continue; Restart to update stays offered meanwhile
 │   │   ├── Another release this install takes (update, required) -> download -> replaces the staged one
@@ -1892,6 +1908,7 @@ Hex checks the release service            // maintain.updates
 ├── macOS location not replaceable (read-only, translocated, root-owned) -> Download update (DMG)
 ├── Package manager (pacman, Nix) -> its command, once it serves another version
 ├── Source build, test build -> never checks
+├── `HEX_X86_BASELINE=ivybridge` source build (2012 floor) -> source build: never checks; official artifacts target x86-64-v3
 └── Failure -> keep the running version, back off, Check for updates retries
 
 Check for updates pressed (footer, menu bar, app menu)   // maintain.update-feedback (#1120)
@@ -2277,7 +2294,8 @@ Linux beta                               // not macOS feature parity
 │       │   // keysym outside the active group
 │       │   ├── 15 s after the last paste -> session closes when its grant restores, so
 │       │   │   GNOME's remote-control indicator shows only around pastes (#718); a grant
-│       │   │   that can't restore keeps its session
+│       │   │   that can't restore keeps its session; KDE keeps it too, for the
+│       │   │   paster's lifetime, since Plasma notifies on every session start (#2508)
 │       │   ├── Session showed the dialog -> 250 ms for it to hand focus back
 │       │   └── Restored or open session -> 150 ms after wl-copy (minus the reopen), so the target holds the new
 │       │       selection before Ctrl+V (GNOME pasted nothing or the old clipboard, #578)
@@ -2348,7 +2366,9 @@ sends a letter no group has on its pc105 key, rather than keysyms, which fixes
 KWin 6.8's fake input, where a Latin `v` under a Russian layout arrived as a
 bare `v` with Ctrl stuck down (#1939), and Mutter, which drops a keysym outside
 the active group. Neither fix is observed on a real KDE or GNOME session
-either. The modifier wait (`ShortcutKeys` in
+either. The KDE session exemption (`closes_idle_remote_desktop` in
+[linux/session.rs](../../src/linux/session.rs)) is unit-tested only, not
+observed on Plasma. The modifier wait (`ShortcutKeys` in
 [linux/input.rs](../../src/linux/input.rs)) has unit tests for its timing only;
 it is not yet observed on Hyprland, and a modifier held past the wait still
 changes the paste. wtype numbers its keymap from evdev code 1 in order of first
@@ -2877,7 +2897,7 @@ macOS `hex app` -> one menu-bar process, Rune window // dev.rune-ui-macos
 ├── While the window shows, its poll re-checks timed state every 250 ms (Rune Tx::wake_after); close hides it (Dock policy restored)
 ├── ⌘Q / menu-bar Quit / Ctrl-C quit and join
 ├── Meeting capsules: Rune interactive overlays (offer, call ended, ready, recording
-│   with Copy new (N) / Copy all of the in-call transcript; compact until hovered,
+│   with Copy agent prompt / Copy all of the in-call transcript; compact until hovered,
 │   dragged to any corner)
 └── Modes app icons: Finder's icon (NSWorkspace) in the picker, chips, and mode rows
 Windows `hex app` -> one tray process, Rune window // dev.rune-ui-windows
@@ -2895,11 +2915,23 @@ Windows `hex app` -> one tray process, Rune window // dev.rune-ui-windows
 ├── Modes app icons: the executable's first icon (PrivateExtractIconsW)
 └── Not yet: custom caption
 iOS prototype (`HEXMobile`) -> Record/transcribe/copy and keyboard handoff
+├── Speech model preparation: launch dictates with Apple Speech on iOS 26 (an OS
+│   asset, no app download) or Parakeet V2; a preparation that says nothing for 30 s, or
+│   nothing new for 120 s, ends as "The speech model isn't ready. Try again." (time iOS
+│   has Hex suspended doesn't count), so "Checking the speech model" cannot stay at 0%
+│   forever. Apple's reservation and asset status are watched at 60 s the same way, a
+│   reservation or release that never answers is forgotten, and a keyboard check that
+│   hangs counts no strike toward Hex's handoff. The keyboard's own check has its own 30 s
+│   limit, retries after a real background trip, and a late answer can't reopen it. Unit
+│   tests only (`DictationControllerTests`, `SpeechModelInstallTests`,
+│   `AppleSpeechAssetReservationsTests`); no physical iPhone run checks either deadline.
 ├── Experiments: Full keyboard, Apple Intelligence cleanup, Custom vocabulary,
 │   Hinglish, Greeklish, Two-language dictation, Adaptive touch, German spatial autocorrect,
-│   Korean keyboard (두벌식), ABC under the emoji key, Keyboard themes (Black, White,
-│   Navy, Forest, Ember), Two-thumb selection, Delete swiped words letter by letter,
-│   Hide word suggestions, Join the keyboard when unfolded, Learn each language separately
+│   Swipe typing in more languages, Korean keyboard (두벌식), Dvorak punctuation keys, Comma
+│   and period keys, Quick accents, Emoji shortcodes, ABC under the emoji key, Keyboard
+│   themes (Black, White, Navy, Forest, Ember), Two-thumb selection, Delete swiped words
+│   letter by letter, Hide word suggestions, Join the keyboard when unfolded, Learn each
+│   language separately
 ├── Full keyboard's languages (Settings › Keyboard › Languages, with Full chosen): one or
 │   more layouts, the space bar names the current one and a slide switches letters, accents
 │   and autocorrect, and the input mode reports the language typing
@@ -2913,10 +2945,18 @@ iOS prototype (`HEXMobile`) -> Record/transcribe/copy and keyboard handoff
 │   dictionary behind its autocorrect (a missing accent is the cheapest fix, "koszonom" →
 │   "köszönöm", while a word of its own such as "meg" keeps its spelling), English as its
 │   bilingual partner through the Latin-script rule, and no typing (spatial) model
-├── English Dvorak on iPhone: comma and period precede P, and semicolon sits to the
-│   left of Space when two keys fit. On the Duo's split keyboard all three sit on the
-│   left half. Shift types `<`, `>`, and `:`.
-│   See [iOS keyboard layouts](../../ios/README.md#capabilities).
+├── Khmer (ភាសាខ្មែរ) → Layout → Khmer (iPhone-style, default) or Khmerism
+│   ├── Start a sentence → three suggested words; type a first letter → familiar completions.
+│   │   From the second Khmer code point, a larger local dictionary can finish the word.
+│   ├── Choose សូម → អរគុណ → ច្រើន to write សូមអរគុណច្រើន without inserting spaces.
+│   │   The offline word-pair model also ranks completions after a space or zero-width space.
+│   ├── Khmer-script Pali and Sanskrit terms complete from a prefix and stay as typed
+│   ├── Khmerism → hold for corner characters; coeng brings subscript consonants onto the keys
+│   ├── Autocorrect → smart typing; Swipe typing → trace a word (both on by default)
+│   ├── Swipe in emoji search → only the query changes; Backspace on an uncommitted
+│   │   swipe choice dismisses it and preserves the preceding text
+│   └── Checks: KeyboardLayoutTests, KhmerAutocompleteTests and FullKeyboardEngineTests use
+│       key maps, simulated fields and synthetic paths. Physical swipe accuracy is unmeasured.
 ├── Korean keyboard (두벌식) (off by default, `experiments.koreanKeyboard`): Settings ›
 │   Experiments adds 한국어 to Settings › Keyboard › Languages, typed on the standard two-set
 │   rows (ㅂㅈㄷㄱㅅㅛㅕㅑㅐㅔ / ㅁㄴㅇㄹㅎㅗㅓㅏㅣ / ㅋㅌㅊㅍㅠㅜㅡ, shift's ㅃㅉㄸㄲㅆ and ㅒㅖ, no
@@ -2982,6 +3022,23 @@ iOS prototype (`HEXMobile`) -> Record/transcribe/copy and keyboard handoff
 │   host that removes one code point per call (some Devanagari and Thai clusters) can leave
 │   fragments. Off, a second finger is ignored exactly as before.
 │   Unit tests only: no CI compiles the iOS targets, and no physical iPhone run checks it
+├── Swipe typing in more languages (off by default, `experiments.swipeMoreLanguages`): with
+│   Settings › Keyboard › Swipe typing on, a swipe reads the layout language's own word list
+│   wherever one is bundled, not only English and Spanish: also French (France), Polish, and
+│   German while Spatial autocorrect and German spatial autocorrect are on. A language with
+│   no typing model keeps a drag as a slide to another key. Off, only English and Spanish
+│   swipe, exactly as before.
+│   Gaps:
+│   - A word with ß (German) or œ/æ (French) has no key, so a swipe drops it from its
+│     candidates ("groß", "Straße", "cœur").
+│   - A swiped German noun goes in lowercase: the noun capitalisation applies to tapped
+│     words only.
+│   - French and Polish have no language-specific never-suggest rows (only the shared
+│     ones), so a swipe's top reading isn't filtered for language-specific offensive words
+│     there.
+│   - The decoder's parameters are tuned on English and Spanish, so French, Polish and
+│     German accuracy is unmeasured.
+│   Unit tests only: no CI compiles the iOS targets, and no physical iPhone run checks it
 ├── Delete swiped words letter by letter (off by default, `experiments.swipeDeleteLetterByLetter`):
 │   right after a swipe, delete acts as anywhere else and takes one character, instead of the
 │   whole swiped word and the space the swipe added before it (#2321). The swipe's record
@@ -3004,6 +3061,62 @@ iOS prototype (`HEXMobile`) -> Record/transcribe/copy and keyboard handoff
 │   when the globe shows, space after them, return from m). Apple's Split Keyboard
 │   preference can't be read by a keyboard extension. Off, the split keyboard is unchanged.
 │   Unit tests only: no CI compiles the iOS targets, and no physical iPhone run checks it
+├── Dvorak punctuation keys (off by default, `experiments.dvorakPunctuation`): English Dvorak
+│   in a plain text field on the joined keyboard (including a floating iPad) starts row 1 with
+│   apostrophe, comma and period. Row 3 ends with W, V and Delete. The bottom row puts Q
+│   and Z beside a wider space bar, with semicolon available on the numbers layer. Manual
+│   shift or caps lock types a double quote, < or > from the top-row punctuation keys.
+│   Auto-capitalization leaves punctuation alone.
+│   On the split Duo, comma and period join the left half's top row and semicolon fits beside
+│   the left space bar. URL and email fields keep their own period and add semicolon where it
+│   fits. Docked iPads keep the system layout. Adaptive touch learns the alternate key positions
+│   separately. `KeyboardLayoutTests` check rows, bounds and hit targets across keyboard shapes.
+│   `FullKeyboardEngineTests` check typing and shift. Physical iPhone coverage is pending.
+├── Comma and period keys (off by default, `experiments.commaPeriodKeys`): a comma just left
+│   of the space bar and a period just right of it, both a letter wide, on an iPhone's letters
+│   page in a plain text field. On the joined keyboard the comma starts where the bar used to
+│   start and the period ends where it used to end, the bar moving inward at both ends; on the
+│   Duo's split keyboard the comma takes from the left half's bar and the period from the right
+│   half's, each bar keeping its inner edge. Neither is added unless the bar still holds a
+│   letter-wide space after them (on an upright iPhone showing both the globe and emoji keys
+│   with the Hex key beside space there isn't room, so they're skipped). They type `,` and
+│   `.` with shift on too. The 123 and #+= pages, a URL or email field (which keeps its own
+│   `.`), an iPad, and English's Dvorak letters while Dvorak punctuation already puts both on
+│   row 1 are unchanged; off, every layout is key for key the one it was.
+│   Unit tests only (`KeyboardLayoutTests`, `FullKeyboardEngineTests`): no CI compiles the iOS
+│   targets, and no physical iPhone run checks it
+├── Quick accents (off by default, `experiments.quickAccents`): a held letter's callout opens
+│   on the language's preferred accent (`KeyboardLanguage.quickAccentPrimaries`: Spanish o →
+│   ó, English e → é, Italian a → à, capitals via the callout's own mapping), else the first
+│   variant after the key's own where it has no entry, found where the arrangement put it, so
+│   letting go in place types it. The cell under the finger at opening (`accentOpenCell`) is
+│   remembered, so the preselection stands until the finger moves into another cell, where
+│   sliding picks that one as before; letting go far below still cancels, and another key
+│   going down while the callout is held commits the preselection. Letters only: the 123 and
+│   #+= pages' held symbols, and the mark keys ˇ and ʼ, keep the key's own selected. Off, the
+│   callout opens on the key's own, as before.
+│   Unit tests only (`FullKeyboardEngineTests`): no CI compiles the iOS targets, and no
+│   physical iPhone run checks it
+├── Emoji shortcodes (off by default, `experiments.emojiShortcodes`): in a plain text field
+│   that takes emoji (the emoji key shows), with autocorrect on and secure entry off, while
+│   the full keyboard's text before the cursor ends in a colon and a name after whitespace or
+│   at the start of the field (":pizza": the first character a letter or digit, at least two
+│   letters or digits, then only a-z, 0-9, "_", "+" and "-", case-insensitive), the strip
+│   shows up to three emoji the bundled index names (`EmojiShortcode`, over `EmojiLibrary`
+│   and scripts/build-emoji-data.py's data) instead of its words: an exact name or alias
+│   first, then the names and keywords the token starts, one per family; your emoji use breaks
+│   exact ties and moves prefix matches up. A tap takes the whole token back and types the
+│   emoji with its skin tone, counted like one from the panel; typing the closing ":" of a
+│   name typed in full (":pizza:") types the emoji instead. The emoji search, fields with
+│   autocorrect off and secure fields get neither. No match leaves the strip and typing as
+│   they were, a colon inside a word ("abc:pizza") is not a token, and off, nothing changes.
+│   The setting is in the App Group, and without Full Access it reads off. Only names the
+│   index weighs as names or aliases complete: ":heart:", ":joy:" and ":tada:" are keywords
+│   in the data and stay text, and ":smile:" completes to 😊, its first alias, not 😄; adding
+│   them needs more aliases and a regenerated index, which scripts/build-emoji-data.py can't
+│   make from the repo alone (Unicode's emoji-test.txt 18.0 and CLDR 49 are not in the repo).
+│   Unit tests only (`EmojiShortcodeTests`): no CI compiles the iOS targets, and no physical
+│   iPhone run checks it
 ├── Learn each language separately (off by default, `experiments.learnPerLanguage`):
 │   every typing correction and dictation fix is tagged with the language it was typed
 │   or dictated in; on, the keys learn a language's typos and rejections from that
@@ -3053,6 +3166,7 @@ Sources: [meeting.rs](../../src/meeting.rs),
 [meeting/watcher.rs](../../src/meeting/watcher.rs),
 [control/developer_control.rs](../../src/control/developer_control.rs),
 `SCENES` in [rune_ui.rs](../../src/rune_ui.rs), [iOS guide](../../ios/README.md),
+[Khmer keyboard layouts and editing](../../ios/docs/khmer-keyboards.md),
 [Android typing and checks](../../android/benchmark/typing/README.md).
 The iOS custom vocabulary experiment stays off by default and keeps its list in
 the App Group. Apple Speech also receives it as a best-effort recognition hint,
@@ -3123,10 +3237,10 @@ discovery or installed-app behavior.
 
 `default_paste_hotkeys_follow_build_capabilities` in
 [app_settings.rs](../../src/app_settings.rs) checks the production default runtime
-and settings projections: Paste Last remains available in both build profiles;
-meeting paste is present in debug or after the Meetings opt-in. `meeting_paste_is_only_active_in_developer_builds`
-in [suppression.rs](../../src/suppression.rs) checks the corresponding constructed
-hotkey event, including ordinary-chord discard in release. These replace an
+and settings projections: Paste Last remains available in both build profiles.
+`option_control_v_is_an_ordinary_chord` in [suppression.rs](../../src/suppression.rs)
+checks that Option-Control-V, the removed meeting paste, is an ordinary chord
+that discards a capture. These replace an
 unconditional debug-only expectation and a test-only copy of the reservation rule;
 they do not establish native keyboard delivery or meeting insertion.
 

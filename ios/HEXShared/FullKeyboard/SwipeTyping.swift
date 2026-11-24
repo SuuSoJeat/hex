@@ -2,9 +2,9 @@ import QuartzCore
 import UIKit
 
 /// Settings › Keyboard › Swipe typing: slide from a letter through the letters of a word and lift,
-/// and the word goes in, as with Apple's QuickPath and Gboard's glide typing. English and
-/// Spanish layouts only (the languages with a typing model); every other layout keeps a drag
-/// as a slide to another key.
+/// and the word goes in, as with Apple's QuickPath and Gboard's glide typing. English, Spanish,
+/// and both Khmer layouts use this setting. French (France), Polish, and German use Swipe
+/// typing in more languages.
 ///
 /// A touch on a letter key becomes a swipe once it travels more than a key's pitch from
 /// where it went down: the key no longer types, a light trail follows the finger, and the
@@ -65,9 +65,10 @@ final class SwipeTyping {
     }
 
     var model: TypingDecoderModel { decoder.model }
+    private var isKhmer: Bool { model.language == KeyboardLanguage.khmer.rawValue }
 
-    /// How far a letter touch travels before it is a swipe: a key's width and gap.
-    var threshold: CGFloat { engine.layout.swipePitch }
+    /// Khmer also needs short strokes between adjacent keys.
+    var threshold: CGFloat { engine.layout.swipePitch * (isKhmer ? 0.65 : 1) }
 
     var isSwiping: Bool { active != nil }
 
@@ -102,10 +103,14 @@ final class SwipeTyping {
     /// touch's timestamp (now when nil).
     func began(id: Int, at point: CGPoint, time: TimeInterval? = nil) {
         guard engine.allowsSwipes, let touch = engine.touches[id], !touch.committed,
-              touch.key.character?.first?.isLetter == true else { return }
+              isSwipeKey(touch.key) else { return }
         var stroke = Stroke()
         stroke.add(point, at: time ?? clock())
         pending[id] = stroke
+    }
+
+    private func isSwipeKey(_ key: KeyboardKey) -> Bool {
+        TypingDecoder.Keys.swipeLetter(on: key, language: engine.layout.language) != nil
     }
 
     /// True when the touch is a swipe (now or already): the plane leaves it to this.
@@ -123,6 +128,11 @@ final class SwipeTyping {
         guard let first = stroke.points.first, hypot(point.x - first.x, point.y - first.y) > threshold,
               let touch = engine.touches[id], !touch.committed, engine.activeAccentMenu == nil,
               engine.allowsSwipes else { return false }
+        if isKhmer {
+            let layout = engine.layout
+            guard let next = layout.hitTest(point), isSwipeKey(next),
+                  next.kind != layout.hitTest(first)?.kind else { return false }
+        }
         pending[id] = nil
         syncWords()
         engine.beginSwipe(touchID: id)
@@ -161,6 +171,10 @@ final class SwipeTyping {
 
     func cancelAll() {
         pending.removeAll()
+        if isKhmer, engine.pendingKhmerSwipeChoices != nil {
+            engine.dismissKhmerSwipeChoices()
+            engine.refreshSuggestions()
+        }
         guard active != nil else { return }
         active = nil
         generation += 1
@@ -175,14 +189,17 @@ final class SwipeTyping {
         trail.fade()
         let started = clock()
         let layout = engine.layout
-        let candidates = decoder.decode(
+        let reading = decoder.read(
             stroke.points.map(layout.joinedForSwipe), times: stroke.times, keys: engine.swipeKeys,
             previous: engine.swipePreviousWord, limit: 8
         )
-        let words = ranked(candidates)
+        let rankedWords = ranked(reading.candidates)
+        let words = isKhmer ? rankedWords : engine.autocorrect.readingsOfferingOwnCapitals(
+            rankedWords, capsLock: engine.shift.state == .locked, model: model
+        )
         let elapsed = clock() - started
         lastDecodeTime = elapsed
-        if let letter = slidTapLetter(stroke), let start = stroke.points.first,
+        if !isKhmer, let letter = slidTapLetter(stroke), let start = stroke.points.first,
            words.first.map({ !Self.word($0, startsAndEndsWith: letter) }) ?? true {
             // A tap that slid: its letter goes in as a tap's would, after the space a swiped
             // word before it keeps pending and with the capital shift gives it.
@@ -191,7 +208,7 @@ final class SwipeTyping {
             engine.touchEnded(id: id, at: start)
             return
         }
-        engine.endSwipe(typing: words, points: stroke.points.count, decodeTime: elapsed)
+        engine.endSwipe(typing: words, points: stroke.points.count, decodeTime: elapsed, requiresChoice: reading.requiresChoice)
     }
 
     /// How far (key pitches) a swipe may go from where it went down and still be a tap
@@ -222,6 +239,7 @@ final class SwipeTyping {
 
     /// The readings best first once a rare name or abbreviation costs `nameCost` more.
     func ranked(_ candidates: [SwipeDecoder.Candidate]) -> [String] {
+        if isKhmer { return candidates.map(\.text) }
         let model = decoder.model
         func rareName(_ text: String) -> Bool {
             guard engine.swipeReadsAsName(text) else { return false }
@@ -262,12 +280,16 @@ final class SwipeTyping {
     // MARK: - Spacing
 
     /// Whether a swiped word needs a space before it, as Apple's keyboard adds one: unless
-    /// the text before the cursor is empty or ends in a space, a line break or opening
-    /// punctuation (a bracket, an opening quote, ¿ or ¡, or a mark that starts a word such
-    /// as @ # /). A straight quote opens when nothing or a space comes before it.
+    /// the text before the cursor is empty or ends in a space, a line break, an attachment
+    /// (U+FFFC: a shared link's card or a picture in the text) or opening punctuation (a
+    /// bracket, an opening quote, ¿ or ¡, or a mark that starts a word such as @ # /). A
+    /// straight quote opens when nothing or a space comes before it. Apple's keyboard swipes
+    /// "hello" right after an attachment with no space, in Messages after a link's card (which
+    /// then moves the word to its own line) and in a text view after a picture mid-line (black
+    /// box, iOS 27.2 simulator); Hex's space there began the word's line.
     static func needsSpace(before: String?) -> Bool {
         guard let before, let last = before.last else { return false }
-        if last.isWhitespace || last.isNewline || opening.contains(last) { return false }
+        if last.isWhitespace || last.isNewline || last == "\u{FFFC}" || opening.contains(last) { return false }
         if last == "\"" || last == "'" {
             let previous = before.dropLast().last
             return !(previous == nil || previous!.isWhitespace || previous!.isNewline || opening.contains(previous!))
@@ -279,9 +301,10 @@ final class SwipeTyping {
 }
 
 extension KeyboardLanguage {
-    /// Swipe typing reads only the layouts with a typing model; elsewhere a drag stays a
-    /// slide to another key.
-    var supportsSwipeTyping: Bool { self == .english || self == .spanish }
+    /// Swipe typing's default layouts, English, Spanish, and Khmer. Another language swipes too with a
+    /// typing model when Settings › Experiments › Swipe typing in more languages is on
+    /// (`FullKeyboardSettings.swipesIn`); elsewhere a drag stays a slide to another key.
+    var supportsSwipeTyping: Bool { self == .english || self == .spanish || self == .khmer }
 }
 
 /// The light trail behind a swiping finger: the last `tail` seconds of its path, which

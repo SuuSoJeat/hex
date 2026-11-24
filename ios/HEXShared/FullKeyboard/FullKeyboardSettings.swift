@@ -1,7 +1,7 @@
 import Foundation
 
-/// How hard the keys' haptic tap is (Settings › Keyboard › Strength). Medium is meant to match
-/// Apple's keyboard (testers found Hex's, a 0.65 light impact, too weak beside it).
+/// How hard the keys' haptic tap is (Settings › Keyboard › Strength). Light by default: testers
+/// found Medium, the default until TestFlight in November 2026, too strong.
 nonisolated enum KeyHapticStrength: String, CaseIterable, Sendable {
     case light
     case medium
@@ -63,6 +63,15 @@ struct FullKeyboardSettings {
     /// Simulator scenes pass `--join-unfolded-keyboard on` (or `off`) for Settings ›
     /// Experiments › Join the keyboard when unfolded.
     static let joinUnfoldedKeyboardLaunchArgument = "--join-unfolded-keyboard"
+    /// Simulator scenes pass `--experiment-dvorak-punctuation` for Settings › Experiments ›
+    /// Dvorak punctuation keys.
+    static let dvorakPunctuationLaunchArgument = "--experiment-dvorak-punctuation"
+    /// Simulator scenes pass `--experiment-comma-period-keys` for Settings › Experiments ›
+    /// Comma and period keys.
+    static let commaPeriodKeysLaunchArgument = "--experiment-comma-period-keys"
+    /// Simulator scenes pass `--experiment-quick-accents` for Settings › Experiments ›
+    /// Quick accents.
+    static let quickAccentsLaunchArgument = "--experiment-quick-accents"
 
     private enum Key {
         static let fullKeyboard = "experiments.fullKeyboard"
@@ -71,6 +80,8 @@ struct FullKeyboardSettings {
         static let spatialAutocorrect = "experiments.spatialAutocorrect"
         static let germanSpatialAutocorrect = "experiments.germanSpatialAutocorrect"
         static let koreanKeyboard = KoreanKeyboardExperiment.key
+        static let khmerismNoColors = "experiments.khmerismNoColors"
+        static let khmerismNoSuperscripts = "experiments.khmerismNoSuperscripts"
         static let keyPopups = "settings.keyboardKeyPopups"
         static let haptics = "settings.keyboardHaptics"
         static let hapticStrength = "settings.keyboardHapticStrength"
@@ -80,6 +91,7 @@ struct FullKeyboardSettings {
         static let keyboardThemes = "experiments.keyboardThemes"
         static let keyboardTheme = "settings.keyboardTheme"
         static let swipeTyping = "experiments.swipeTyping"
+        static let swipeMoreLanguages = "experiments.swipeMoreLanguages"
         static let swipeDeleteLetterByLetter = "experiments.swipeDeleteLetterByLetter"
         static let twoThumbSelection = "experiments.twoThumbSelection"
         static let hideWordSuggestions = "experiments.hideWordSuggestions"
@@ -87,6 +99,10 @@ struct FullKeyboardSettings {
         static let numberRow = "settings.keyboardNumberRow"
         static let dictationBarAutoStart = "settings.dictationBarAutoStart"
         static let joinKeyboardWhenUnfolded = "experiments.joinKeyboardWhenUnfolded"
+        static let dvorakPunctuation = "experiments.dvorakPunctuation"
+        static let commaPeriodKeys = "experiments.commaPeriodKeys"
+        static let quickAccents = "experiments.quickAccents"
+        static let emojiShortcodes = "experiments.emojiShortcodes"
     }
 
     private let defaults: UserDefaults?
@@ -124,18 +140,19 @@ struct FullKeyboardSettings {
     }
 
     /// Settings › Keyboard › Spatial autocorrect: autocorrect reads your taps with a language
-    /// model (`TypingDecoder`) instead of `UITextChecker`'s one-edit guesses, in English and
-    /// Spanish. On by default. Stored as `experiments.spatialAutocorrect`, from when it was an
+    /// model (`TypingDecoder`) instead of `UITextChecker`'s one-edit guesses, in English,
+    /// Spanish and French (France). On by default. Stored as `experiments.spatialAutocorrect`, from when it was an
     /// experiment (off by default) that only its switch ever wrote: unset or true is on and
     /// false off, so testers who never touched it get it and those who turned it off keep it off.
+    /// Khmer uses tap positions to rank spelling suggestions.
     var spatialAutocorrect: Bool {
         get { defaults?.object(forKey: Key.spatialAutocorrect) as? Bool ?? true }
         nonmutating set { defaults?.set(newValue, forKey: Key.spatialAutocorrect) }
     }
 
     /// Settings › Experiments › German spatial autocorrect: lets the Deutsch layout read your
-    /// taps with the German model Android ships (`TypingDecoder`), as English and Spanish
-    /// already do. Off by default, like every experiment: a keyboard without it types German
+    /// taps with the German model Android ships (`TypingDecoder`), as English, Spanish and
+    /// French already do. Off by default, like every experiment: a keyboard without it types German
     /// exactly as before (the dictionary engine, and no word list for the letter odds, the
     /// strip or a bilingual partner). Stored as `experiments.germanSpatialAutocorrect`.
     var germanSpatialAutocorrect: Bool {
@@ -152,14 +169,39 @@ struct FullKeyboardSettings {
         nonmutating set { defaults?.set(newValue, forKey: Key.koreanKeyboard) }
     }
 
+    /// Settings › Experiments › Khmerism › No colors: use the keyboard theme for every keycap.
+    var khmerismNoColors: Bool {
+        get { defaults?.object(forKey: Key.khmerismNoColors) as? Bool ?? false }
+        nonmutating set { defaults?.set(newValue, forKey: Key.khmerismNoColors) }
+    }
+
+    /// Settings › Experiments › Khmerism › No superscripts: hide the corner labels on the keys.
+    var khmerismNoSuperscripts: Bool {
+        get { defaults?.object(forKey: Key.khmerismNoSuperscripts) as? Bool ?? false }
+        nonmutating set { defaults?.set(newValue, forKey: Key.khmerismNoSuperscripts) }
+    }
+
+    func swipeTypingModel(for language: KeyboardLanguage, override: Bool? = nil) -> TypingDecoderModel? {
+        guard override ?? swipeTyping, swipesIn(language) else { return nil }
+        return language == .khmer ? TypingDecoderModel.bundled(language.rawValue) : typingModel(for: language)
+    }
+
     /// The typing model the keyboard may read `language`'s taps with: its bundled model, with
-    /// German's only while both Spatial autocorrect and the German experiment are on. English
-    /// and Spanish never wait on the experiment. The keyboard asks this for the word list, the
+    /// German's only while both Spatial autocorrect and the German experiment are on. English,
+    /// Spanish and French never wait on the experiment; Canada's and Switzerland's French
+    /// (`fr-CA`, `fr-CH`) have no file of their own and keep `UITextChecker`. The keyboard asks this for the word list, the
     /// decoder and a bilingual partner, so one gate keeps a German model out of everything
     /// until it is chosen; `TypingDecoderModel.bundled` still loads any bundled file for tests.
     func typingModel(for language: KeyboardLanguage) -> TypingDecoderModel? {
+        if language == .khmer { return nil } // Khmer reads its model for swipes and predictions; taps use Khmer spelling rules.
         if language == .german, !(spatialAutocorrect && germanSpatialAutocorrect) { return nil }
         return TypingDecoderModel.bundled(language.rawValue)
+    }
+
+    /// English, Spanish, and Khmer support swiping. The more-languages experiment adds
+    /// French (France), Polish, and German when its model is enabled.
+    func swipesIn(_ language: KeyboardLanguage) -> Bool {
+        language.supportsSwipeTyping || (swipeMoreLanguages && typingModel(for: language) != nil)
     }
 
     /// Suggestions and autocorrect may offer swear words (`OffensiveWords`); slurs never.
@@ -181,10 +223,10 @@ struct FullKeyboardSettings {
         nonmutating set { defaults?.set(newValue, forKey: Key.haptics) }
     }
 
-    /// Settings › Keyboard › Strength, under Haptics: how hard each key's tap is. Medium, the
-    /// default, is meant to feel like Apple's keyboard.
+    /// Settings › Keyboard › Strength, under Haptics: how hard each key's tap is. Light until
+    /// you choose one; a choice is kept, whichever it is.
     var hapticStrength: KeyHapticStrength {
-        get { defaults?.string(forKey: Key.hapticStrength).flatMap(KeyHapticStrength.init(rawValue:)) ?? .medium }
+        get { defaults?.string(forKey: Key.hapticStrength).flatMap(KeyHapticStrength.init(rawValue:)) ?? .light }
         nonmutating set { defaults?.set(newValue.rawValue, forKey: Key.hapticStrength) }
     }
 
@@ -255,12 +297,21 @@ struct FullKeyboardSettings {
     }
 
     /// Settings › Keyboard › Swipe typing: slide through a word's letters to type it, on the
-    /// English and Spanish layouts (`SwipeTyping`). On by default. Stored as
+    /// English, Spanish, and Khmer layouts (`SwipeTyping`),
+    /// and with Swipe typing in more languages on
+    /// also every layout with a typing model (`swipesIn(_:)`). On by default. Stored as
     /// `experiments.swipeTyping`, from when it was an experiment (off by default): unset or
     /// true is on and false off, so testers who turned it off keep it off.
     var swipeTyping: Bool {
         get { defaults?.object(forKey: Key.swipeTyping) as? Bool ?? true }
         nonmutating set { defaults?.set(newValue, forKey: Key.swipeTyping) }
+    }
+
+    /// Settings › Experiments › Swipe typing in more languages adds languages whose models
+    /// are ready (see `swipesIn(_:)`). Off by default.
+    var swipeMoreLanguages: Bool {
+        get { defaults?.object(forKey: Key.swipeMoreLanguages) as? Bool ?? false }
+        nonmutating set { defaults?.set(newValue, forKey: Key.swipeMoreLanguages) }
     }
 
     /// Settings › Experiments › Delete swiped words letter by letter: delete right after a swipe
@@ -301,6 +352,43 @@ struct FullKeyboardSettings {
         nonmutating set { defaults?.set(newValue, forKey: Key.joinKeyboardWhenUnfolded) }
     }
 
+    /// Settings › Experiments › Dvorak punctuation keys (off by default). In joined text
+    /// fields, adds apostrophe, comma and period and puts Q and Z around the space bar.
+    var dvorakPunctuation: Bool {
+        get { defaults?.bool(forKey: Key.dvorakPunctuation) ?? false }
+        nonmutating set { defaults?.set(newValue, forKey: Key.dvorakPunctuation) }
+    }
+
+    /// Settings › Experiments › Comma and period keys (off by default): a comma just left of the
+    /// space bar and a period just right of it, both a letter wide, on an iPhone's letters page
+    /// in a text field. Where Dvorak punctuation is drawn its row 1 already has both, so they
+    /// aren't added again. Stored as `experiments.commaPeriodKeys`.
+    var commaPeriodKeys: Bool {
+        get { defaults?.bool(forKey: Key.commaPeriodKeys) ?? false }
+        nonmutating set { defaults?.set(newValue, forKey: Key.commaPeriodKeys) }
+    }
+
+    /// Settings › Experiments › Quick accents: a held letter's callout opens on its language's
+    /// preferred accent (Spanish "o" → "ó"), or the first variant after the key's own where the
+    /// language has none, so letting go types it. Sliding still picks another, and the 123 and
+    /// #+= pages' held symbols are unchanged. Off by default, like every experiment. Stored as
+    /// `experiments.quickAccents`.
+    var quickAccents: Bool {
+        get { defaults?.bool(forKey: Key.quickAccents) ?? false }
+        nonmutating set { defaults?.set(newValue, forKey: Key.quickAccents) }
+    }
+
+    /// Settings › Experiments › Emoji shortcodes: the strip offers emoji for a ":name" typed
+    /// after a space or at the start of the field (":pizza"), a tap takes the whole token back
+    /// and types the emoji, and the closing ":" of a name typed in full (":pizza:") types it
+    /// instead. Off by default, so a keyboard without it types colons exactly as before; without
+    /// Full Access the App Group reads false, which is off. Stored as
+    /// `experiments.emojiShortcodes`.
+    var emojiShortcodes: Bool {
+        get { defaults?.object(forKey: Key.emojiShortcodes) as? Bool ?? false }
+        nonmutating set { defaults?.set(newValue, forKey: Key.emojiShortcodes) }
+    }
+
     /// Settings › Keyboard › Auto-start: when the dictation bar starts dictating by itself.
     /// When switching by default.
     var dictationBarAutoStart: DictationBarAutoStart {
@@ -323,7 +411,10 @@ struct FullKeyboardSettings {
     /// `--experiment-keyboard-themes` for Keyboard themes and `--keyboard-theme <raw>` for
     /// the theme it draws,
     /// `--hex-key left|right` for the Hex key's side, `--number-row on|off` for the number row,
-    /// and `--join-unfolded-keyboard on|off` for the joined keyboard on the Duo unfolded.
+    /// `--join-unfolded-keyboard on|off` for the joined keyboard on the Duo unfolded,
+    /// `--experiment-dvorak-punctuation` for the Dvorak punctuation keys,
+    /// `--experiment-comma-period-keys` for the comma and period keys, and
+    /// `--experiment-quick-accents` for the quick accents.
     func applyLaunchArguments(_ arguments: [String] = ProcessInfo.processInfo.arguments) {
         if arguments.contains(Self.launchArgument) {
             isEnabled = true
@@ -340,6 +431,15 @@ struct FullKeyboardSettings {
         }
         if arguments.contains(Self.emojiLettersLaunchArgument) {
             emojiLettersUnderEmojiKey = true
+        }
+        if arguments.contains(Self.dvorakPunctuationLaunchArgument) {
+            dvorakPunctuation = true
+        }
+        if arguments.contains(Self.commaPeriodKeysLaunchArgument) {
+            commaPeriodKeys = true
+        }
+        if arguments.contains(Self.quickAccentsLaunchArgument) {
+            quickAccents = true
         }
         if arguments.contains(Self.keyboardThemesLaunchArgument) {
             keyboardThemesEnabled = true

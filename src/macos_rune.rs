@@ -327,7 +327,10 @@ pub fn run(shutdown: &'static AtomicBool, listener: ListenerConfig, hidden: bool
         .enabled
         .then(|| crate::keyboard_input_sources::current(mtm))
         .flatten();
-    let setup_ready = crate::desktop::onboarding::status(&settings.transcription).ready();
+    // A file that only awaits its pinned check is here, and macOS runs it as
+    // it is: setup is not what an upgrade needs to reopen, but a missing
+    // permission still is.
+    let setup_ready = crate::desktop::onboarding::launch_ready(&settings.transcription);
     crate::desktop::onboarding::recheck_after_identity_change(&mut settings, setup_ready);
     let onboarding_completed = crate::desktop::onboarding::completion_recorded();
     let history = match crate::history::History::open_default(settings.history_retention) {
@@ -944,19 +947,12 @@ impl Pump {
             // Labs › Copy dictation audio: the newest kept recording as a
             // file on the clipboard, never pasted.
             StatusItemAction::CopyLastDictationAudio => {
-                if !(crate::labs::copy_dictation_audio() && crate::labs::keep_recordings()) {
+                if !crate::labs::copy_dictation_audio() {
                     return;
                 }
-                let copied = self
-                    .runtime
-                    .history()
-                    .and_then(|history| history.newest_recording(crate::history::now_ms()))
-                    .ok_or_else(|| eyre!("no dictation with kept audio is in History"))
-                    .and_then(|path| {
-                        crate::history::recordings::copy_to_clipboard(&path)
-                            .map_err(|error| eyre!("{error:#}"))
-                    });
-                if let Err(error) = copied {
+                if let Err(error) =
+                    crate::history::recordings::copy_newest(self.runtime.history().as_ref())
+                {
                     tracing::warn!(%error, "could not copy the last dictation's audio");
                 }
             }

@@ -121,13 +121,13 @@ extension FullKeyboardEngine {
         target.documentContextBeforeInput.map(SmartPunctuation.plain)
     }
 
-    /// Smart quotes in this field: a text field that doesn't turn them off.
+    /// Smart quotes in this field: a text or web search field that doesn't turn them off.
     var smartQuotes: Bool {
-        field == .text && target.isSecureTextEntry != true && SmartPunctuation.isOn(target.smartQuotesType)
+        field.takesWords && target.isSecureTextEntry != true && SmartPunctuation.isOn(target.smartQuotesType)
     }
 
     var smartDashes: Bool {
-        field == .text && target.isSecureTextEntry != true && SmartPunctuation.isOn(target.smartDashesType)
+        field.takesWords && target.isSecureTextEntry != true && SmartPunctuation.isOn(target.smartDashesType)
     }
 
     /// `text` as it goes into the field, after `previous` (the field's character before the
@@ -157,10 +157,13 @@ extension FullKeyboardEngine {
     /// Deletes a suggestion's space before `text`, one of `suggestionJoiners`, typed right
     /// after it. True when it did: the mark then goes in as typed.
     func dropsSuggestionSpace(before text: String) -> Bool {
+        guard text.count == 1, let mark = text.first,
+              Self.suggestionJoiners.contains(mark) || (layout.language == .khmer && Self.khmerClosingMarks.contains(mark)) else {
+            return false
+        }
         // A held space (`spacePending`) has nothing to delete, and the word is finished already.
-        if spacePending, text.count == 1, let mark = text.first, Self.suggestionJoiners.contains(mark) { return true }
-        guard text.count == 1, let mark = text.first, Self.suggestionJoiners.contains(mark),
-              let spaced = suggestionSpaceBefore, spaced.last == " ", spaced == textBefore else { return false }
+        if spacePending { return true }
+        guard let spaced = suggestionSpaceBefore, spaced.last == " ", spaced == textBefore else { return false }
         typingLog?.edit("delete", [TypingLogField("deleted", .string(" ")), TypingLogField("src", .string("suggestion_space"))])
         forgetTypingContext()
         target.deleteBackward()

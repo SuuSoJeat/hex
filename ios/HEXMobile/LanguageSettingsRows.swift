@@ -178,6 +178,16 @@ private func automaticKeyboardLanguage() -> KeyboardLanguage {
     )
 }
 
+/// The layout whose Khmer options are available in Keyboard settings and Experiments.
+@MainActor
+func configuredKhmerLayout() -> KeyboardLetterLayout? {
+    let settings = LanguageSettings()
+    let languages = KeyboardLanguageList.resolve(
+        chosen: settings.keyboardLanguages, stored: nil, automatic: automaticKeyboardLanguage()
+    )
+    return languages.languages.contains(.khmer) ? settings.letterLayout(for: .khmer) : nil
+}
+
 /// Settings › Keyboard › Languages (while the full keyboard is on): Automatic with the
 /// layout it picks, or the languages chosen, in order. Opens `KeyboardLanguagesPage`.
 struct KeyboardLanguagesRow: View {
@@ -349,8 +359,8 @@ struct KeyboardLanguagesPage: View {
     }
 
     /// The languages whose keys the keyboard shows, with more than one layout to pick: each
-    /// chosen one (Automatic's while none is), but only the first of English and Spanish
-    /// together, whose keys both type on (`KeyboardLanguageList.layout`).
+    /// chosen one (Automatic's while none is), but only the first of English and Spanish, or
+    /// English and German, together, whose keys both type on (`KeyboardLanguageList.layout`).
     private var arranged: [KeyboardLanguage] {
         let typing = chosen.isEmpty ? [automatic] : chosen
         var seen = Set<KeyboardLanguage>()

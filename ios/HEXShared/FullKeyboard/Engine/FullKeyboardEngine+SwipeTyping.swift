@@ -1,0 +1,434 @@
+import QuartzCore
+import UIKit
+
+/// Commits swipe readings to the field and offers alternatives in the strip. `SwipeTyping`
+/// tracks the touch and decodes its path.
+@MainActor
+extension FullKeyboardEngine {
+    /// The word a swipe just typed, until anything else changes the text: delete takes it
+    /// back whole, space never autocorrects it, and the strip offers the swipe's other
+    /// readings, any of which takes its place.
+    struct SwipedWord: Equatable {
+        /// What the swipe put in: a space when one was needed, then the word.
+        var inserted: String
+        var word: String
+        /// The text before and after the cursor right after it went in, as Hex expects the host
+        /// to report them: an update that matches is the echo of Hex's own edit (`hostEchoed`).
+        var before: String?
+        var after: String?
+        var document: UUID? = nil
+        /// Its other readings, cased as the word is, best first.
+        var alternatives: [String]
+    }
+
+    /// Words taken back right after a swipe typed them, at one place in the text: the next
+    /// swipe there types its next reading instead, and the strip may still offer them (Record
+    /// typing logs: "two" swiped three times running for "yep", with "yep" in the strip). Taken
+    /// back: delete took the whole word back, or deletes took out all its letters (Settings ›
+    /// Experiments › Delete swiped words letter by letter), with nothing else typed since the
+    /// swipe. One place: the text before it is the same, trailing spaces aside, in the same
+    /// field. Every word taken back there in a row counts. Any other edit (a letter, a space,
+    /// punctuation, a pick from the strip), a swipe somewhere else or another field forgets
+    /// them. Only which reading goes in changes; the decoder's readings for a path don't.
+    @MainActor
+    final class SwipeRetries {
+        private var place: String?
+        /// Lowercased, the first taken back first.
+        private var words: [String] = []
+        /// A swiped word deletes are taking out one character at a time: its place, the word,
+        /// the characters left (the word and the space the swipe added) and that space's length.
+        private var deleting: (place: String?, word: String, left: Int, space: Int)?
+        /// The next edit is this record's own (a swipe here, or a delete taking a swiped word
+        /// back), not one that forgets it.
+        private var ownEdit = false
+
+        /// `readings` with the words taken back where `before` ends moved after the others.
+        func reordered(_ readings: [String], before: String?) -> [String] {
+            guard !words.isEmpty, Self.place(of: before) == place else { return readings }
+            return readings.filter { !words.contains($0.lowercased()) } + readings.filter { words.contains($0.lowercased()) }
+        }
+
+        /// `reordered`, for a swipe going in now; one somewhere else forgets the words.
+        func typing(_ readings: [String], before: String?) -> [String] {
+            guard !readings.isEmpty else { return readings }
+            deleting = nil
+            if Self.place(of: before) == place { ownEdit = true } else { forget() }
+            return reordered(readings, before: before)
+        }
+
+        /// Delete took back the whole word `swiped` typed.
+        func tookBack(_ swiped: SwipedWord) {
+            took(swiped.word, at: Self.place(of: swiped.before.map { String($0.dropLast(swiped.inserted.count)) }))
+        }
+
+        /// A delete is about to go; `swiped` is the word a swipe just typed when this delete
+        /// starts taking it out one character at a time.
+        func willDelete(letterOf swiped: SwipedWord?) {
+            if let swiped {
+                let place = Self.place(of: swiped.before.map { String($0.dropLast(swiped.inserted.count)) })
+                deleting = (place, swiped.word, swiped.inserted.count, swiped.inserted.count - swiped.word.count)
+            }
+            guard var pending = deleting else { return }
+            pending.left -= 1
+            ownEdit = true
+            if pending.left == pending.space { took(pending.word, at: pending.place) }
+            deleting = pending.left > 0 ? pending : nil
+        }
+
+        /// The keys edited the text (`FullKeyboardEngine.didEdit`).
+        func edited() {
+            if ownEdit { ownEdit = false } else { forget() }
+        }
+
+        func forget() {
+            place = nil
+            words = []
+            deleting = nil
+            ownEdit = false
+        }
+
+        private func took(_ word: String, at place: String?) {
+            if place != self.place { words = [] }
+            self.place = place
+            words.append(word.lowercased())
+            ownEdit = true
+        }
+
+        /// A real iPhone reports nothing before the cursor in an empty field (nil, where a
+        /// swipe's record keeps ""): the same place.
+        private static func place(of before: String?) -> String {
+            var text = before ?? ""
+            while text.last == " " { text.removeLast() }
+            return text
+        }
+    }
+
+    /// Whether a letter touch may become a swipe now: on the letters page of a text or web
+    /// search field (not an address or a URL), with no accent menu open.
+    var allowsSwipes: Bool {
+        guard layerState.layer == .letters, field.takesWords, activeAccentMenu == nil else { return false }
+        // Leave the next key to finish an explicitly tapped coeng.
+        return layout.language != .khmer || (!isAfterKhmerCoeng && target.isSecureTextEntry != true
+            && !target.hasRestrictedTextContentType)
+    }
+
+    /// The letter keys a swipe is read against, where they're drawn.
+    var swipeKeys: TypingDecoder.Keys {
+        TypingDecoder.Keys(layout: layout) ?? TypingDecoder.Keys(centres: [:], pitch: .zero, bottomRowY: 0)
+    }
+
+    /// The word before a swipe's, lowercased, when only spaces (or the one the swipe will
+    /// add) come between them.
+    var swipePreviousWord: String? {
+        if layout.language == .khmer { return nil }
+        let before = textBefore ?? ""
+        return AutocorrectEngine.previousWord(SwipeTyping.needsSpace(before: before) ? before + " " : before, token: "")
+    }
+
+    /// The strip while swiping (the word so far) and right after (the other readings, the
+    /// likeliest in the centre slot); nil otherwise.
+    var swipeSuggestions: [KeyboardSuggestion]? {
+        if isSwiping {
+            return swipePreview.map { [KeyboardSuggestion(displayText: $0, replacement: $0, kind: .primary(autoReplace: true))] } ?? []
+        }
+        if let choices = pendingKhmerSwipeChoices, khmerSwipeChoicesAreCurrent {
+            return choices.words.map { KeyboardSuggestion(displayText: $0, replacement: $0, kind: .swiped) }
+        }
+        guard let swipedWord else { return nil }
+        if layout.language == .khmer,
+           (swipedWord.document == nil || swipedWord.document != target.documentIdentifier) { return nil }
+        var items = swipedWord.alternatives.prefix(3).map { KeyboardSuggestion(displayText: $0, replacement: $0, kind: .swiped) }
+        if items.count >= 2 { items.swapAt(0, 1) }
+        if layout.language == .khmer, items.count < 3, khmerPickedWord != nil {
+            let following = khmerSuggestionChoices().filter { prediction in
+                prediction.kind == .khmerPrediction && !items.contains { $0.displayText == prediction.displayText }
+            }
+            items += following.prefix(3 - items.count)
+        }
+        return items
+    }
+
+    /// `words` that may be offered after the word before (`AutocorrectEngine.mayOffer`), once each.
+    func swipeReadings(_ words: [String]) -> [String] {
+        let previous = swipePreviousWord
+        var seen = Set<String>()
+        return words.filter { autocorrect.mayOffer($0, after: previous) && seen.insert($0.lowercased()).inserted }
+    }
+
+    /// Whether a swiped word starts with a capital: shift (one-shot, held, caps lock, or
+    /// automatic), or the automatic capital the space the swipe adds brings ("Hi." then a
+    /// swipe types " There").
+    var swipeCapital: Bool {
+        if shift.isUppercase { return true }
+        guard shift.state == .off, !shift.isHeld else { return false }
+        let before = typingContext
+        guard SwipeTyping.needsSpace(before: before) else { return false }
+        return AutoCapitalization.shouldCapitalize(
+            mode: autoCapitalizationMode,
+            before: (before ?? "") + " ",
+            hasText: true
+        )
+    }
+
+    /// A reading as it's typed: all capitals with caps lock, a capital first letter with
+    /// `capital`, else a name the dictionary only knows capitalised ("monday" -> "Monday").
+    /// One of your own words with a capital that is also a common word (a Contacts name such
+    /// as "Bell" or "Will") is written as the sentence needs it, as Apple's keyboard swipes
+    /// "the bell rang" beside a contact Kate Bell (`AutocorrectEngine.withoutStrayCapital`).
+    /// With Auto-capitalization off, no capital you didn't ask for ("i'm", "monday"), but
+    /// your own spellings keep theirs.
+    func swipeCased(_ word: String, capital: Bool) -> String {
+        if layout.language == .khmer { return word }
+        if shift.state == .locked { return word.uppercased() }
+        guard let first = word.first else { return word }
+        if capital { return first.uppercased() + word.dropFirst() }
+        if !autoCapitalizes {
+            return autocorrect.isOwnSpelling(word) ? word : word.lowercased()
+        }
+        if swipeReadsAsName(word) { return first.uppercased() + word.dropFirst() }
+        return autocorrect.withoutStrayCapital(word, typed: "")
+    }
+
+    /// The strip's other readings after a swipe, cased as its word is (`readings` best first,
+    /// the first the one typed). A reading that is a text replacement's shortcut shows as its
+    /// replacement ("home" as "at my house"), the swiped word's first, as Apple's keyboard
+    /// offers one after a swipe (black box, iOS 27.2); space never puts it in.
+    func swipeAlternatives(_ readings: [String], capital: Bool) -> [String] {
+        func replacement(_ reading: String) -> String? {
+            guard target.autocorrectionType != .no else { return nil }
+            let typed = capital ? reading.prefix(1).uppercased() + reading.dropFirst() : reading
+            guard let replaced = autocorrect.textReplacement(before: typed), replaced.typed.count == typed.count else { return nil }
+            return replaced.replacement
+        }
+        var out: [String] = []
+        if let first = readings.first, let phrase = replacement(first) { out.append(phrase) }
+        for reading in readings.dropFirst() {
+            let item = replacement(reading) ?? swipeCased(reading, capital: capital)
+            if !out.contains(item) { out.append(item) }
+        }
+        return Array(out.prefix(3))
+    }
+
+    /// Whether a swipe's reading, as the model spells it (lowercase), is a word the dictionary
+    /// knows only with a capital: a name, day or place ("monday"), or an abbreviation.
+    func swipeReadsAsName(_ word: String) -> Bool {
+        guard autocorrect.hasDictionary, word == word.lowercased(), word.count >= 2, let first = word.first else { return false }
+        return autocorrect.checker.isWordValid(first.uppercased() + word.dropFirst()) && !autocorrect.checker.isWordValid(word)
+    }
+
+    /// What goes against a swiped word, as on Apple's keyboard: closing punctuation and
+    /// brackets, an apostrophe, a hyphen and a slash. Anything else tapped right after a swipe
+    /// (a straight quote and opening brackets included) starts the next word.
+    static let swipeJoiners: Set<Character> = [",", ".", "!", "?", ";", ":", ")", "]", "}", "'", "’", "-", "/"]
+
+    struct KhmerSwipeChoices {
+        var words: [String]
+        var before: String?
+        var after: String?
+        var document: UUID
+        var route: Int
+    }
+
+    func dismissKhmerSwipeChoices() {
+        pendingKhmerSwipeChoices = nil
+    }
+
+    func cancelPendingKhmerSwipeOnBackspace() -> Bool {
+        guard khmerSwipeChoicesAreCurrent else { return false }
+        dismissKhmerSwipeChoices()
+        refreshSuggestions()
+        return true
+    }
+
+    var khmerSwipeChoicesAreCurrent: Bool {
+        guard let choices = pendingKhmerSwipeChoices else { return false }
+        return layout.language == .khmer && allowsSwipes
+            && choices.before == typingContext && choices.after == target.documentContextAfterInput
+            && choices.document == target.documentIdentifier && choices.route == target.inputRouteRevision
+            && (target.selectedText ?? "").isEmpty
+    }
+
+    /// The swipe under way reads as `words` so far (best first): the strip shows the first
+    /// that may be offered.
+    func showSwipePreview(_ words: [String]) {
+        guard isSwiping else { return }
+        let next = swipeRetries.reordered(swipeReadings(words), before: typingContext).first.map { swipeCased($0, capital: swipeCapital) }
+        guard next != swipePreview else { return }
+        swipePreview = next
+        refreshSuggestions()
+    }
+
+    /// The best reading usually goes in on lift. Near-tied Khmer spellings sharing
+    /// the same path can wait for a pick in the strip.
+    func endSwipe(typing words: [String], points: Int, decodeTime: TimeInterval?, requiresChoice: Bool = false) {
+        guard isSwiping else { return }
+        isSwiping = false
+        swipePreview = nil
+        // The finger came up off a key: a quick tap on the strip's lower half next is a key.
+        lastKeyTouchAt = clock()
+        let readings = swipeRetries.typing(swipeReadings(words), before: typingContext)
+        if let log = typingLog {
+            log.ui("swipe_end", [
+                TypingLogField("points", .int(points)),
+                TypingLogField("ms", decodeTime.map { .ms($0 * 1000) } ?? .null),
+                TypingLogField("readings", .strings(Array(readings.prefix(4)))),
+            ])
+        }
+        guard !readings.isEmpty, layout.language != .khmer || allowsSwipes else {
+            refreshSuggestions()
+            onChange?()
+            return
+        }
+        // Without a field ID, commit at lift so no choice can carry into another field.
+        if layout.language == .khmer, requiresChoice, readings.count > 1, khmerSwipeOffersChoices,
+           let document = target.documentIdentifier, (target.selectedText ?? "").isEmpty {
+            swipedWord = nil
+            let words = Array(readings.prefix(3))
+            pendingKhmerSwipeChoices = KhmerSwipeChoices(
+                words: words, before: typingContext, after: target.documentContextAfterInput,
+                document: document, route: target.inputRouteRevision
+            )
+            refreshSuggestions()
+            onChange?()
+            return
+        }
+        commitSwipe(readings)
+    }
+
+    func commitSwipe(_ readings: [String], edit: EditKind = .normal) {
+        guard khmerDeleteRecovery == nil, let first = readings.first else { return }
+        let before = typingContext
+        let isKhmer = layout.language == .khmer
+        let space = !isKhmer && SwipeTyping.needsSpace(before: before)
+        let capital = !isKhmer && swipeCapital
+        let word = swipeCased(first, capital: capital)
+        let inserted = (space ? " " : "") + word
+        if space { learning?.didFinish(word: AutocorrectEngine.currentToken(in: before), language: autocorrect.language.rawValue) }
+        tokenTaps.removeAll()
+        adaptiveTouch?.forget()
+        typingLog?.edit("insert", [
+            TypingLogField("inserted", .string(inserted)),
+            TypingLogField("src", .string("swipe")),
+        ])
+        let rendered = smartened(inserted)
+        if isKhmer { rememberKhmerPickedWord(word, before: (before ?? "") + rendered) }
+        rememberTypingContext(before: before, inserted: rendered)
+        target.insertText(rendered)
+        finishedWord = nil
+        lastSpaceAt = nil
+        layerState.didInsert(inserted)
+        if layerState.layer == .letters { shift.didType() }
+        swipedWord = SwipedWord(
+            inserted: inserted,
+            word: word,
+            before: (before ?? "") + SmartPunctuation.plain(rendered),
+            after: target.documentContextAfterInput,
+            document: isKhmer ? target.documentIdentifier : nil,
+            alternatives: swipeAlternatives(readings, capital: capital)
+        )
+        logState("typed")
+        didEdit(edit)
+        typingLog?.context("swipe")
+    }
+
+    /// Puts another of the swipe's readings in its word's place; the word joins the others.
+    func replaceSwipedWord(with text: String) {
+        guard var swiped = swipedWord, let before = textBefore, before.hasSuffix(swiped.word) else {
+            swipedWord = nil
+            refreshSuggestions()
+            return
+        }
+        let isKhmer = layout.language == .khmer
+        let prefix: String
+        if isKhmer {
+            guard swiped.document == target.documentIdentifier, hostEchoed(swiped),
+                  let remaining = removeKhmerSuffix(swiped.word, from: before) else {
+                swipedWord = nil
+                forgetTypingContext()
+                didEdit()
+                return
+            }
+            prefix = remaining
+        } else {
+            prefix = String(before.dropLast(swiped.word.count))
+        }
+        typingLog?.edit("suggestion", [
+            TypingLogField("slot", suggestions.firstIndex { $0.replacement == text }.map { .int($0) } ?? .null),
+            TypingLogField("text", .string(text)),
+            TypingLogField("deleted", .string(swiped.word)),
+            TypingLogField("inserted", .string(text)),
+            TypingLogField("candidates", TypingLogger.candidates(suggestions)),
+        ])
+        // The reading's place, read before the deletes: a lagging host still reports the old word.
+        let rendered = smartened(text)
+        if isKhmer { rememberKhmerPickedWord(text, before: prefix + rendered) }
+        rememberTypingContext(before: prefix, inserted: rendered)
+        if !isKhmer {
+            for _ in 0..<swiped.word.count { target.deleteBackward() }
+        }
+        target.insertText(isKhmer ? rendered : smartened(text))
+        swiped.inserted = isKhmer ? text : String(swiped.inserted.dropLast(swiped.word.count)) + text
+        swiped.alternatives = Array(([swiped.word] + swiped.alternatives.filter { $0 != text }).prefix(3))
+        swiped.word = text
+        swiped.before = prefix + SmartPunctuation.plain(rendered)
+        swiped.after = target.documentContextAfterInput
+        swipedWord = swiped
+        lastSpaceAt = nil
+        didEdit()
+        typingLog?.context("suggestion")
+    }
+
+    /// Right after a swipe, a tapped letter, digit, opening mark or symbol goes in after a
+    /// space, as Apple's keyboard keeps one pending after a swiped word ("hello" then "w"
+    /// types "hello w", "(" types "hello ("); punctuation in `swipeJoiners` goes against the
+    /// word ("hello,"). Shift as you set it stays; with it off, the space may bring a capital
+    /// (a field that capitalises every word).
+    func spaceAfterSwipedWord(before text: String) {
+        guard layout.language != .khmer,
+              let swiped = swipedWord, let first = text.first, !Self.swipeJoiners.contains(first),
+              let before = typingContext, before.hasSuffix(swiped.word) else { return }
+        swipedWord = nil
+        learning?.didFinish(word: AutocorrectEngine.currentToken(in: before), language: autocorrect.language.rawValue)
+        typingLog?.edit("insert", [
+            TypingLogField("inserted", .string(" ")),
+            TypingLogField("src", .string("swipe_space")),
+        ])
+        rememberTypingContext(before: before, inserted: " ")
+        target.insertText(" ")
+        tokenTaps.removeAll()
+        finishedWord = nil
+        lastSpaceAt = nil
+        if shift.state == .off { refreshAutoCapitalization() }
+    }
+
+    /// Takes back what a swipe typed when it is still right before the cursor.
+    func deleteSwipedWord(_ swiped: SwipedWord) -> Bool {
+        guard let before = textBefore, before.hasSuffix(swiped.inserted) else { return false }
+        let isKhmer = layout.language == .khmer
+        if isKhmer {
+            guard swiped.document == target.documentIdentifier, hostEchoed(swiped) else { return false }
+            switch deleteKhmerSuffix(swiped.inserted, from: before) {
+            case .rejected:
+                return false
+            case .interrupted:
+                // The proxy may have partially applied the edit. Avoid an extra delete.
+                didEdit()
+                return true
+            case .removed:
+                break
+            }
+        }
+        typingLog?.edit("delete", [
+            TypingLogField("deleted", .string(swiped.inserted)),
+            TypingLogField("src", .string("swipe")),
+        ])
+        if !isKhmer {
+            for _ in 0..<swiped.inserted.count { target.deleteBackward() }
+        }
+        swipeRetries.tookBack(swiped)
+        tokenTaps.removeAll()
+        lastSpaceAt = nil
+        didEdit()
+        return true
+    }
+}

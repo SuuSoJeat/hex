@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 @main
 struct HEXMobileApp: App {
@@ -15,7 +16,9 @@ struct HEXMobileApp: App {
         HinglishSettings().applyLaunchArguments()
         GreeklishSettings().applyLaunchArguments()
         TwoLanguageDictationSettings().applyLaunchArguments()
+        VoiceIsolationSettings().applyLaunchArguments()
         MultilingualParakeetSettings().applyLaunchArguments()
+        KeyboardParakeetSettings().applyLaunchArguments()
         SettingsSnapshotFixture.applyDefaults()
     }
 
@@ -54,6 +57,12 @@ struct HEXMobileApp: App {
                     } else if case .translationSettings = request {
                         openedFromKeyboard = false
                         openPage = .dictation
+                    } else if case .pasteSettings = request {
+                        openedFromKeyboard = false
+                        openPage = .keyboard
+                        if let settingsURL = URL(string: UIApplication.openSettingsURLString) {
+                            UIApplication.shared.open(settingsURL)
+                        }
                     } else {
                         openedFromKeyboard = true
                     }
@@ -66,6 +75,8 @@ struct HEXMobileApp: App {
                     } else if phase == .active {
                         dictation.endStaleLiveActivities()
                         dictation.appBecameActive()
+                        // Settings › Dictation › Speech model in keyboard: picks its download up.
+                        dictation.startKeyboardParakeetDownloadIfWanted()
                     }
                 }
             }

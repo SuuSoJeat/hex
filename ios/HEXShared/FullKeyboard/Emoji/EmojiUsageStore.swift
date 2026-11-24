@@ -82,7 +82,12 @@ final class EmojiUsageStore {
 final class EmojiRoutedTarget: KeyboardTextTarget {
     let document: KeyboardTextTarget
     /// Set while searching; the keys type here.
-    var query: String?
+    var query: String? {
+        didSet {
+            if (oldValue == nil) != (query == nil) { inputRouteRevision += 1 }
+        }
+    }
+    private(set) var inputRouteRevision = 0
     /// Return while searching.
     var onSearchReturn: (() -> Void)?
 
@@ -105,6 +110,7 @@ final class EmojiRoutedTarget: KeyboardTextTarget {
     var smartQuotesType: UITextSmartQuotesType? { isSearching ? .no : document.smartQuotesType }
     var smartDashesType: UITextSmartDashesType? { isSearching ? .no : document.smartDashesType }
     var selectedText: String? { isSearching ? nil : document.selectedText }
+    var isSecureTextEntry: Bool? { isSearching ? nil : document.isSecureTextEntry }
     var documentIdentifier: UUID? { document.documentIdentifier }
 
     func insertText(_ text: String) {

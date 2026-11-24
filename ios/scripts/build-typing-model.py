@@ -4,8 +4,39 @@ Books Ngram v3 (2020-02-17, CC BY 3.0) word and word-pair counts, keeping only w
 word list knows: SCOWL (sizes up to 70) for English, RLA-ES (LibreOffice's es_ES and
 es_MX Hunspell dictionaries, used under their MPL 1.1 option) for Spanish. Counts are summed over 1980-2019.
 
+English also takes two things the books can't give it:
+- Contractions at the frequency of the words they stand for. Google Books splits "don't"
+  into "do" and "n't", so its own count of "don't" is tiny (14.4 nats in the first model,
+  as rare as a word ranked 100,000th). Each contraction in CONTRACTIONS counts as often as
+  its expansion's pair ("do not") when that is commoner, and the ones SCOWL lists only with
+  a capital ("I'm") or not at all are added in lowercase.
+- en-extra-words.tsv beside this script: chat and tech words written for Hex ("app", "lol",
+  "csv"), each at its tier's cost; a word the books have only gets commoner.
+Both join the vocabulary before pairs are counted, so their pairs are counted too.
+
+Khmer takes word counts from the bundled SIL/Keyman list, additional Khmer-script
+Buddhist terms from km-buddhist.txt alongside that list, and pair counts from
+km-corpus-pairs.tsv.gz beside this script. For familiar conversational contexts
+Hex's km-next-words.tsv supplies the preferred follow-ups. The larger prefix
+dictionary is built from the original corpus with count-khmer-word-pairs.py.
+
+Polish has no Google Books counts. Its words and word pairs come from the National Corpus of
+Polish's n-grams (NKJP, its 300M-word balanced subcorpus), kept only where PoliMorf lists the
+word and the word isn't a plain spelling at least 20 times rarer than its marked twin in NKJP or
+in ParlaMint 5.0's Polish transcripts, which write every mark ("sie" beside "się"; NKJP's internet
+texts are often typed without marks, so "ide" is only 3.6 times rarer than "idę" there and 97 times
+in ParlaMint). A pair may span a comma, which people typing leave out ("wiem, że" is typed "wiem
+że"). ł's base letter is l, so ł is read from the l key as é is from e. Beside the model it writes
+<output>.valid: PoliMorf's other words NKJP uses at least twice (one per line, a tab and its cost
+in eighths of a nat, sorted by UTF-8 bytes, as Android's validity lists). The source can be
+parlamint or nkjp alone instead, to compare (each failed the typing gate on its own). The inputs,
+their licences and checksums are POLISH_INPUTS below; the build refuses a file whose checksum
+differs.
+
     python3 -m venv /tmp/venv && /tmp/venv/bin/pip install spylls   # Spanish only
     /tmp/venv/bin/python scripts/build-typing-model.py es <workdir> HEXKeyboard/TypingModel/es.hextm
+    python3 scripts/build-typing-model.py pl <workdir> pl.hextm [nkjp+parlamint|nkjp|parlamint]
+    python3 scripts/build-typing-model.py km HEXKeyboard/TypingModel/km-autocomplete.tsv HEXKeyboard/TypingModel/km.hextm
 
 Needs about 7 GB free in <workdir> while it runs (English downloads ~240 GB of ngrams,
 Spanish ~50 GB, each file deleted once counted) and a fast connection; every stage is
@@ -29,10 +60,51 @@ SCOWL = "https://downloads.sourceforge.net/project/wordlist/SCOWL/2020.12.07/sco
 RLA_ES = "https://raw.githubusercontent.com/LibreOffice/dictionaries/master/es/"
 RLA_ES_LOCALES = ("es_ES", "es_MX")
 FIRST_YEAR = 1980
-MAX_WORDS = {"en": 90_000, "es": 110_000}
+MAX_WORDS = {"en": 90_000, "es": 110_000, "pl": 150_000}
 MAX_BYTES = 3_600_000      # the whole model
 MIN_PAIR = 2_000           # pairs rarer than this (1980-2019) can't make the cut
-LETTERS = {"en": "abcdefghijklmnopqrstuvwxyz'", "es": "abcdefghijklmnopqrstuvwxyzñáéíóúü"}
+LETTERS = {"en": "abcdefghijklmnopqrstuvwxyz'", "es": "abcdefghijklmnopqrstuvwxyzñáéíóúü",
+           "pl": "abcdefghijklmnopqrstuvwxyząćęłńóśźż"}
+# Base letters NFD doesn't give: ł has no decomposition.
+BASES = {"ł": "l"}
+CONTRACTIONS = {"en": {
+    "don't": "do not", "doesn't": "does not", "didn't": "did not", "can't": "can not", "won't": "will not",
+    "isn't": "is not", "aren't": "are not", "wasn't": "was not", "weren't": "were not", "haven't": "have not",
+    "hasn't": "has not", "hadn't": "had not", "wouldn't": "would not", "couldn't": "could not",
+    "shouldn't": "should not", "mustn't": "must not", "needn't": "need not",
+    "i'm": "i am", "i'll": "i will", "i've": "i have", "i'd": "i would",
+    "it's": "it is", "that's": "that is", "what's": "what is", "where's": "where is", "who's": "who is",
+    "there's": "there is", "here's": "here is", "he's": "he is", "she's": "she is", "let's": "let us",
+    "you're": "you are", "we're": "we are", "they're": "they are", "you'll": "you will", "we'll": "we will",
+    "they'll": "they will", "he'll": "he will", "she'll": "she will", "it'll": "it will",
+    "you've": "you have", "we've": "we have", "they've": "they have", "you'd": "you would",
+    "we'd": "we would", "they'd": "they would", "he'd": "he would", "she'd": "she would",
+}}
+EXTRA_WORDS = {"en": "en-extra-words.tsv"}
+TIER_COST = {"1": 10.0, "2": 12.0, "3": 13.5}  # nats: about the 2,000th word, then rarer
+# Polish's inputs: file in <workdir>, where it comes from, its licence, its SHA-256 (fetched
+# 2026-11-22).
+POLISH_INPUTS = {
+    "polimorf.tab.gz": (
+        "https://clarin-pl.eu/dspace/bitstream/handle/11321/577/polimorf-20180722.tab.gz?sequence=1",
+        "PoliMorf 2018-07-23 (http://hdl.handle.net/11321/577), BSD 2-Clause; the notice is in the file",
+        "2b1f07224c434c8710def382d497cf8221d5764e8d683d2ad34242810ab72746"),
+    "ParlaMint-PL.tgz": (
+        "https://www.clarin.si/repository/xmlui/bitstream/handle/11356/2004/ParlaMint-PL.tgz?sequence=23&isAllowed=y",
+        "ParlaMint 5.0, Polish (http://hdl.handle.net/11356/2004), CC BY 4.0",
+        "66739847c4454e21d524755cea17e41dd923c78cdefe03b6775e9f10720ba957"),
+    "nkjp-1grams.gz": (
+        "http://zil.ipipan.waw.pl/NKJPNGrams?action=AttachFile&do=get&target=1grams.gz",
+        "NKJP n-grams, balanced subcorpus (http://zil.ipipan.waw.pl/NKJPNGrams), CC BY",
+        "73af49094621b2f86b594beba783c14aee8c8212f1aff3d61f281ab5d99e3dc9"),
+    "nkjp-2grams.gz": (
+        "http://zil.ipipan.waw.pl/NKJPNGrams?action=AttachFile&do=get&target=2grams.gz",
+        "NKJP n-grams, balanced subcorpus (http://zil.ipipan.waw.pl/NKJPNGrams), CC BY",
+        "34a88c20fcfc67ff528a2cad8233a8e4af4c7508e989da4483a104abd4e483d4"),
+}
+# The fewest times a pair is seen to be kept, per Polish corpus (36M and 300M words, against
+# the books' hundreds of billions); nkjp+parlamint counts NKJP's.
+POLISH_MIN_PAIR = {"parlamint": 3, "nkjp": 10, "nkjp+parlamint": 10}
 
 
 def urls(lang, n):
@@ -161,6 +233,20 @@ def cost(p):
     return max(0, min(255, round(-math.log(max(p, 1e-30)) * 8)))
 
 
+def extra_words(lang, total):
+    """EXTRA_WORDS' words with the count their tier's cost stands for."""
+    if lang not in EXTRA_WORDS:
+        return {}
+    words = {}
+    for line in open(os.path.join(os.path.dirname(os.path.abspath(__file__)), EXTRA_WORDS[lang]), encoding="utf-8"):
+        if not line.strip() or line.startswith("#"):
+            continue
+        word, tier = line.rstrip("\n").split("\t")
+        assert re.fullmatch("[" + LETTERS[lang] + "]+", word), word
+        words[word] = max(words.get(word, 0), round(total * math.exp(-TIER_COST[tier])))
+    return words
+
+
 def main(lang, work, out_path):
     for d in ("raw", "uni", "bi"):
         os.makedirs(os.path.join(work, d), exist_ok=True)
@@ -189,22 +275,36 @@ def main(lang, work, out_path):
     for line in open(vocab_path, encoding="utf-8"):
         w, c = line.rstrip("\n").split("\t")
         vocab[w] = int(c)
+    for w, c in extra_words(lang, total).items():
+        vocab[w] = max(vocab.get(w, 0), counts.get(w.encode("utf-8"), 0), c)
+    for w in CONTRACTIONS.get(lang, {}):
+        vocab.setdefault(w, max(1, counts.get(w.encode("utf-8"), 0)))
+    # Pairs are counted over the vocabulary with these words (a cached bi/ from a run
+    # without them lacks their pairs).
+    pair_vocab = os.path.join(work, "vocab-pairs.tsv")
+    with open(pair_vocab, "w", encoding="utf-8") as f:
+        for w in sorted(vocab):
+            f.write(f"{w}\t{vocab[w]}\n")
 
-    with multiprocessing.Pool(workers, initializer=load_vocab, initargs=(vocab_path,)) as pool:
+    with multiprocessing.Pool(workers, initializer=load_vocab, initargs=(pair_vocab,)) as pool:
         bi_files = pool.map(count_pairs, [(lang, u, work) for u in urls(lang, 2)])
     pairs = {}
     for p in bi_files:
         for line in open(p, "rb"):
             k, c = line.rstrip(b"\n").split(b"\t")
             pairs[k] = pairs.get(k, 0) + int(c)
+    # Pairs of words no longer in the vocabulary (a bi/ cached by a run with more words) go.
+    pairs = {k: c for k, c in pairs.items() if all(w.decode("utf-8") in vocab for w in k.split(b" "))}
+    for w, expansion in CONTRACTIONS.get(lang, {}).items():
+        vocab[w] = max(vocab[w], pairs.get(expansion.encode("utf-8"), 0))
     write_model(lang, vocab, total, pairs, out_path)
 
 
-def write_model(lang, vocab, total, pairs, out_path):
+def write_model(lang, vocab, total, pairs, out_path, min_pair=MIN_PAIR, context_totals=None, max_pairs=None):
     scalars = sorted({c for w in vocab for c in w})
     code = {c: i + 1 for i, c in enumerate(scalars)}
     def base(c):
-        b = unicodedata.normalize("NFD", c)[0]
+        b = BASES.get(c) or unicodedata.normalize("NFD", c)[0]
         return code.get(b, code[c])
     enc = {w: bytes(code[c] for c in w) for w in vocab}
     words = sorted(vocab, key=lambda w: enc[w])
@@ -212,15 +312,17 @@ def write_model(lang, vocab, total, pairs, out_path):
     blob = b"".join(enc[w] for w in words)
     fixed = 28 + 8 * len(scalars) + 4 * (len(words) + 1) + len(words) + 3 + 4 * (len(words) + 1) + len(blob)
     budget = (MAX_BYTES - fixed) // 5
+    if max_pairs is not None:
+        budget = min(budget, max_pairs)
 
     # Keep the pairs that tell the most over the single-word model (backoff 0.4):
     # count x log(P(b | a) / (0.4 P(b))), positive only, best first, as many as fit.
     scored = []
     for k, c in pairs.items():
-        if c < MIN_PAIR:
+        if c < min_pair:
             continue
         a, b = k.decode("utf-8").split(" ")
-        p = c / vocab[a]
+        p = c / (context_totals[a] if context_totals is not None else vocab[a])
         gain = c * math.log(p / (0.4 * vocab[b] / total))
         if gain > 0:
             scored.append((gain, index[a], index[b], min(p, 1.0)))
@@ -255,7 +357,250 @@ def write_model(lang, vocab, total, pairs, out_path):
           f"{len(scalars)} letters, {len(out) / 1e6:.2f} MB")
 
 
+def polish_input(name, work):
+    """`name` from POLISH_INPUTS in `work`, fetched once and checked against its SHA-256."""
+    import hashlib
+    url, _, digest = POLISH_INPUTS[name]
+    path = os.path.join(work, name)
+    fetch(url, path)
+    h = hashlib.sha256()
+    with open(path, "rb") as f:
+        for block in iter(lambda: f.read(1 << 20), b""):
+            h.update(block)
+    if h.hexdigest() != digest:
+        sys.exit(f"{path}: SHA-256 {h.hexdigest()}, expected {digest}")
+    return path
+
+
+POLISH_WORD = re.compile("[" + LETTERS["pl"] + "]+")
+POLISH_TOKEN = re.compile(r"\w+|[^\w\s]")
+
+
+POLISH_EDGE = ".,;:!?\"'()[]«»„”…"
+
+
+def polish_counts(source, work):
+    """Polish word and pair counts (lowercase, letters only) from `source`. A pair may span a
+    comma, which people typing leave out ("wiem, że" is typed "wiem że"), never other
+    punctuation or a word with other characters."""
+    words, pairs = {}, {}
+    def add(tokens, count=1):
+        prev = None
+        for t in tokens:
+            if t == "," and prev:
+                continue
+            w = t if POLISH_WORD.fullmatch(t) else None
+            if w:
+                words[w] = words.get(w, 0) + count
+                if prev:
+                    k = prev + " " + w
+                    pairs[k] = pairs.get(k, 0) + count
+            prev = w
+    if source == "parlamint":
+        path = polish_input("ParlaMint-PL.tgz", work)
+        seg = re.compile(r"<seg\b[^>]*>(.*?)</seg>", re.S)
+        with tarfile.open(path) as t:
+            for m in t:
+                if not (m.isfile() and re.search(r"/\d{4}/ParlaMint-PL_[^/]+\.xml$", m.name)):
+                    continue
+                text = t.extractfile(m).read().decode("utf-8")
+                for body in seg.findall(text):
+                    body = re.sub(r"<[^>]+>", " ", body).replace("&amp;", "&")
+                    add(POLISH_TOKEN.findall(unicodedata.normalize("NFC", body).lower()))
+        return words, pairs
+    for n in (1, 2):
+        path = polish_input(f"nkjp-{n}grams.gz", work)
+        with gzip.open(path, "rt", encoding="utf-8", errors="replace") as f:
+            for line in f:
+                parts = line.split()
+                if len(parts) != n + 1 or not parts[0].isdigit():
+                    continue
+                c, raw = int(parts[0]), [unicodedata.normalize("NFC", g) for g in parts[1:]]
+                # The n-grams keep punctuation on its word ("wiem,"): strip it, letting only a
+                # comma sit between the two words of a pair.
+                grams = [g.strip(POLISH_EDGE) for g in raw]
+                if n == 2 and raw[0].rstrip(",") != raw[0].rstrip(POLISH_EDGE):
+                    continue
+                if not all(POLISH_WORD.fullmatch(g) for g in grams):
+                    continue
+                target = words if n == 1 else pairs
+                key = " ".join(grams)
+                target[key] = target.get(key, 0) + c
+    return words, pairs
+
+
+def polimorf_forms(work):
+    path = polish_input("polimorf.tab.gz", work)
+    forms = set()
+    with gzip.open(path, "rt", encoding="utf-8") as f:
+        for line in f:
+            if not line.startswith("#"):
+                w = unicodedata.normalize("NFC", line.split("\t", 1)[0].lower())
+                if POLISH_WORD.fullmatch(w):
+                    forms.add(w)
+    return forms
+
+
+# A plain spelling at least this many times rarer than its marked twin ("sie" and "się",
+# "bedzie" and "będzie") is a typo PoliMorf happens to list, not a word to keep as typed.
+TWIN_RATIO = 20
+
+
+def fold(word):
+    return "".join(BASES.get(c) or unicodedata.normalize("NFD", c)[0] for c in word)
+
+
+def without_plain_twins(words, check=None):
+    """`words` (word -> count) less spellings with fewer marks than a twin TWIN_RATIO times as
+    common, in `words` or in `check` (another corpus's counts)."""
+    def marks(w):
+        return sum(a != b for a, b in zip(w, fold(w)))
+    def plain_twins(counts):
+        best = {}
+        for w, c in counts.items():
+            f = fold(w)
+            if c > best.get(f, (0, ""))[0]:
+                best[f] = (c, w)
+        return {w for w, c in counts.items()
+                if best[fold(w)][0] >= TWIN_RATIO * c and marks(w) < marks(best[fold(w)][1])}
+    drop = plain_twins(words)
+    if check:
+        # A word the other corpus never uses counts as once there.
+        best = {}
+        for w, c in check.items():
+            f = fold(w)
+            if c > best.get(f, (0, ""))[0]:
+                best[f] = (c, w)
+        drop |= {w for w in words if fold(w) in best and best[fold(w)][1] != w
+                 and marks(w) < marks(best[fold(w)][1]) and best[fold(w)][0] >= TWIN_RATIO * max(check.get(w, 0), 1)}
+    return {w: c for w, c in words.items() if w not in drop}
+
+
+def main_polish(work, out_path, source):
+    """Polish: `source`'s counts, the words PoliMorf knows less plain twins, the commonest
+    MAX_WORDS of them; then <out_path less .hextm>.valid."""
+    os.makedirs(work, exist_ok=True)
+    words, pairs = polish_counts(source.split("+")[0], work)
+    check = polish_counts("parlamint", work)[0] if source == "nkjp+parlamint" else None
+    total = sum(words.values())
+    forms = polimorf_forms(work)
+    listed = without_plain_twins({w: c for w, c in words.items() if w in forms}, check)
+    kept = sorted(listed, key=lambda w: (-listed[w], w))[: MAX_WORDS["pl"]]
+    vocab = {w: listed[w] for w in kept}
+    print(f"{source}: {total} words counted, {len(words)} distinct, {len(listed)} listed, {len(kept)} kept")
+    in_vocab = {k.encode("utf-8"): c for k, c in pairs.items() if all(p in vocab for p in k.split(" "))}
+    write_model("pl", vocab, total, in_vocab, out_path, POLISH_MIN_PAIR[source])
+    valid = sorted((w for w, c in listed.items() if c >= 2 and w not in vocab), key=lambda w: w.encode("utf-8"))
+    valid_path = (out_path[:-6] if out_path.endswith(".hextm") else out_path) + ".valid"
+    with open(valid_path, "w", encoding="utf-8") as f:
+        for w in valid:
+            f.write(f"{w}\t{cost(listed[w] / total)}\n")
+    print(f"{valid_path}: {len(valid)} words outside the model")
+
+
+def read_khmer_corpus_rows(vocab):
+    rows = {}
+    corpus_path = os.path.join(os.path.dirname(__file__), "km-corpus-pairs.tsv.gz")
+    with gzip.open(corpus_path, "rt", encoding="utf-8") as source:
+        for line_number, line in enumerate(source, 1):
+            previous, word, raw_count = line.rstrip("\r\n").split("\t")
+            count = int(raw_count)
+            # The corpus tokenizer can find SIL entries with digits or punctuation
+            # that the letters-only decoder omits from its vocabulary.
+            if previous not in vocab or word not in vocab:
+                continue
+            row = rows.setdefault(previous, {})
+            if word in row or count <= 0:
+                raise ValueError(f"{corpus_path}:{line_number}: invalid pair {previous} {word}")
+            row[word] = count
+    return rows
+
+
+def khmer_pair_counts(vocab, rows, max_followers):
+    # Normalize pair counts against their own corpus: SIL counts individual words
+    # in different texts.
+    # A small reserve for unseen words avoids assigning near-certainty to a
+    # continuation on the strength of a handful of examples.
+    totals = {previous: 16 + sum(row.values()) for previous, row in rows.items()}
+    editorial_contexts = set()
+    ranked_path = os.path.join(os.path.dirname(__file__), "km-next-words.tsv")
+    with open(ranked_path, encoding="utf-8") as source:
+        for line_number, line in enumerate(source, 1):
+            if line.startswith("#") or not line.strip():
+                continue
+            previous, *following = line.rstrip("\r\n").split("\t")
+            if (previous not in vocab or previous in editorial_contexts or not following
+                    or len(set(following)) != len(following) or any(w not in vocab for w in following)):
+                raise ValueError(f"{ranked_path}:{line_number}: invalid suggestions for {previous!r}")
+            editorial_contexts.add(previous)
+            total = totals.setdefault(previous, 16)
+            # Editorial weights introduce likely chat words with descending scores.
+            # Preserve the relative ranking of the other observed follow-ups below
+            # them, so a typed prefix outside this short list can still use context.
+            curated = {word: total * 0.08 / (2 ** rank) for rank, word in enumerate(following)}
+            row = rows.setdefault(previous, {})
+            for word in curated:
+                row.pop(word, None)
+            if row:
+                scale = min(1, min(curated.values()) / (2 * max(row.values())))
+                row.update((word, count * scale) for word, count in row.items())
+            row.update(curated)
+
+    pairs = {}
+    for previous, row in rows.items():
+        for word, count in sorted(row.items(), key=lambda item: (-item[1], item[0]))[:max_followers]:
+            pairs[f"{previous} {word}".encode("utf-8")] = count
+    return pairs, totals
+
+
+def valid_khmer_word(word):
+    def begins_word(character):
+        return 0x1780 <= ord(character) <= 0x17B3
+
+    coeng = "\u17d2"
+    if not word or not begins_word(word[0]) or word.endswith(coeng):
+        return False
+    if any(not (0x1780 <= ord(c) <= 0x17D2 or c == "\u17dd") for c in word):
+        return False
+    return all(a != coeng or begins_word(b) for a, b in zip(word, word[1:]))
+
+
+def khmer_word_counts(wordlist):
+    vocab = {}
+    with open(wordlist, encoding="utf-8") as source:
+        for line in source:
+            word, frequency = line.rstrip("\r\n").split("\t")
+            count = int(frequency)
+            if count > 0 and valid_khmer_word(word):
+                vocab[word] = vocab.get(word, 0) + count
+
+    # Preserve the measured costs of SIL words when adding uncounted terms.
+    total = sum(vocab.values())
+    extra_path = os.path.join(os.path.dirname(wordlist), "km-buddhist.txt")
+    with open(extra_path, encoding="utf-8") as source:
+        for line_number, line in enumerate(source, 1):
+            word = line.strip()
+            if not word or word.startswith("#"):
+                continue
+            if not valid_khmer_word(word):
+                raise ValueError(f"{extra_path}:{line_number}: invalid Khmer word {word!r}")
+            vocab.setdefault(word, 1)
+    return vocab, total
+
+
+def build_khmer(wordlist, out_path):
+    vocab, total = khmer_word_counts(wordlist)
+    rows = read_khmer_corpus_rows(vocab)
+    pairs, context_totals = khmer_pair_counts(vocab, rows, max_followers=64)
+    write_model("km", vocab, total, pairs, out_path, min_pair=0, context_totals=context_totals)
+
+
 if __name__ == "__main__":
-    if len(sys.argv) != 4 or sys.argv[1] not in FILES:
+    if len(sys.argv) in (4, 5) and sys.argv[1] == "pl" and (sys.argv[4:] or ["nkjp+parlamint"])[0] in POLISH_MIN_PAIR:
+        main_polish(sys.argv[2], sys.argv[3], (sys.argv[4:] or ["nkjp+parlamint"])[0])
+    elif len(sys.argv) == 4 and sys.argv[1] == "km":
+        build_khmer(*sys.argv[2:])
+    elif len(sys.argv) != 4 or sys.argv[1] not in FILES:
         sys.exit(__doc__)
-    main(*sys.argv[1:])
+    else:
+        main(*sys.argv[1:])

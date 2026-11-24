@@ -2,13 +2,15 @@ import CoreGraphics
 import XCTest
 @testable import HEX
 
-/// Swipe typing's decoder (`SwipeDecoder`) on the bundled English and Spanish models, with
-/// swipes drawn through Hex's own key geometry. It has its own file because the decoder reads
-/// a path without the keys' engine and its fixtures are paths; how the keys type a swipe is
-/// in FullKeyboardEngineTests.
+/// Swipe typing's decoder (`SwipeDecoder`) on the bundled English, Spanish, French, German
+/// and Polish models, with swipes drawn through Hex's own key geometry. It has its own file
+/// because the decoder reads a path without the keys' engine and its fixtures are paths; how
+/// the keys type a swipe is in FullKeyboardEngineTests.
 @MainActor
 final class SwipeDecoderTests: XCTestCase {
-    private func decoder(_ language: KeyboardLanguage, swearing: Bool = false) throws -> (SwipeDecoder, TypingDecoder.Keys) {
+    private func decoder(
+        _ language: KeyboardLanguage, swearing: Bool = false, letters: KeyboardLetterLayout? = nil
+    ) throws -> (SwipeDecoder, TypingDecoder.Keys) {
         let model = try XCTUnwrap(TypingDecoderModel.bundled(language.rawValue), "the \(language) model is bundled")
         var decoder = SwipeDecoder(model: model)
         decoder.neverSuggest = TypingDecoder.NeverSuggest(
@@ -19,7 +21,7 @@ final class SwipeDecoderTests: XCTestCase {
                 AutocorrectEngine.englishContractions, cost: { SwipeDecoder.costOfContraction($0) }, model: model
             )
         }
-        let keys = try XCTUnwrap(TypingDecoder.Keys(layout: KeyboardLayout(width: 390, language: language)))
+        let keys = try XCTUnwrap(TypingDecoder.Keys(layout: KeyboardLayout(width: 390, language: language, letters: letters)))
         return (decoder, keys)
     }
 
@@ -51,6 +53,72 @@ final class SwipeDecoderTests: XCTestCase {
             XCTAssertEqual(read(word, es, keys).first, word)
         }
         XCTAssertEqual(Set(read("esta", es, keys).prefix(2)), ["esta", "está"], "one path, both readings")
+    }
+
+    /// Settings › Experiments › Swipe typing in more languages reads French (France), German
+    /// and Polish on their own layouts too: an accented letter is read on its base letter's
+    /// key, and French's AZERTY and German's QWERTZ are the keys as drawn.
+    func testFrenchGermanAndPolishSwipesReadTheirWords() throws {
+        for (language, word) in [(KeyboardLanguage.french, "bonjour"), (.german, "hallo"), (.polish, "dzień")] {
+            let (decoder, keys) = try decoder(language)
+            XCTAssertTrue(read(word, decoder, keys).prefix(2).contains(word), "\(language): \(word)")
+        }
+    }
+
+    func testKhmerSwipesKeepCoengAndCornerGlyphsInTypingOrder() throws {
+        let (decoder, keys) = try decoder(.khmer, letters: .khmerism)
+        XCTAssertEqual(keys.swipeAliases["ខ"], "ិ")
+        XCTAssertNotNil(keys.centres["្"])
+        XCTAssertNotNil(keys.centres["ំ"])
+        let word = "ខ្ញុំ"
+        XCTAssertEqual(decoder.model.encode(word)?.count, 5)
+        XCTAssertEqual(read(word, decoder, keys).first, word)
+    }
+
+    func testKhmerNearTieAtTheSamePositionsOffersAChoice() throws {
+        let (decoder, keys) = try decoder(.khmer, letters: .khmerism)
+        XCTAssertEqual(SwipePath.through("ដៃ", keys: keys), SwipePath.through("ដ៏", keys: keys))
+        let reading = decoder.read(SwipePath.through("ដៃ", keys: keys), keys: keys)
+        XCTAssertEqual(Set(reading.candidates.prefix(2).map(\.text)), ["ដៃ", "ដ៏"])
+        XCTAssertTrue(reading.requiresChoice)
+    }
+
+    func testKhmerPersonalWordCanSwipeAcrossTwoKeysInOneGrapheme() throws {
+        let (base, keys) = try decoder(.khmer, letters: .khmer)
+        var decoder = base
+        let word = "ឈី" // Shift-ឆ and Shift-ិ form a single Swift Character.
+        let path = SwipePath.through(word, keys: keys)
+        XCTAssertFalse(decoder.decode(path, keys: keys, limit: 32).contains { $0.text == word })
+        decoder.extraWords.add([word, "ឈ"], cost: SwipeDecoder.ownWordCost, model: decoder.model)
+        XCTAssertEqual(decoder.extraWords.texts, [word])
+        XCTAssertTrue(decoder.decode(path, keys: keys, limit: 32).contains { $0.text == word })
+    }
+
+    func testKhmerSwipePitchMatchesAdjacentKeyCentres() throws {
+        for letters in KeyboardLanguage.khmer.letterLayouts {
+            let layout = KeyboardLayout(width: 440, language: .khmer, letters: letters)
+            let row = layout.keys.filter { $0.row == 1 && $0.character != nil }
+            let keys = try XCTUnwrap(TypingDecoder.Keys(layout: layout))
+            let first = try XCTUnwrap(row.first)
+            let next = try XCTUnwrap(row.dropFirst().first)
+            XCTAssertEqual(keys.pitch.width, next.frame.midX - first.frame.midX, accuracy: 0.001, "\(letters)")
+        }
+    }
+
+    func testRegularKhmerSwipesUseItsOwnBaseAndShiftedPositions() throws {
+        let (decoder, keys) = try decoder(.khmer, letters: .khmer)
+        let (khmerism, khmerismKeys) = try self.decoder(.khmer, letters: .khmerism)
+        XCTAssertTrue(decoder.model === khmerism.model, "one bundled Khmer model")
+        XCTAssertNotEqual(SwipePath.through("ខ្ញុំ", keys: keys), SwipePath.through("ខ្ញុំ", keys: khmerismKeys))
+        XCTAssertLessThan(keys.pitch.width, khmerismKeys.pitch.width, "regular Khmer fits twelve columns")
+        XCTAssertEqual(keys.swipeAliases["ភ"], "ផ")
+        XCTAssertNil(keys.swipeAliases["ខ"], "regular Khmer has a base key for ខ")
+        for word in ["ខ្ញុំ", "ភាសា"] {
+            XCTAssertTrue(word.unicodeScalars.map(Character.init).allSatisfy {
+                keys.centres[keys.swipeAliases[$0] ?? $0] != nil
+            }, "\(word) has a position for every scalar")
+            XCTAssertEqual(read(word, decoder, keys).first, word)
+        }
     }
 
     /// Google Books splits "don't" into "do n't", so the model barely counts it: the decoder
@@ -138,9 +206,10 @@ enum SwipePath {
     /// letter's key, an apostrophe on none), a point every `step` points, moved by `offset`.
     static func through(_ word: String, keys: TypingDecoder.Keys, offset: CGVector = .zero, step: CGFloat = 6) -> [CGPoint] {
         var centres: [CGPoint] = []
-        for letter in word.lowercased() where letter != "'" {
+        let letters = keys.swipeAliases.isEmpty ? Array(word.lowercased()) : word.unicodeScalars.map(Character.init)
+        for letter in letters where letter != "'" {
             let base = String(letter).decomposedStringWithCanonicalMapping.unicodeScalars.first.map(Character.init)
-            guard let centre = keys.centres[letter] ?? base.flatMap({ keys.centres[$0] }) else { continue }
+            guard let centre = keys.centres[keys.swipeAliases[letter] ?? letter] ?? base.flatMap({ keys.centres[$0] }) else { continue }
             if centres.last != centre { centres.append(centre) }
         }
         guard let first = centres.first else { return [] }
