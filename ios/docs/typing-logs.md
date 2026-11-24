@@ -185,7 +185,7 @@ cursor, for every `edit` (and `dictation`) line remove `deleted` (a string;
 | `delete_word` | `deleted`, `src`: `repeat_word` (held past 1.4 s) |
 | `autocorrect` | `from`, `to`, `deleted` (= `from`), `inserted` (`to` + space). Applied on space. |
 | `autocorrect_undo` | `deleted` (the correction, without its space or mark), `inserted` (what was typed), `src`: `strip`. The strip's revert, offered once delete took the correction's space or mark (or the cursor came back to its end), put back what was typed. |
-| `suggestion` | `slot` (0 left, 1 centre, 2 right), `text` (as shown), `deleted` (the word being typed), `inserted` (the replacement + space), `candidates` (as in `candidates`) |
+| `suggestion` | `slot` (0 left, 1 centre, 2 right), `text` (as shown), `deleted` (the word being typed), `inserted` (the replacement, including any space the keyboard adds), `candidates` (as in `candidates`) |
 | `double_space_period` | `deleted`: `" "`, `inserted`: `". "` |
 | `space_swallowed` | `after`: `suggestion`. A space right after a suggestion typed its own changed nothing. |
 | `return` | `inserted`: `"\n"`, `returnKeyType`, `send` (the key said Send); `ignored: true` and no `inserted` when the key was disabled (empty field) |
@@ -197,7 +197,9 @@ cursor, for every `edit` (and `dictation`) line remove `deleted` (a string;
 
 The suggestions the strip offers: `items`: `[{slot, text, replacement?, kind,
 auto?}]`, `kind` `literal` (left, what you typed), `primary` (centre; `auto`:
-space will apply it), `secondary`. Written only when they changed, lazily: just
+space will apply it), `secondary`. A Khmer-to-English pick has kind `khmer_english`.
+Its `suggestion` edit records the Khmer text removed and the English text inserted.
+Candidates are written only when they changed, lazily: just
 before the next touch goes down and at session end, so each line is what was on
 screen when a finger next went down. The strip hides them while it shows Undo
 dictation, a status, or the clipboard chips.

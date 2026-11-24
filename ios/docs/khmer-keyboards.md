@@ -163,10 +163,15 @@ Both layouts use the existing **Autocorrect** and **Swipe typing** switches in
 
 Turn on **Settings › Experiments › Languages › English suggestions in Khmer**
 to see English spellings for matched loanwords and app names on either layout.
-Type **តេឡេក្** to see both **តេឡេក្រាម** and **Telegram**. Once a prefix
-identifies one entry in the bundled list, you can tap either spelling to use
-it. Search fields can show these choices with autocorrection off. Space keeps
-what you typed. Matching works offline and offers at most one English choice.
+Type **តេឡេក្** to see both **តេឡេក្រាម** and **Telegram**. A partial spelling
+can qualify as soon as it identifies one English result. For example, **ម៉ៃក្រូ**
+still fits both Microsoft and microphone, so the keyboard waits for more input.
+When an ordinary Khmer completion also fits, it can appear alongside the two
+spellings. Search fields can offer both spellings with autocorrection off.
+
+Matching works offline, including in joined Khmer text. Tapping the English
+choice replaces the matched text before the caret and preserves following
+punctuation. Space keeps what you typed.
 
 The [Khmer-to-English transliteration lexicon](../HEXKeyboard/TypingModel/km-english-suggestions.tsv)
 contains app names, Cambodian services, and everyday digital loanwords. Each

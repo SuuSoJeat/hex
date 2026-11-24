@@ -203,15 +203,33 @@ extension FullKeyboardEngine {
         if prefix == nil && !live { khmerPickedWord = nil }
         let input = prefix ?? before
         let match = khmerAutocomplete.flatMap { khmerEnglishMatch(using: $0, before: input) }
-        let english = match.map {
-            KeyboardSuggestion(displayText: $0.english, replacement: $0.english, kind: .khmerEnglish(typed: $0.typed))
-        }
-        if let match, let english, match.typed != match.khmer {
+        // Search fields can disable corrections and still accept explicit transliteration picks.
+        let offersDictionaryChoices = target.autocorrectionType != .no
+        var ordinary = offersDictionaryChoices
+            ? khmerDictionaryChoices(before: before, prefix: prefix, hasEnglishMatch: match != nil)
+            : []
+        guard let match else { return ordinary }
+        let english = KeyboardSuggestion(
+            displayText: match.english, replacement: match.english, kind: .khmerEnglish(typed: match.typed)
+        )
+        if match.typed != match.khmer {
             let suffix = String(decoding: match.khmer.utf16.dropFirst(match.typed.utf16.count), as: UTF16.self)
-            return [KeyboardSuggestion(displayText: match.khmer, replacement: suffix, kind: .khmerCompletion), english]
+            let completion = KeyboardSuggestion(displayText: match.khmer, replacement: suffix, kind: .khmerCompletion)
+            // Keep the highest-ranked distinct Khmer choice alongside the two matched spellings.
+            let first = ordinary.first { $0.displayText != match.khmer && $0.kind != .khmerKeepLiteral }
+            guard let first else { return [completion, english] }
+            return ordinary.first?.displayText == match.khmer ? [completion, first, english] : [first, completion, english]
         }
-        // Search fields can turn off corrections while still accepting explicit picks.
-        guard allowsKhmerSuggestions else { return english.map { [$0] } ?? [] }
+        if offersDictionaryChoices, !ordinary.contains(where: { $0.kind == .khmerKeepLiteral }),
+           khmerAutocomplete?.wordSuffix(in: match.typed[...], personalWords: autocorrect.ownWords) == match.typed {
+            ordinary.insert(
+                KeyboardSuggestion(displayText: match.typed, replacement: match.typed, kind: .khmerKeepLiteral), at: 0
+            )
+        }
+        return Array(ordinary.prefix(2)) + [english]
+    }
+
+    private func khmerDictionaryChoices(before: String?, prefix: String?, hasEnglishMatch: Bool) -> [KeyboardSuggestion] {
         let context: (word: String, prefix: String)?
         if let prefix, let pick = khmerPickedWord {
             context = (pick.word, prefix)
@@ -224,6 +242,7 @@ extension FullKeyboardEngine {
             return khmerPredictions(khmerFollowingWords(context.word))
         }
         guard let index = khmerAutocomplete else { return [] }
+        let input = prefix ?? before
         if let correction = autocorrect.khmerCorrection(
             using: index, beforeInput: input, substitutionGain: khmerSubstitutionGain(before: before)
         ), target.documentIdentifier != nil || khmerReplacementTail(
@@ -233,12 +252,10 @@ extension FullKeyboardEngine {
                 KeyboardSuggestion(displayText: "“\(correction.typed)”", replacement: correction.typed, kind: .khmerKeepLiteral),
                 KeyboardSuggestion(
                     displayText: correction.replacement, replacement: correction.replacement,
-                    kind: .khmerCorrection(autoReplace: correction.automaticallyApplies && english == nil)
+                    kind: .khmerCorrection(autoReplace: correction.automaticallyApplies && !hasEnglishMatch)
                 ),
             ]
-            if let english {
-                choices.append(english)
-            } else if let word = correction.dictionaryAlternative {
+            if let word = correction.dictionaryAlternative {
                 choices.append(KeyboardSuggestion(displayText: word, replacement: word, kind: .khmerCorrection(autoReplace: false)))
             } else if correction.typed.utf16.count >= 2, index.expandedWords != nil,
                       let completion = autocorrect.khmerCompletions(using: index, beforeInput: correction.typed).first(where: {
@@ -262,14 +279,6 @@ extension FullKeyboardEngine {
             let remaining = completions.dropFirst(personal.count).filter { !preferred.contains($0.displayText) }
             completions = Array((Array(personal) + contextual + remaining).prefix(3))
         }
-        if let english, case .khmerEnglish(let typed) = english.kind {
-            if index.wordSuffix(in: typed[...], personalWords: autocorrect.ownWords) == typed {
-                completions.insert(
-                    KeyboardSuggestion(displayText: typed, replacement: typed, kind: .khmerKeepLiteral), at: 0
-                )
-            }
-            return Array(completions.prefix(2)) + [english]
-        }
         return completions
     }
 
@@ -289,9 +298,17 @@ extension FullKeyboardEngine {
                 autocorrect.suppressAndKeep(suggestion.replacement)
                 refreshSuggestions()
             } else if case .khmerEnglish(let typed) = suggestion.kind {
-                if let before = caret.before, removeKhmerSuffix(typed, from: before) != nil {
+                if let before = caret.before,
+                   case .removed = deleteKhmerSuffix(typed, from: before, verifyStartWithRightContext: true) {
+                    typingLog?.edit("suggestion", [
+                        TypingLogField("slot", suggestions.firstIndex(of: suggestion).map { .int($0) } ?? .null),
+                        TypingLogField("text", .string(suggestion.displayText)),
+                        TypingLogField("deleted", .string(typed)),
+                        TypingLogField("inserted", .string(suggestion.replacement)),
+                        TypingLogField("candidates", TypingLogger.candidates(suggestions)),
+                    ])
                     forgetTextAroundKeys()
-                    insert(suggestion.replacement, source: "khmer_english")
+                    insert(suggestion.replacement, source: nil)
                 }
             } else {
                 applyKhmerCorrection(ending: "", picked: suggestion.replacement)
@@ -527,7 +544,7 @@ extension FullKeyboardEngine {
 
     /// UIKit can delete one Khmer scalar where Swift sees a whole character. Stop at the
     /// exact word boundary, checking each step against the original text before the caret.
-    func deleteKhmerSuffix(_ suffix: String, from before: String) -> KhmerSuffixDeletion {
+    func deleteKhmerSuffix(_ suffix: String, from before: String, verifyStartWithRightContext: Bool = false) -> KhmerSuffixDeletion {
         guard khmerDeleteRecovery == nil, let rawBefore = target.documentContextBeforeInput,
               SmartPunctuation.plain(rawBefore).utf16.elementsEqual(before.utf16),
               before.utf16.suffix(suffix.utf16.count).elementsEqual(suffix.utf16),
@@ -543,8 +560,15 @@ extension FullKeyboardEngine {
             routeRevision: target.inputRouteRevision,
             after: target.documentContextAfterInput
         )
-        // With text to the right, a nil prefix after deleting to the start is ambiguous.
-        guard boundary != 0 || caret.after?.isEmpty != false else { return .rejected }
+        // Some hosts report nil at the start of a nonempty field. For an English pick
+        // replacing the entire prefix, check that we can read it from across the next
+        // character before sending any deletes. Word-delete gestures keep their boundary.
+        let needsStartConfirmation = boundary == 0 && caret.after?.isEmpty == false
+        if needsStartConfirmation {
+            guard verifyStartWithRightContext, let visible = khmerPrefixAcrossNextCharacter(at: caret),
+                  !visible.isEmpty, rawBefore.utf16.suffix(visible.utf16.count).elementsEqual(visible.utf16),
+                  target.documentContextBeforeInput?.utf16.elementsEqual(rawBefore.utf16) == true else { return .rejected }
+        }
         var end = original.count
         var previous = rawBefore
         while end > boundary {
@@ -559,11 +583,13 @@ extension FullKeyboardEngine {
                     })
                     return .interrupted
                 }
-                confirmed = observedKhmerDelete(in: original, before: previous, end: end)
+                confirmed = observedKhmerDelete(in: original, before: previous, end: end,
+                                                confirmStartAt: needsStartConfirmation ? caret : nil)
                 if confirmed != nil { break }
             }
             guard let confirmed else {
-                recoverKhmerDelete(in: original, before: previous, end: end, at: caret)
+                recoverKhmerDelete(in: original, before: previous, end: end, at: caret,
+                                   confirmStart: needsStartConfirmation)
                 return .interrupted
             }
             end = confirmed.end
@@ -597,8 +623,41 @@ extension FullKeyboardEngine {
             && target.documentContextAfterInput == caret.after && (target.selectedText ?? "").isEmpty
     }
 
-    private func observedKhmerDelete(in original: [UInt16], before: String, end: Int) -> (text: String, end: Int)? {
-        guard let live = target.documentContextBeforeInput else {
+    /// Read the left context by moving across the first right-hand character and back.
+    /// Its presence makes even an empty prefix observable without treating nil as proof.
+    private func khmerPrefixAcrossNextCharacter(at caret: KhmerDeleteCaret) -> String? {
+        guard sameKhmerDeleteCaret(caret), let right = caret.after, let next = right.first else { return nil }
+        // A one-step request cannot overshoot the end on a host that counts whole
+        // characters. Other hosts report a single UTF-16 unit of the next character.
+        target.adjustTextPosition(byCharacterOffset: 1)
+        let width = String(next).utf16.count
+        for _ in 0..<3 {
+            guard target.documentIdentifier == caret.document, target.inputRouteRevision == caret.routeRevision,
+                  (target.selectedText ?? "").isEmpty else { return nil }
+            guard let left = target.documentContextBeforeInput else { continue }
+            let after = target.documentContextAfterInput ?? ""
+            for consumed in width == 1 ? [1] : [width, 1] {
+                let crossed = String(decoding: right.utf16.prefix(consumed), as: UTF16.self)
+                let remaining = String(decoding: right.utf16.dropFirst(consumed), as: UTF16.self)
+                guard left.utf16.suffix(consumed).elementsEqual(crossed.utf16),
+                      after.utf16.starts(with: remaining.utf16) else { continue }
+                // Only reverse a forward move the proxy actually showed. A capped
+                // right-hand window may have revealed extra text at its far end.
+                target.adjustTextPosition(byCharacterOffset: -1)
+                guard sameKhmerDeleteCaret(caret) else { return nil }
+                return String(decoding: left.utf16.dropLast(consumed), as: UTF16.self)
+            }
+        }
+        return nil
+    }
+
+    private func observedKhmerDelete(in original: [UInt16], before: String, end: Int,
+                                     confirmStartAt caret: KhmerDeleteCaret? = nil) -> (text: String, end: Int)? {
+        var live = target.documentContextBeforeInput
+        if live == nil, let caret, before.count == 1 {
+            live = khmerPrefixAcrossNextCharacter(at: caret)
+        }
+        guard let live else {
             return target.hasText ? nil : ("", 0)
         }
         guard !live.utf16.elementsEqual(before.utf16) else { return nil }
@@ -613,13 +672,15 @@ extension FullKeyboardEngine {
 
     /// The proxy may need a run loop to publish a delete. Stop the edit and recover the
     /// original spelling before sending any literal key text waiting behind it.
-    private func recoverKhmerDelete(in original: [UInt16], before: String, end: Int, at caret: KhmerDeleteCaret) {
+    private func recoverKhmerDelete(in original: [UInt16], before: String, end: Int, at caret: KhmerDeleteCaret,
+                                    confirmStart: Bool = false) {
         khmerDeleteRecovery = KhmerDeleteRecovery(caret: caret, task: Task { [weak self] in
             for attempt in 0..<5 {
                 if attempt > 0 { try? await Task.sleep(for: .milliseconds(12 << (attempt - 1))) }
                 guard let self, !Task.isCancelled else { return }
                 guard self.sameKhmerDeleteCaret(caret) else { break }
-                if let confirmed = self.observedKhmerDelete(in: original, before: before, end: end) {
+                if let confirmed = self.observedKhmerDelete(in: original, before: before, end: end,
+                                                            confirmStartAt: confirmStart ? caret : nil) {
                     // With no right-hand context a cursor move can also reveal a shorter prefix.
                     // Only a scalar or a whole grapheme can confirm the one outstanding Backspace.
                     if caret.after == nil, self.target.hasText, let last = before.last {

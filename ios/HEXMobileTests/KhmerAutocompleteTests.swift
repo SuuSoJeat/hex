@@ -29,6 +29,38 @@ final class KhmerAutocompleteTests: XCTestCase {
         XCTAssertEqual(partial?.english, "Telegram")
     }
 
+    func testAmbiguousEnglishPrefixDoesNotFallBackToAShorterJoinedReading() throws {
+        let bundled = try XCTUnwrap(KhmerAutocomplete.bundled)
+        for preceding in ["", "ខ្ញុំ"] {
+            XCTAssertNil(bundled.englishMatch(in: preceding + "ម៉ៃក្រូ", personalWords: []))
+            XCTAssertEqual(bundled.englishMatch(in: preceding + "ក្រូ", personalWords: [])?.english, "Chrome")
+        }
+    }
+
+    func testEnglishPrefixesUseDistinctTargetsAndPreferAnExactSpelling() {
+        let model = KhmerAutocomplete(wordlist: "", englishWordlist: """
+        ស្កេន\tscan
+        ស្កេនន័រ\tscanner
+        វ៉ាយហ្វាយ\tWi-Fi
+        វ៉ាយហ្វៃ\tWi-Fi
+        """)
+        XCTAssertEqual(model.englishMatch(in: "វ", personalWords: [])?.english, "Wi-Fi")
+        XCTAssertNil(model.englishMatch(in: "ស", personalWords: []))
+        XCTAssertEqual(model.englishMatch(in: "ស្កេន", personalWords: [])?.english, "scan")
+    }
+
+    func testEnglishSuggestionsRecoverKnownBoundariesInLongJoinedText() {
+        let model = KhmerAutocomplete(wordlist: "ខ្ញុំ\t100\nតេឡេក្រាម\t2", englishWordlist: "តេឡេក្រាម\tTelegram")
+        let preceding = String(repeating: "ខ្ញុំ", count: 25)
+        for typed in ["តេឡេក្", "តេឡេក្រាម"] {
+            let match = model.englishMatch(in: preceding + typed, personalWords: [])
+            XCTAssertEqual(match?.typed, typed)
+            XCTAssertEqual(match?.english, "Telegram")
+            XCTAssertNil(model.englishMatch(in: preceding + "ឝ្ឞ្ស" + typed, personalWords: []))
+        }
+        XCTAssertNil(model.wordSuffix(in: (preceding + "តេឡេក្រាម")[...]))
+    }
+
     func testRanksCompletionsAndAppendsTheExactScalarsAfterCoeng() {
         let prefix = "កម្"
         let results = model.suggestions(beforeInput: prefix, limit: 2)

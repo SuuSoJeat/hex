@@ -372,6 +372,28 @@ final class TypingLogTests: XCTestCase {
         return text
     }
 
+    func testKhmerEnglishSuggestionReplaysAsOneReplacement() async throws {
+        let rig = makeRig(logging: true)
+        let field = try XCTUnwrap(rig.target as? FixtureTextTarget)
+        field.documentIdentifier = UUID()
+        rig.view.languageOverride = .khmer
+        let engine = rig.view.engine
+        engine.khmerEnglishSuggestions = true
+        await engine.khmerAutocompleteLoad?.value
+        engine.insert("ណូត", source: "key")
+        engine.acceptSuggestion(try XCTUnwrap(engine.suggestions.first { $0.displayText == "note" }))
+        XCTAssertEqual(field.text, "note")
+
+        rig.logger?.endSession(reason: "test")
+        rig.store?.waitUntilWritten()
+        let url = try XCTUnwrap(TypingLogStore.days(in: directory).first).url
+        let events = try lines(url)
+        let pick = try XCTUnwrap(events.first { $0["op"] as? String == "suggestion" })
+        XCTAssertEqual(pick["deleted"] as? String, "ណូត")
+        XCTAssertEqual(pick["inserted"] as? String, "note")
+        XCTAssertEqual(replay(events), field.text)
+    }
+
     func testTypingOnTheRealKeyboardLogsTouchesKeysAndTextThatReplayToTheField() throws {
         let rig = makeRig(logging: true)
         // "dont" autocorrects on space; x is typed and deleted; two spaces make a period;
