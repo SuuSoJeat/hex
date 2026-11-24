@@ -144,10 +144,10 @@ extension FullKeyboardEngine {
         return learning
     }
 
-    private func khmerPreviousWord(at caret: KhmerPredictionCaret) -> String? {
+    private func khmerPreviousWord(at caret: KhmerPredictionCaret, learnedWords: [String]) -> String? {
         if khmerPrefixAfterPick(at: caret) != nil { return khmerPickedWord?.word }
         guard let before = caret.before, !khmerStartsSentence(before: before) else { return nil }
-        return khmerAutocomplete?.separatedContext(in: before, personalWords: autocorrect.ownWords)?.word
+        return khmerAutocomplete?.separatedContext(in: before, personalWords: autocorrect.ownWords + learnedWords)?.word
     }
 
     func alignKhmerTypedRun(before: String?) {
@@ -175,7 +175,10 @@ extension FullKeyboardEngine {
         if text == "\n" || text == " " || text == "\u{200B}" || text.isEmpty
             || (text.count == 1 && text.first.map({ Self.wordEnders.contains($0) || Self.khmerClosingMarks.contains($0) }) == true) {
             guard let run, text == "\n" || source == "key" || source == "slide" || source == "khmerism_hold" else { return }
-            let words = index.wordsForLearning(in: run.text, vocabulary: autocorrect.lexiconTerms)
+            let words = index.wordsForLearning(
+                in: run.text, vocabulary: autocorrect.lexiconTerms + journal.khmerSuggestions.preferredWords(),
+                allowsNewWord: true
+            )
             guard !words.isEmpty, words.allSatisfy({ autocorrect.mayOffer($0) }) else { return }
             journal.recordKhmerWords(words, after: run.previous)
             return
@@ -187,8 +190,11 @@ extension FullKeyboardEngine {
         guard run != nil || atBoundary || khmerPrefixAfterPick(at: caret)?.isEmpty == true else { return }
         let typed = (run?.text ?? "") + text
         guard typed.utf16.count <= KhmerAutocomplete.learningRunLimit else { return }
+        let previous = if let run { run.previous } else {
+            khmerPreviousWord(at: caret, learnedWords: journal.khmerSuggestions.preferredWords())
+        }
         khmerTypedRun = KhmerTypedRun(
-            text: typed, previous: run == nil ? khmerPreviousWord(at: caret) : run?.previous,
+            text: typed, previous: previous,
             caret: khmerPredictionCaret(before: (before ?? "") + text)
         )
     }
@@ -299,13 +305,16 @@ extension FullKeyboardEngine {
 
     private func khmerDictionaryChoices(before: String?, prefix: String?, hasEnglishMatch: Bool) -> [KeyboardSuggestion] {
         let usage = khmerLearning?.khmerSuggestions ?? KhmerSuggestionLearning()
+        let learnedWords = usage.preferredWords()
         let context: (word: String, prefix: String)?
         if let prefix, let pick = khmerPickedWord {
             context = (pick.word, prefix)
         } else if khmerStartsSentence(before: before) {
             return khmerPredictions(Self.khmerStarters.filter { autocorrect.mayOffer($0) })
         } else {
-            context = before.flatMap { khmerAutocomplete?.separatedContext(in: $0, personalWords: autocorrect.ownWords) }
+            context = before.flatMap {
+                khmerAutocomplete?.separatedContext(in: $0, personalWords: autocorrect.ownWords + learnedWords)
+            }
         }
         if let context, context.prefix.isEmpty {
             return khmerPredictions(khmerFollowingWords(context.word, usage: usage))
@@ -313,7 +322,7 @@ extension FullKeyboardEngine {
         guard let index = khmerAutocomplete else { return [] }
         let input = prefix ?? before
         if let correction = autocorrect.khmerCorrection(
-            using: index, beforeInput: input, substitutionGain: khmerSubstitutionGain(before: before)
+            using: index, beforeInput: input, learnedWords: learnedWords, substitutionGain: khmerSubstitutionGain(before: before)
         ), target.documentIdentifier != nil || khmerReplacementTail(
             from: correction.typed, to: correction.replacement
         ).removed.isEmpty {
@@ -335,7 +344,7 @@ extension FullKeyboardEngine {
             return choices
         }
         var completions = autocorrect.khmerCompletions(
-            using: index, beforeInput: input, learnedWords: usage.preferredWords()
+            using: index, beforeInput: input, learnedWords: learnedWords
         ).map {
             KeyboardSuggestion(displayText: $0.word, replacement: $0.suffix, kind: .khmerCompletion)
         }
@@ -364,9 +373,10 @@ extension FullKeyboardEngine {
             }
             if suggestion.kind == .khmerCompletion || suggestion.kind == .khmerPrediction {
                 if let journal = khmerLearning, let index = khmerAutocomplete {
-                    let words = index.wordsForLearning(in: suggestion.displayText, vocabulary: autocorrect.lexiconTerms)
+                    let learnedWords = journal.khmerSuggestions.preferredWords()
+                    let words = index.wordsForLearning(in: suggestion.displayText, vocabulary: autocorrect.lexiconTerms + learnedWords)
                     if words.count == 1, autocorrect.mayOffer(words[0]) {
-                        journal.recordKhmerWords(words, after: khmerPreviousWord(at: caret))
+                        journal.recordKhmerWords(words, after: khmerPreviousWord(at: caret, learnedWords: learnedWords))
                     }
                 }
                 rememberKhmerPickedWord(suggestion.displayText, before: (caret.before ?? "") + suggestion.replacement)
@@ -525,6 +535,7 @@ extension FullKeyboardEngine {
         guard picked != nil || khmerEnglishMatch(using: index, before: input) == nil,
               let suggested = autocorrect.khmerCorrection(
                 using: index, beforeInput: input,
+                learnedWords: khmerLearning?.khmerSuggestions.preferredWords() ?? [],
                 substitutionGain: picked == nil ? nil : khmerSubstitutionGain(before: before)
               ) else {
             return false

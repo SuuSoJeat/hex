@@ -2,6 +2,12 @@ import XCTest
 @testable import HEX
 
 final class KhmerAutocompleteTests: XCTestCase {
+    func testLearningDoesNotTreatAmbiguousJoinedWordsAsOneNewWord() {
+        let index = KhmerAutocomplete(wordlist: "កា\t10\nកាត\t10\nតង\t10\nង\t10")
+        XCTAssertEqual(index.wordsForLearning(in: "កាតង", vocabulary: [], allowsNewWord: true), [])
+        XCTAssertEqual(index.wordsForLearning(in: "កា្", vocabulary: [], allowsNewWord: true), [])
+    }
+
     private let model = KhmerAutocomplete(wordlist: """
     ខ្ញុំ\t100
     ស្រ\t90

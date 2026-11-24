@@ -3,6 +3,43 @@ import XCTest
 @testable import HEX
 
 extension FullKeyboardEngineTests {
+    func testKhmerPersonalSuggestionsLearnNewManuallyTypedWord() async throws {
+        let word = "ហេក្ស"
+        let index = KhmerAutocomplete(wordlist: "សូម\t100\nហាម\t50")
+        XCTAssertTrue(index.wordsForLearning(in: word, vocabulary: []).isEmpty)
+
+        for letters in [KeyboardLetterLayout.khmer, .khmerism] {
+            smartField(language: .khmer)
+            target.documentIdentifier = UUID()
+            engine.letterLayout = letters
+            await engine.khmerAutocompleteLoad?.value
+            engine.khmerAutocomplete = index
+            let journal = TypingJournal(directory: nil, settings: TypingJournalSettings(defaults: defaults))
+            engine.journal = journal
+            engine.khmerPersonalSuggestions = true
+
+            for count in 1...2 {
+                for unit in "សូម".unicodeScalars {
+                    engine.insertKhmerKeyText(String(unit), source: "key")
+                }
+                tap(.space)
+                for unit in word.unicodeScalars {
+                    engine.insertKhmerKeyText(String(unit), source: "key")
+                }
+                tap(.returnKey)
+                XCTAssertEqual(journal.khmerSuggestions.preferredWords(after: "សូម"), count == 1 ? [] : [word])
+            }
+
+            engine.insertKhmerKeyText("ហ", source: "key")
+            let completion = try XCTUnwrap(engine.suggestions.first)
+            XCTAssertEqual(completion.displayText, word)
+            XCTAssertFalse(completion.willAutoReplace)
+            engine.acceptSuggestion(completion)
+            XCTAssertTrue(target.text.hasSuffix(word))
+            XCTAssertFalse(engine.autocorrect.lexiconTerms.contains(word))
+        }
+    }
+
     func testKhmerLearningExportIncludesAllRetainedCounts() throws {
         var learning = KhmerSuggestionLearning()
         learning.record("សូម", after: nil)

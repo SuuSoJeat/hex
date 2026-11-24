@@ -2979,7 +2979,8 @@ iOS prototype (`HEXMobile`) -> Record/transcribe/copy and keyboard handoff
 │   │   The bundled lexicon covers app names, Cambodian services, and digital loanwords.
 │   ├── Experiments → Languages → Personal Khmer suggestions (off by default)
 │   │   With Learn how I type on, both layouts count completed words and adjacent pairs
-│   │   from typing and suggestion picks. Repeated words can move up in prefix completions,
+│   │   from typing and suggestion picks. A short new spelling typed twice as a separate
+│   │   word can become a personal completion. Repeated words can move up in prefix completions,
 │   │   and repeated pairs in next-word predictions. Settings → Privacy → Export Khmer
 │   │   learning data saves retained counts as JSON through the iOS document picker.
 │   │   Delete what Hex learned clears the on-device counts. See ios/docs/khmer-keyboards.md.
