@@ -145,8 +145,13 @@ find an unambiguous dictionary reading. Unknown spellings can be added through
 Custom vocabulary. Pasted text alone and secure fields teach nothing.
 Only bounded word and pair counts are stored on the iPhone. Turning the
 experiment off pauses learning and restores the usual suggestions.
+When counts exist, **Settings › Privacy › Export Khmer learning data** saves
+`hex-khmer-learning.json` to a location you choose. `words` maps each retained
+word to its count. `pairs` maps each preceding word to its following words
+and their counts. The file includes counts of one and contains only Khmer
+suggestion data. You can export saved counts while learning is paused.
 **Settings › Privacy › Learn how I type › Delete what Hex learned** clears
-the counts.
+the on-device counts. Saved exports are separate files.
 
 ## Smart typing and swipe typing
 
