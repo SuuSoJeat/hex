@@ -90,6 +90,14 @@ final class FullKeyboardEngine {
     var isAfterKhmerCoeng = false
     var khmerSmartRun: KhmerSmartRun?
     var khmerPickedWord: (word: String, caret: KhmerPredictionCaret)?
+    var khmerTypedRun: KhmerTypedRun?
+    var khmerPersonalSuggestions = false {
+        didSet {
+            guard oldValue != khmerPersonalSuggestions else { return }
+            khmerTypedRun = nil
+            if layout.language == .khmer { refreshSuggestions() }
+        }
+    }
     var khmerStripCaret: KhmerPredictionCaret?
     var khmerEnglishSuggestions = false {
         didSet {
@@ -111,7 +119,11 @@ final class FullKeyboardEngine {
     let autocorrect: AutocorrectEngine
     /// Learn how I type (Experiments); nil while off.
     var journal: TypingJournal? {
-        didSet { syncLearning() }
+        didSet {
+            khmerTypedRun = nil
+            syncLearning()
+            if khmerPersonalSuggestions, layout.language == .khmer { refreshSuggestions() }
+        }
     }
 
     var learning: TypingJournal? {
@@ -1381,7 +1393,10 @@ final class FullKeyboardEngine {
             ])
         }
         let contextBefore = typingContext
-        if layout.language == .khmer { recordKhmerSpatialTap(before: contextBefore, inserted: text, source: source) }
+        if layout.language == .khmer {
+            observeKhmerTyping(text, source: source, before: contextBefore)
+            recordKhmerSpatialTap(before: contextBefore, inserted: text, source: source)
+        }
         rememberTypingContext(before: contextBefore, inserted: text)
         if let khmerSyllable, let context = expectedTypingContext {
             khmerSmartRun = KhmerSmartRun(syllable: khmerSyllable, context: context, tapTime: khmerTapTime)
@@ -1447,6 +1462,7 @@ final class FullKeyboardEngine {
         let isKhmer = (layoutLanguage ?? language) == .khmer
         if wasKhmer != isKhmer {
             khmerPickedWord = nil
+            khmerTypedRun = nil
             shift.reset()
             clearKhmerSmartRun()
             clearKhmerSpatialTaps()

@@ -133,6 +133,66 @@ extension FullKeyboardEngine {
         khmerPickedWord = allowsKhmerSuggestions ? (word, khmerPredictionCaret(before: before)) : nil
     }
 
+    struct KhmerTypedRun {
+        let text: String
+        let previous: String?
+        var caret: KhmerPredictionCaret
+    }
+
+    private var khmerLearning: TypingJournal? {
+        guard khmerPersonalSuggestions, allowsKhmerSuggestions, target.documentIdentifier != nil else { return nil }
+        return learning
+    }
+
+    private func khmerPreviousWord(at caret: KhmerPredictionCaret) -> String? {
+        if khmerPrefixAfterPick(at: caret) != nil { return khmerPickedWord?.word }
+        guard let before = caret.before, !khmerStartsSentence(before: before) else { return nil }
+        return khmerAutocomplete?.separatedContext(in: before, personalWords: autocorrect.ownWords)?.word
+    }
+
+    func alignKhmerTypedRun(before: String?) {
+        guard var run = khmerTypedRun else { return }
+        let caret = khmerPredictionCaret(before: before)
+        if run.caret == caret { return }
+        defer { khmerTypedRun = run.caret == caret ? run : nil }
+        // A capped proxy may drop units on the left. Keep the run only if the whole
+        // visible window matches the expected edit and still holds every typed unit.
+        guard let edit = expectedTypingContext, let before, let old = run.caret.before,
+              let reported = edit.reported, reported.utf16.count == before.utf16.count,
+              before.utf16.count >= run.text.utf16.count, old.utf16.count > before.utf16.count,
+              old.utf16.elementsEqual(edit.expected.utf16),
+              before.utf16.elementsEqual(old.utf16.suffix(before.utf16.count)) else { return }
+        run.caret.before = before
+    }
+
+    func observeKhmerTyping(_ text: String, source: String?, before: String?) {
+        alignKhmerTypedRun(before: before)
+        let run = khmerTypedRun
+        khmerTypedRun = nil
+        guard let journal = khmerLearning, let index = khmerAutocomplete else { return }
+        let caret = khmerPredictionCaret(before: before)
+
+        if text == "\n" || text == " " || text == "\u{200B}" || text.isEmpty
+            || (text.count == 1 && text.first.map({ Self.wordEnders.contains($0) || Self.khmerClosingMarks.contains($0) }) == true) {
+            guard let run, text == "\n" || source == "key" || source == "slide" || source == "khmerism_hold" else { return }
+            let words = index.wordsForLearning(in: run.text, vocabulary: autocorrect.lexiconTerms)
+            guard !words.isEmpty, words.allSatisfy({ autocorrect.mayOffer($0) }) else { return }
+            journal.recordKhmerWords(words, after: run.previous)
+            return
+        }
+
+        guard source == "key" || source == "slide" || source == "khmerism_hold" || source == "accent",
+              text.utf16.allSatisfy(KhmerAutocomplete.isWordUnit) else { return }
+        let atBoundary = before?.utf16.last.map { !KhmerAutocomplete.isWordUnit($0) } ?? !target.hasText
+        guard run != nil || atBoundary || khmerPrefixAfterPick(at: caret)?.isEmpty == true else { return }
+        let typed = (run?.text ?? "") + text
+        guard typed.utf16.count <= KhmerAutocomplete.learningRunLimit else { return }
+        khmerTypedRun = KhmerTypedRun(
+            text: typed, previous: run == nil ? khmerPreviousWord(at: caret) : run?.previous,
+            caret: khmerPredictionCaret(before: (before ?? "") + text)
+        )
+    }
+
     /// An explicit choice establishes a word boundary even though Khmer inserts no space.
     func khmerPrefixAfterPick(at caret: KhmerPredictionCaret) -> String? {
         guard let pick = khmerPickedWord, pick.caret.document == caret.document, pick.caret.route == caret.route,
@@ -160,7 +220,9 @@ extension FullKeyboardEngine {
     private static let khmerStarters = ["ខ្ញុំ", "សូម", "តើ"]
     private static let khmerCommonWords = ["បាន", "មាន", "នៅ", "ទៅ"]
 
-    private func khmerFollowingWords(_ previous: String, prefix: String = "") -> [String] {
+    private func khmerFollowingWords(
+        _ previous: String, prefix: String = "", usage: KhmerSuggestionLearning
+    ) -> [String] {
         func allowed(_ word: String) -> Bool {
             word != previous && autocorrect.mayOffer(word, after: previous)
         }
@@ -168,7 +230,13 @@ extension FullKeyboardEngine {
         // Keep the established first-key ranking. With a known boundary or a
         // longer prefix, the wider set of continuations becomes more useful.
         let model = prefix.utf16.count == 1 ? compact : (khmerAutocomplete?.expandedWords ?? compact)
-        var words = model?.nextWords(after: previous, khmerPrefix: prefix, allowing: allowed) ?? []
+        var words = Array(usage.preferredWords(after: previous, prefix: prefix).filter(allowed).prefix(3))
+        if words.count < 3 {
+            let predicted = model?.nextWords(after: previous, khmerPrefix: prefix) {
+                allowed($0) && !words.contains($0)
+            } ?? []
+            words.append(contentsOf: predicted.prefix(3 - words.count))
+        }
         // While typing a prefix, the ordinary frequency-ranked completions fill any spare slots.
         guard prefix.isEmpty else { return words }
         for word in Self.khmerCommonWords where words.count < 3 && !words.contains(word) && allowed(word) {
@@ -230,6 +298,7 @@ extension FullKeyboardEngine {
     }
 
     private func khmerDictionaryChoices(before: String?, prefix: String?, hasEnglishMatch: Bool) -> [KeyboardSuggestion] {
+        let usage = khmerLearning?.khmerSuggestions ?? KhmerSuggestionLearning()
         let context: (word: String, prefix: String)?
         if let prefix, let pick = khmerPickedWord {
             context = (pick.word, prefix)
@@ -239,7 +308,7 @@ extension FullKeyboardEngine {
             context = before.flatMap { khmerAutocomplete?.separatedContext(in: $0, personalWords: autocorrect.ownWords) }
         }
         if let context, context.prefix.isEmpty {
-            return khmerPredictions(khmerFollowingWords(context.word))
+            return khmerPredictions(khmerFollowingWords(context.word, usage: usage))
         }
         guard let index = khmerAutocomplete else { return [] }
         let input = prefix ?? before
@@ -265,12 +334,14 @@ extension FullKeyboardEngine {
             }
             return choices
         }
-        var completions = autocorrect.khmerCompletions(using: index, beforeInput: input).map {
+        var completions = autocorrect.khmerCompletions(
+            using: index, beforeInput: input, learnedWords: usage.preferredWords()
+        ).map {
             KeyboardSuggestion(displayText: $0.word, replacement: $0.suffix, kind: .khmerCompletion)
         }
         if let context {
             let prefix = context.prefix
-            let preferred = khmerFollowingWords(context.word, prefix: prefix)
+            let preferred = khmerFollowingWords(context.word, prefix: prefix, usage: usage)
             let personal = completions.prefix { autocorrect.lexiconTerms.contains($0.displayText) }
             let contextual = preferred.filter { word in !personal.contains { $0.displayText == word } }.map { word in
                 let suffix = String(decoding: word.utf16.dropFirst(prefix.utf16.count), as: UTF16.self)
@@ -292,6 +363,12 @@ extension FullKeyboardEngine {
                 return true
             }
             if suggestion.kind == .khmerCompletion || suggestion.kind == .khmerPrediction {
+                if let journal = khmerLearning, let index = khmerAutocomplete {
+                    let words = index.wordsForLearning(in: suggestion.displayText, vocabulary: autocorrect.lexiconTerms)
+                    if words.count == 1, autocorrect.mayOffer(words[0]) {
+                        journal.recordKhmerWords(words, after: khmerPreviousWord(at: caret))
+                    }
+                }
                 rememberKhmerPickedWord(suggestion.displayText, before: (caret.before ?? "") + suggestion.replacement)
                 insert(suggestion.replacement, source: suggestion.kind == .khmerPrediction ? "khmer_prediction" : "khmer_completion")
             } else if suggestion.kind == .khmerKeepLiteral {

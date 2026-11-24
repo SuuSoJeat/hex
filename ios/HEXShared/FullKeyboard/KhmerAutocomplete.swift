@@ -61,6 +61,7 @@ struct KhmerAutocomplete: Sendable {
     private static let minimumSubstitutionGain = 0.65
     private static let minimumCoengCorrectionFrequency = 1_000
     private static let contextLength = 96
+    static let learningRunLimit = 48
     private static let coeng: UInt16 = 0x17D2
     private static let dependentVowels: ClosedRange<UInt16> = 0x17B6...0x17C5
     private static let spellingAlphabet = Array(UInt16(0x1780)...0x17B3) + Array(UInt16(0x17B6)...0x17D2) + [0x17DD]
@@ -131,6 +132,32 @@ struct KhmerAutocomplete: Sendable {
 
     static func endsWithWordText(_ text: Substring) -> Bool {
         text.utf16.last.map(isWordUnit) ?? false
+    }
+
+    /// Learn a joined run only when its shortest dictionary reading is unambiguous.
+    func wordsForLearning(in text: String, vocabulary: [String]) -> [String] {
+        let run = Array(text.utf16)
+        guard let first = run.first, Self.beginsWord(first), run.count <= Self.learningRunLimit,
+              run.allSatisfy(Self.isWordUnit), Self.hasCompleteClusters(run[...]) else { return [] }
+        let personal = PersonalLexicon(vocabulary)
+        var readings: [(words: [String], unique: Bool)?] = Array(repeating: nil, count: run.count + 1)
+        readings[run.count] = ([], true)
+        for start in run.indices.reversed() where start == 0 || Self.isBoundary(start, in: run) {
+            var ends = Array(repeating: false, count: run.count + 1)
+            markWordEnds(from: start, in: run, personal: personal, expanded: expandedWords, into: &ends)
+            for end in (start + 1)...run.count where ends[end] {
+                guard let suffix = readings[end] else { continue }
+                let count = suffix.words.count + 1
+                if let best = readings[start] {
+                    if best.words.count == count { readings[start]?.unique = false }
+                    if best.words.count <= count { continue }
+                }
+                let word = String(decoding: run[start..<end], as: UTF16.self)
+                readings[start] = ([word] + suffix.words, suffix.unique)
+            }
+        }
+        guard let reading = readings[0], reading.unique else { return [] }
+        return reading.words
     }
 
     /// A space or zero-width space marks the previous word even after the next word has begun.

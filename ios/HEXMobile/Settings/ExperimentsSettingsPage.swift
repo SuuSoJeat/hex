@@ -189,6 +189,14 @@ struct ExperimentsSettingsPage: View {
             SettingsDivider()
 
             SettingsToggleRow(
+                title: String(localized: "Personal Khmer suggestions"),
+                detail: String(localized: "Suggest Khmer words and word pairs you use often. Needs Learn how I type."),
+                isOn: keyboardBinding(\.khmerPersonalSuggestions)
+            )
+
+            SettingsDivider()
+
+            SettingsToggleRow(
                 title: String(localized: "Swipe typing in more languages"),
                 detail: String(localized: "French and Polish, and German with German spatial autocorrect"),
                 isOn: keyboardBinding(\.swipeMoreLanguages)

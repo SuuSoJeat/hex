@@ -1,7 +1,9 @@
 @MainActor
 extension AutocorrectEngine {
-    func khmerCompletions(using index: KhmerAutocomplete, beforeInput: String?) -> [KhmerAutocomplete.Candidate] {
-        index.suggestions(beforeInput: beforeInput, personalWords: lexiconTerms) { mayOffer($0) }
+    func khmerCompletions(
+        using index: KhmerAutocomplete, beforeInput: String?, learnedWords: [String] = []
+    ) -> [KhmerAutocomplete.Candidate] {
+        index.suggestions(beforeInput: beforeInput, personalWords: lexiconTerms + learnedWords) { mayOffer($0) }
     }
 
     func khmerCorrection(

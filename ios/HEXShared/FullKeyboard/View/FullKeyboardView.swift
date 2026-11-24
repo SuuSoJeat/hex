@@ -586,6 +586,7 @@ final class FullKeyboardView: UIView {
         }
         engine.korean.isEnabled = FullKeyboardSettings().koreanKeyboard
         engine.khmerEnglishSuggestions = FullKeyboardSettings().khmerEnglishSuggestions
+        engine.khmerPersonalSuggestions = FullKeyboardSettings().khmerPersonalSuggestions
         engine.showsKeyPopups = FullKeyboardSettings().keyPopups
         engine.autoCapitalizes = FullKeyboardSettings().autoCapitalization
         engine.deletesSwipedWordsLetterByLetter = FullKeyboardSettings().deletesSwipedWordsLetterByLetter

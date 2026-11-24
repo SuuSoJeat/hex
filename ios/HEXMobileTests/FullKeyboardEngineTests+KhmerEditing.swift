@@ -3,6 +3,87 @@ import XCTest
 @testable import HEX
 
 extension FullKeyboardEngineTests {
+    func testKhmerPersonalSuggestionsLearnJoinedTypingAndPersistOnBothLayouts() async throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let settings = TypingJournalSettings(defaults: defaults)
+        let index = KhmerAutocomplete(wordlist: "ខ្ញុំ\t100\nសូម\t90\nសុខ\t10")
+        XCTAssertFalse(FullKeyboardSettings(defaults: defaults).khmerPersonalSuggestions)
+
+        for letters in [KeyboardLetterLayout.khmer, .khmerism] {
+            TypingJournal.delete(in: directory, settings: settings)
+            smartField(language: .khmer)
+            target.documentIdentifier = UUID()
+            engine.letterLayout = letters
+            await engine.khmerAutocompleteLoad?.value
+            engine.khmerAutocomplete = index
+            engine.autocorrect.isEnabled = false
+            engine.journal = TypingJournal(directory: directory, settings: settings)
+            engine.khmerPersonalSuggestions = true
+
+            // Existing host text followed by a space does not teach a word.
+            target.insertText("ខ្ញុំសុខ")
+            engine.textDidChange()
+            tap(.space)
+            XCTAssertTrue(try XCTUnwrap(engine.journal).khmerSuggestions.isEmpty)
+            tap(.returnKey)
+
+            for _ in 0..<2 {
+                for unit in "ខ្ញុំសុខ".unicodeScalars {
+                    engine.insertKhmerKeyText(String(unit), source: "key")
+                }
+                tap(.returnKey)
+            }
+
+            let reloaded = TypingJournal(directory: directory, settings: settings)
+            engine.journal = reloaded
+            XCTAssertEqual(reloaded.khmerSuggestions.preferredWords(after: "ខ្ញុំ"), ["សុខ"])
+            engine.insertKhmerKeyText("ស", source: "key")
+            XCTAssertEqual(engine.suggestions.first?.displayText, "សុខ")
+            tap(.delete)
+            let first = try XCTUnwrap(engine.suggestions.first { $0.displayText == "ខ្ញុំ" })
+            engine.acceptSuggestion(first)
+            XCTAssertEqual(engine.suggestions.first?.displayText, "សុខ")
+            engine.insertKhmerKeyText("ស", source: "key")
+            XCTAssertEqual(engine.suggestions.first?.displayText, "សុខ")
+            XCTAssertFalse(try XCTUnwrap(engine.suggestions.first).willAutoReplace)
+
+            engine.khmerPersonalSuggestions = false
+            XCTAssertEqual(engine.suggestions.first?.displayText, "សូម")
+            engine.khmerPersonalSuggestions = true
+            TypingJournal.delete(in: directory, settings: settings)
+            engine.refreshSuggestions()
+            XCTAssertTrue(reloaded.khmerSuggestions.isEmpty)
+            XCTAssertEqual(engine.suggestions.first?.displayText, "សូម")
+        }
+    }
+
+    func testKhmerPersonalSuggestionsLearnFromPicksInEligibleFields() async throws {
+        smartField(language: .khmer)
+        await engine.khmerAutocompleteLoad?.value
+        target.documentIdentifier = UUID()
+        let journal = TypingJournal(directory: nil, settings: TypingJournalSettings(defaults: defaults))
+        engine.journal = journal
+        engine.khmerPersonalSuggestions = true
+        for _ in 0..<2 {
+            for word in ["សូម", "អរគុណ"] {
+                engine.acceptSuggestion(try XCTUnwrap(engine.suggestions.first { $0.displayText == word }))
+            }
+            tap(.returnKey)
+        }
+        XCTAssertEqual(journal.khmerSuggestions.preferredWords(after: "សូម"), ["អរគុណ"])
+
+        let learned = journal.khmerSuggestions
+        target.isSecureTextEntry = true
+        engine.configureForField()
+        for unit in "ខ្ញុំ".unicodeScalars {
+            engine.insertKhmerKeyText(String(unit), source: "key")
+        }
+        tap(.returnKey)
+        XCTAssertEqual(journal.khmerSuggestions, learned)
+    }
+
     private func loadKhmerKeyboard(for field: KeyboardTextTarget) async {
         let autocorrect = AutocorrectEngine(learnedWords: LearnedWordsStore(defaults: defaults))
         engine = FullKeyboardEngine(target: field, autocorrect: autocorrect)
