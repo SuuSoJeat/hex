@@ -140,9 +140,12 @@ After two uses, a word can rank higher in prefix completions, and a word
 pair can rank higher after its first word. Suggestions still require a tap.
 
 Hex counts words you pick from the strip and words you type and finish with
-a space, punctuation, or Return. Joined text teaches word pairs when Hex can
-find an unambiguous dictionary reading. Unknown spellings can be added through
-Custom vocabulary. Pasted text alone and secure fields teach nothing.
+a space, punctuation, or Return. To teach a new spelling, type it twice as a
+separate word. A short unfamiliar spelling can become a personal completion
+and take part in next-word predictions. Joined text teaches word pairs when
+Hex can find an unambiguous reading. Use spaces when entering new words amid
+joined text so Hex can tell where the new word starts and ends. Pasted text
+alone and secure fields teach nothing.
 Only bounded word and pair counts are stored on the iPhone. Turning the
 experiment off pauses learning and restores the usual suggestions.
 When counts exist, **Settings › Privacy › Export Khmer learning data** saves

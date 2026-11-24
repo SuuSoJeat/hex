@@ -7,11 +7,12 @@ extension AutocorrectEngine {
     }
 
     func khmerCorrection(
-        using index: KhmerAutocomplete, beforeInput: String?, substitutionGain: KhmerAutocomplete.SubstitutionGain? = nil
+        using index: KhmerAutocomplete, beforeInput: String?, learnedWords personalWords: [String] = [],
+        substitutionGain: KhmerAutocomplete.SubstitutionGain? = nil
     ) -> KhmerAutocomplete.Correction? {
         guard isEnabled else { return nil }
         return index.correction(
-            beforeInput: beforeInput, personalWords: lexiconTerms, learnedSpellings: learning.typos,
+            beforeInput: beforeInput, personalWords: lexiconTerms + personalWords, learnedSpellings: learning.typos,
             substitutionGain: substitutionGain,
             canCorrect: { typed in
                 let key = typed.lowercased()

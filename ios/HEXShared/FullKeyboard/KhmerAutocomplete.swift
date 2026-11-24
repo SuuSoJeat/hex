@@ -134,8 +134,9 @@ struct KhmerAutocomplete: Sendable {
         text.utf16.last.map(isWordUnit) ?? false
     }
 
-    /// Learn a joined run only when its shortest dictionary reading is unambiguous.
-    func wordsForLearning(in text: String, vocabulary: [String]) -> [String] {
+    /// Learn a joined run when its shortest dictionary reading is unambiguous.
+    /// A short, manually typed run with explicit boundaries can also be a new word.
+    func wordsForLearning(in text: String, vocabulary: [String], allowsNewWord: Bool = false) -> [String] {
         let run = Array(text.utf16)
         guard let first = run.first, Self.beginsWord(first), run.count <= Self.learningRunLimit,
               run.allSatisfy(Self.isWordUnit), Self.hasCompleteClusters(run[...]) else { return [] }
@@ -156,8 +157,8 @@ struct KhmerAutocomplete: Sendable {
                 readings[start] = ([word] + suffix.words, suffix.unique)
             }
         }
-        guard let reading = readings[0], reading.unique else { return [] }
-        return reading.words
+        if let reading = readings[0] { return reading.unique ? reading.words : [] }
+        return allowsNewWord && (2...24).contains(run.count) ? [text] : []
     }
 
     /// A space or zero-width space marks the previous word even after the next word has begun.
