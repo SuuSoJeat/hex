@@ -91,6 +91,11 @@ final class FullKeyboardEngine {
     var khmerSmartRun: KhmerSmartRun?
     var khmerPickedWord: (word: String, caret: KhmerPredictionCaret)?
     var khmerStripCaret: KhmerPredictionCaret?
+    var khmerEnglishSuggestions = false {
+        didSet {
+            if oldValue != khmerEnglishSuggestions, layout.language == .khmer { refreshSuggestions() }
+        }
+    }
     var khmerSpatialSuggestions = false {
         didSet {
             guard oldValue != khmerSpatialSuggestions else { return }

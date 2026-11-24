@@ -185,6 +185,12 @@ extension FullKeyboardEngine {
         words.map { KeyboardSuggestion(displayText: $0, replacement: $0, kind: .khmerPrediction) }
     }
 
+    private func khmerEnglishSuggestion(using index: KhmerAutocomplete, before: String?) -> KeyboardSuggestion? {
+        guard khmerEnglishSuggestions, target.documentIdentifier != nil, let before,
+              let match = index.englishMatch(in: before, personalWords: autocorrect.ownWords) else { return nil }
+        return KeyboardSuggestion(displayText: match.english, replacement: match.english, kind: .khmerEnglish(typed: match.typed))
+    }
+
     func khmerSuggestionChoices(live: Bool = false) -> [KeyboardSuggestion] {
         guard allowsKhmerSuggestions else { return [] }
         let before = live ? textBefore : typingContext
@@ -204,6 +210,7 @@ extension FullKeyboardEngine {
         }
         guard let index = khmerAutocomplete else { return [] }
         let input = prefix ?? before
+        let english = khmerEnglishSuggestion(using: index, before: input)
         if let correction = autocorrect.khmerCorrection(
             using: index, beforeInput: input, substitutionGain: khmerSubstitutionGain(before: before)
         ), target.documentIdentifier != nil || khmerReplacementTail(
@@ -213,10 +220,12 @@ extension FullKeyboardEngine {
                 KeyboardSuggestion(displayText: "“\(correction.typed)”", replacement: correction.typed, kind: .khmerKeepLiteral),
                 KeyboardSuggestion(
                     displayText: correction.replacement, replacement: correction.replacement,
-                    kind: .khmerCorrection(autoReplace: correction.automaticallyApplies)
+                    kind: .khmerCorrection(autoReplace: correction.automaticallyApplies && english == nil)
                 ),
             ]
-            if let word = correction.dictionaryAlternative {
+            if let english {
+                choices.append(english)
+            } else if let word = correction.dictionaryAlternative {
                 choices.append(KeyboardSuggestion(displayText: word, replacement: word, kind: .khmerCorrection(autoReplace: false)))
             } else if correction.typed.utf16.count >= 2, index.expandedWords != nil,
                       let completion = autocorrect.khmerCompletions(using: index, beforeInput: correction.typed).first(where: {
@@ -240,13 +249,21 @@ extension FullKeyboardEngine {
             let remaining = completions.dropFirst(personal.count).filter { !preferred.contains($0.displayText) }
             completions = Array((Array(personal) + contextual + remaining).prefix(3))
         }
+        if let english, case .khmerEnglish(let typed) = english.kind {
+            if index.wordSuffix(in: typed[...], personalWords: autocorrect.ownWords) == typed {
+                completions.insert(
+                    KeyboardSuggestion(displayText: typed, replacement: typed, kind: .khmerKeepLiteral), at: 0
+                )
+            }
+            return Array(completions.prefix(2)) + [english]
+        }
         return completions
     }
 
     /// Khmer chips describe a suffix in joined text. Recheck it against the live caret before editing.
     func acceptKhmerSuggestion(_ suggestion: KeyboardSuggestion) -> Bool {
         switch suggestion.kind {
-        case .khmerCompletion, .khmerPrediction, .khmerKeepLiteral, .khmerCorrection:
+        case .khmerCompletion, .khmerPrediction, .khmerKeepLiteral, .khmerCorrection, .khmerEnglish:
             let caret = khmerPredictionCaret(before: textBefore)
             guard khmerStripCaret == caret, suggestions.contains(suggestion), khmerSuggestionChoices(live: true).contains(suggestion) else {
                 refreshSuggestions()
@@ -258,6 +275,11 @@ extension FullKeyboardEngine {
             } else if suggestion.kind == .khmerKeepLiteral {
                 autocorrect.suppressAndKeep(suggestion.replacement)
                 refreshSuggestions()
+            } else if case .khmerEnglish(let typed) = suggestion.kind {
+                if let before = caret.before, removeKhmerSuffix(typed, from: before) != nil {
+                    forgetTextAroundKeys()
+                    insert(suggestion.replacement, source: "khmer_english")
+                }
             } else {
                 applyKhmerCorrection(ending: "", picked: suggestion.replacement)
             }
@@ -402,8 +424,11 @@ extension FullKeyboardEngine {
     @discardableResult
     func applyKhmerCorrection(ending: String, picked: String? = nil) -> Bool {
         guard allowsKhmerSuggestions, let before = textBefore, before == typingContext,
-              let index = khmerAutocomplete, let suggested = autocorrect.khmerCorrection(
-                using: index, beforeInput: khmerPrefixAfterPick(at: khmerPredictionCaret(before: before)) ?? before,
+              let index = khmerAutocomplete else { return false }
+        let input = khmerPrefixAfterPick(at: khmerPredictionCaret(before: before)) ?? before
+        guard picked != nil || khmerEnglishSuggestion(using: index, before: input) == nil,
+              let suggested = autocorrect.khmerCorrection(
+                using: index, beforeInput: input,
                 substitutionGain: picked == nil ? nil : khmerSubstitutionGain(before: before)
               ) else {
             return false

@@ -159,6 +159,15 @@ Both layouts use the existing **Autocorrect** and **Swipe typing** switches in
   In an identified field, Backspace can take back the last swipe as one word
   according to Hex's existing letter-by-letter deletion setting.
 
+## English suggestions
+
+Turn on **Settings › Experiments › Languages › English suggestions in Khmer**
+to see English spellings for matched loanwords and app names on either layout.
+Typing **ណូត**, **កុំព្យូទ័រ**, or **តេឡេក្រាម** can offer **note**, **computer**,
+or **Telegram**. Tap the suggestion to replace that word without switching
+keyboards, or press Space to keep the Khmer spelling. The bundled list works
+offline and uses at most one suggestion slot.
+
 ## Acceptance examples
 
 | Try this in the Full keyboard | Expected result |

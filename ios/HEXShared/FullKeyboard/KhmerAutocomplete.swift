@@ -133,7 +133,10 @@ struct KhmerAutocomplete: Sendable {
 
     /// The longest known final word that starts at a boundary reached by whole words.
     /// If the run is incomplete or extends beyond the lookback, leave word deletion alone.
-    func wordSuffix(in before: Substring, personalWords: [String] = [], includeExpanded: Bool = true) -> String? {
+    func wordSuffix(
+        in before: Substring, personalWords: [String] = [], includeExpanded: Bool = true,
+        matching: ((String) -> Bool)? = nil
+    ) -> String? {
         let tail = before.utf16.reversed().prefix(Self.contextLength + 1)
         let run = Array(tail.prefix(while: Self.isWordUnit).reversed())
         guard let first = run.first, Self.beginsWord(first),
@@ -143,13 +146,65 @@ struct KhmerAutocomplete: Sendable {
         wordStarts[0] = true
         for start in run.indices where wordStarts[start] {
             let candidate = run[start...]
-            if contains(candidate, personal: personal) || (includeExpanded && isExpandedWord(candidate)) {
+            if let matching {
+                let word = String(decoding: candidate, as: UTF16.self)
+                if matching(word) { return word }
+            } else if contains(candidate, personal: personal) || (includeExpanded && isExpandedWord(candidate)) {
                 return String(decoding: candidate, as: UTF16.self)
             }
             markWordEnds(from: start, in: run, personal: personal, expanded: includeExpanded ? expandedWords : nil,
                          into: &wordStarts)
         }
         return nil
+    }
+
+    /// The experiment's offline list. Each Khmer spelling has one English suggestion.
+    private static let englishSpellings = [
+        "ណូត": "note",
+        "ឆាត": "chat",
+        "លីង": "link",
+        "កូដ": "code",
+        "ស្កេន": "scan",
+        "អេប": "app",
+        "អ៊ីមែល": "email",
+        "អ៊ីម៉ែល": "email",
+        "វ៉ាយហ្វាយ": "Wi-Fi",
+        "វ៉ាយហ្វៃ": "Wi-Fi",
+        "ប៊្លូធូស": "Bluetooth",
+        "អាប់ដេត": "update",
+        "កុំព្យូទ័រ": "computer",
+        "អ៊ីនធឺណិត": "internet",
+        "អ៊ីនធើណែត": "internet",
+        "ម៉ៅស៍": "mouse",
+        "ម៉ូនីទ័រ": "monitor",
+        "កាមេរ៉ា": "camera",
+        "ម៉ៃក្រូហ្វូន": "microphone",
+        "មីក្រូហ្វូន": "microphone",
+        "ស្កេនន័រ": "scanner",
+        "ម៉ាស៊ីនព្រីន": "printer",
+        "វេបខេម": "webcam",
+        "ម៉ូដឹម": "modem",
+        "សូហ្វវែរ": "software",
+        "ហាតវែរ": "hardware",
+        "ហ្វេសប៊ុក": "Facebook",
+        "តេឡេក្រាម": "Telegram",
+        "យូធូប": "YouTube",
+        "ហ្សូម": "Zoom",
+        "ហ្គូហ្គល": "Google",
+        "ជីម៉ែល": "Gmail",
+        "មេសិនជ័រ": "Messenger",
+        "អ៊ីនស្តាក្រាម": "Instagram",
+        "ធីកថុក": "TikTok",
+        "វ៉ាត់ស្អាប់": "WhatsApp",
+        "អិចសែល": "Excel",
+        "ផៅវ័រផយន៍": "PowerPoint",
+    ]
+
+    func englishMatch(in before: String, personalWords: [String]) -> (typed: String, english: String)? {
+        guard let typed = wordSuffix(in: before[...], personalWords: personalWords, matching: {
+            Self.englishSpellings[$0] != nil
+        }), let english = Self.englishSpellings[typed] else { return nil }
+        return (typed, english)
     }
 
     func suggestions(

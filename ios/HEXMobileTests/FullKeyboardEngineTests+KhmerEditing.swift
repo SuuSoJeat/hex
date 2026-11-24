@@ -36,6 +36,58 @@ extension FullKeyboardEngineTests {
         }
     }
 
+    func testKhmerEnglishExperimentOffersOneTapOnlySuggestionOnBothLayouts() async throws {
+        XCTAssertFalse(FullKeyboardSettings(defaults: defaults).khmerEnglishSuggestions)
+        for letters in [KeyboardLetterLayout.khmer, .khmerism] {
+            smartField(language: .khmer)
+            engine.letterLayout = letters
+            target.documentIdentifier = UUID()
+            await engine.khmerAutocompleteLoad?.value
+
+            target.insertText("ណូត")
+            engine.textDidChange()
+            XCTAssertFalse(engine.suggestions.contains { $0.displayText == "note" })
+            engine.khmerEnglishSuggestions = true
+            let note = try XCTUnwrap(engine.suggestions.first { $0.displayText == "note" })
+            XCTAssertEqual(note.kind, .khmerEnglish(typed: "ណូត"))
+            XCTAssertFalse(note.willAutoReplace)
+            tap(.space)
+            XCTAssertEqual(target.text, "ណូត ")
+            engine.acceptSuggestion(note)
+            XCTAssertEqual(target.text, "ណូត ")
+
+            target.insertText("កុំព្យូទ័រ")
+            engine.textDidChange()
+            let computer = try XCTUnwrap(engine.suggestions.first { $0.displayText == "computer" })
+            XCTAssertLessThanOrEqual(engine.suggestions.count, 3)
+            engine.acceptSuggestion(computer)
+            XCTAssertEqual(target.text, "ណូត computer")
+            XCTAssertEqual(engine.layout.language, .khmer)
+        }
+    }
+
+    func testKhmerEnglishExperimentMatchesWholeSpellingsAndRejectsStaleField() async throws {
+        smartField(language: .khmer)
+        target.documentIdentifier = UUID()
+        await engine.khmerAutocompleteLoad?.value
+        engine.khmerEnglishSuggestions = true
+
+        target.insertText("វ៉ាយហ្វ")
+        engine.textDidChange()
+        XCTAssertFalse(engine.suggestions.contains { $0.displayText == "Wi-Fi" })
+        target.insertText("ៃ")
+        engine.textDidChange()
+        let wifi = try XCTUnwrap(engine.suggestions.first { $0.displayText == "Wi-Fi" })
+        target.documentIdentifier = UUID()
+        engine.acceptSuggestion(wifi)
+        XCTAssertEqual(target.text, "វ៉ាយហ្វៃ")
+
+        target.insertText(" តេឡេក្រាម")
+        engine.textDidChange()
+        engine.acceptSuggestion(try XCTUnwrap(engine.suggestions.first { $0.displayText == "Telegram" }))
+        XCTAssertEqual(target.text, "វ៉ាយហ្វៃ Telegram")
+    }
+
     func testKhmerWordPairsAfterJoinedPicksOnBothLayouts() async throws {
         for letters in [KeyboardLetterLayout.khmer, .khmerism] {
             smartField(language: .khmer)

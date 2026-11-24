@@ -80,6 +80,7 @@ struct FullKeyboardSettings {
         static let spatialAutocorrect = "experiments.spatialAutocorrect"
         static let germanSpatialAutocorrect = "experiments.germanSpatialAutocorrect"
         static let koreanKeyboard = KoreanKeyboardExperiment.key
+        static let khmerEnglishSuggestions = "experiments.khmerEnglishSuggestions"
         static let khmerismNoColors = "experiments.khmerismNoColors"
         static let khmerismNoSuperscripts = "experiments.khmerismNoSuperscripts"
         static let keyPopups = "settings.keyboardKeyPopups"
@@ -167,6 +168,11 @@ struct FullKeyboardSettings {
     var koreanKeyboard: Bool {
         get { defaults?.object(forKey: Key.koreanKeyboard) as? Bool ?? false }
         nonmutating set { defaults?.set(newValue, forKey: Key.koreanKeyboard) }
+    }
+
+    var khmerEnglishSuggestions: Bool {
+        get { defaults?.bool(forKey: Key.khmerEnglishSuggestions) ?? false }
+        nonmutating set { defaults?.set(newValue, forKey: Key.khmerEnglishSuggestions) }
     }
 
     /// Settings › Experiments › Khmerism › No colors: use the keyboard theme for every keycap.

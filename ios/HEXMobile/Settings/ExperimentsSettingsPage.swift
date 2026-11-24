@@ -181,6 +181,14 @@ struct ExperimentsSettingsPage: View {
             SettingsDivider()
 
             SettingsToggleRow(
+                title: String(localized: "English suggestions in Khmer"),
+                detail: String(localized: "Tap to insert English spellings for loanwords and app names you type in Khmer"),
+                isOn: keyboardBinding(\.khmerEnglishSuggestions)
+            )
+
+            SettingsDivider()
+
+            SettingsToggleRow(
                 title: String(localized: "Swipe typing in more languages"),
                 detail: String(localized: "French and Polish, and German with German spatial autocorrect"),
                 isOn: keyboardBinding(\.swipeMoreLanguages)
