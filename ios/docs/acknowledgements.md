@@ -76,12 +76,6 @@ The app shows these under Settings › Acknowledgements (`HEXMobile/Acknowledgem
   contributors and describes how Hex adapted each source. The expanded model uses the
   same pinned Khmer Wikipedia snapshot as the smaller model. From the repository root,
   rebuild it with `python3 ios/scripts/count-khmer-word-pairs.py path/to/snapshot.parquet --expanded-dictionary path/to/khmerdict.txt --output ios/HEXKeyboard/TypingModel/km-expanded.hextm`.
-- **Khmer-to-English suggestions.** Hex maintains its own
-  [transliteration lexicon](../HEXKeyboard/TypingModel/km-english-suggestions.tsv).
-  [Wiktionary's Khmer loanword category](https://en.wiktionary.org/wiki/Category:Khmer_terms_borrowed_from_English)
-  and the [Cambodian Ministry of Posts and Telecommunications digital glossary](https://mptc.gov.kh/lexicon/)
-  are references for loanwords and terminology. The lexicon is authored in Hex
-  and includes app names and informal Khmer spelling variants.
 - **Khmerism keyboard layout.** Hex's Khmerism layout builds on the original
   [Khmerism Keyboard Project by Lyheng Phuoy](https://solve.mit.edu/solutions/2452).
   See the [key maps](khmer-keyboards.md#key-maps) for the Hex adaptation.

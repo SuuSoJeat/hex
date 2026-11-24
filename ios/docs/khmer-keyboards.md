@@ -169,14 +169,18 @@ still fits both Microsoft and microphone, so the keyboard waits for more input.
 When an ordinary Khmer completion also fits, it can appear alongside the two
 spellings. Search fields can offer both spellings with autocorrection off.
 
-Matching works offline, including in joined Khmer text. Tapping the English
-choice replaces the matched text before the caret and preserves following
-punctuation. Space keeps what you typed.
+Matching works offline, including in joined Khmer text. For example, tapping
+**computer** after **ម៉ៅស៍កុំព្យូទ័រ** keeps **ម៉ៅស៍** and replaces **កុំព្យូទ័រ**.
+Following punctuation stays in place. Space keeps what you typed.
 
 The [Khmer-to-English transliteration lexicon](../HEXKeyboard/TypingModel/km-english-suggestions.tsv)
 contains app names, Cambodian services, and everyday digital loanwords. Each
 row pairs one Khmer spelling with the English text Hex inserts. Spellings
 that should insert the same text share that English spelling.
+
+Hex maintains this list, including informal Khmer spellings. References for
+loanwords and terminology include [Wiktionary’s Khmer loanword category](https://en.wiktionary.org/wiki/Category:Khmer_terms_borrowed_from_English)
+and the [Cambodian Ministry of Posts and Telecommunications digital glossary](https://mptc.gov.kh/lexicon/).
 
 ## Acceptance examples
 

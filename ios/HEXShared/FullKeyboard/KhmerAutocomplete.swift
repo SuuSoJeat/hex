@@ -73,6 +73,7 @@ struct KhmerAutocomplete: Sendable {
         case ambiguous
     }
     private let englishPrefixes: [String: EnglishPrefix]
+    private let longestEnglishSpelling: Int
 
     static let bundled: KhmerAutocomplete? = {
         var url = Bundle.main.url(forResource: "km-autocomplete", withExtension: "tsv")
@@ -97,7 +98,9 @@ struct KhmerAutocomplete: Sendable {
         englishWordlist: String = ""
     ) {
         self.expandedWords = expandedWords?.language == "km" ? expandedWords : nil
-        englishPrefixes = Self.makeEnglishPrefixes(Self.readEnglishSpellings(englishWordlist))
+        let spellings = Self.readEnglishSpellings(englishWordlist)
+        englishPrefixes = Self.makeEnglishPrefixes(spellings)
+        longestEnglishSpelling = spellings.keys.map { $0.utf16.count }.max() ?? 0
         var entries = wordlist.split(whereSeparator: \.isNewline).compactMap { line -> Entry? in
             let fields = line.split(separator: "\t")
             guard fields.count == 2, let frequency = Int(fields[1]), frequency > 0 else { return nil }
@@ -147,18 +150,20 @@ struct KhmerAutocomplete: Sendable {
     /// Only a suggestion lookup may recover a boundary after the lookback is cut.
     func wordSuffix(
         in before: Substring, personalWords: [String] = [], includeExpanded: Bool = true,
-        matching: ((String) -> Bool)? = nil
+        forEnglishSuggestions: Bool = false
     ) -> String? {
         let run = Self.trailingRun(in: before)
-        guard !run.isEmpty, run.count <= Self.contextLength || matching != nil,
-              Self.hasCompleteClusters(run.suffix(Self.contextLength), allowsTrailingCoeng: matching != nil) else { return nil }
+        guard !run.isEmpty, run.count <= Self.contextLength || forEnglishSuggestions,
+              Self.hasCompleteClusters(run.suffix(Self.contextLength), allowsTrailingCoeng: forEnglishSuggestions) else { return nil }
         let personal = PersonalLexicon(personalWords)
-        var wordStarts = initialWordStarts(in: run, personal: personal)
+        let longestAdditionalWord = max(personal.longestWord, forEnglishSuggestions ? longestEnglishSpelling : 0)
+        var wordStarts = initialWordStarts(in: run, longestAdditionalWord: longestAdditionalWord)
         for start in run.indices where wordStarts[start] {
             let candidate = run[start...]
-            if let matching {
+            if forEnglishSuggestions {
                 let word = String(decoding: candidate, as: UTF16.self)
-                if matching(word) { return word }
+                if englishPrefixes[word] != nil { return word }
+                markEnglishWordEnds(from: start, in: run, into: &wordStarts)
             } else if contains(candidate, personal: personal) || (includeExpanded && isExpandedWord(candidate)) {
                 return String(decoding: candidate, as: UTF16.self)
             }
@@ -211,7 +216,7 @@ struct KhmerAutocomplete: Sendable {
     func englishMatch(in before: String, personalWords: [String]) -> EnglishMatch? {
         // An ambiguous longer spelling still establishes the active suffix. Wait for
         // more letters instead of offering an unrelated English word from inside it.
-        guard let typed = wordSuffix(in: before[...], personalWords: personalWords, matching: { englishPrefixes[$0] != nil }),
+        guard let typed = wordSuffix(in: before[...], personalWords: personalWords, forEnglishSuggestions: true),
               case .unique(let khmer, let english) = englishPrefixes[typed] else { return nil }
         return EnglishMatch(typed: typed, khmer: khmer, english: english)
     }
@@ -227,7 +232,7 @@ struct KhmerAutocomplete: Sendable {
 
         // A connected Khmer run can contain multiple words. Look for the longest active
         // prefix preceded by known words, and allow splits only between Khmer clusters.
-        var wordStarts = initialWordStarts(in: run, personal: personal)
+        var wordStarts = initialWordStarts(in: run, longestAdditionalWord: personal.longestWord)
 
         for start in run.indices where wordStarts[start] {
             let prefix = run[start...]
@@ -429,17 +434,27 @@ struct KhmerAutocomplete: Sendable {
         Array(before.utf16.reversed().prefix(contextLength + 1).prefix(while: isWordUnit).reversed())
     }
 
-    private func initialWordStarts(in run: [UInt16], personal: PersonalLexicon) -> [Bool] {
+    private func initialWordStarts(in run: [UInt16], longestAdditionalWord: Int) -> [Bool] {
         var starts = Array(repeating: false, count: run.count)
         if run.count <= Self.contextLength {
             starts[0] = Self.beginsWord(run[0])
         } else {
             // Unit zero lies just outside the window. Recover near the cut without
             // starting inside a coeng cluster, then require known words up to the caret.
-            let last = min(1 + max(longestWord, personal.longestWord), run.count - 1)
+            let last = min(1 + max(longestWord, longestAdditionalWord), run.count - 1)
             for start in 1...last where Self.isBoundary(start, in: run) { starts[start] = true }
         }
         return starts
+    }
+
+    private func markEnglishWordEnds(from start: Int, in run: [UInt16], into wordStarts: inout [Bool]) {
+        for end in (start + 1)..<run.endIndex {
+            let spelling = String(decoding: run[start..<end], as: UTF16.self)
+            guard let prefix = englishPrefixes[spelling] else { break }
+            if case .unique(let khmer, _) = prefix, khmer == spelling, Self.isBoundary(end, in: run) {
+                wordStarts[end] = true
+            }
+        }
     }
 
     private func markWordEnds(from start: Int, in run: [UInt16], personal: PersonalLexicon,

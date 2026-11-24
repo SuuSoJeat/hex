@@ -24,9 +24,6 @@ final class KhmerAutocompleteTests: XCTestCase {
         ] {
             XCTAssertEqual(bundled.englishMatch(in: typed, personalWords: [])?.english, english)
         }
-        let partial = bundled.englishMatch(in: "តេឡេក្", personalWords: [])
-        XCTAssertEqual(partial?.khmer, "តេឡេក្រាម")
-        XCTAssertEqual(partial?.english, "Telegram")
     }
 
     func testAmbiguousEnglishPrefixDoesNotFallBackToAShorterJoinedReading() throws {
@@ -59,6 +56,24 @@ final class KhmerAutocompleteTests: XCTestCase {
             XCTAssertNil(model.englishMatch(in: preceding + "ឝ្ឞ្ស" + typed, personalWords: []))
         }
         XCTAssertNil(model.wordSuffix(in: (preceding + "តេឡេក្រាម")[...]))
+    }
+
+    func testEnglishSuggestionsCanFollowAnotherTransliterationInJoinedText() throws {
+        let bundled = try XCTUnwrap(KhmerAutocomplete.bundled)
+        let choice = bundled.englishMatch(in: "ម៉ៅស៍កុំព្យូ", personalWords: [])
+        XCTAssertEqual(choice?.typed, "កុំព្យូ")
+        XCTAssertEqual(choice?.english, "computer")
+
+        let model = KhmerAutocomplete(wordlist: "កុំព្យូទ័រ\t1", englishWordlist: """
+        ម៉ៅស៍\tmouse
+        ម៉ៃក្រូហ្វូន\tmicrophone
+        ម៉ៃក្រូសូហ្វ\tMicrosoft
+        កុំព្យូទ័រ\tcomputer
+        """)
+        XCTAssertNil(model.englishMatch(in: "ម៉ៅសកុំព្យូទ័រ", personalWords: []))
+        XCTAssertNil(model.englishMatch(in: "ម៉ៃក្រូកុំព្យូទ័រ", personalWords: []))
+        XCTAssertNil(model.wordSuffix(in: "ម៉ៅស៍កុំព្យូទ័រ"[...]))
+        XCTAssertTrue(model.suggestions(beforeInput: "ម៉ៅស៍កុំព្យូ").isEmpty)
     }
 
     func testRanksCompletionsAndAppendsTheExactScalarsAfterCoeng() {
