@@ -251,6 +251,12 @@ pub struct LabsSettings {
     pub copy_capture_zip: bool,
     /// Meetings offers Import audio…: a local audio file becomes a meeting (macOS).
     pub meeting_import: bool,
+    /// A saved meeting's transcript offers line selection and deletion.
+    pub transcript_edits: bool,
+    /// Meetings stops an offered or by-hand call recording (and a calendar
+    /// reminder's on macOS) 30 s after its call app leaves the microphone, as
+    /// Always record's Stop when the call ends does.
+    pub stop_any_call_recording: bool,
     /// With `labs.annotate_replay` on, keeps a rolling 15 s display buffer via `SCClipBufferingOutput` (macOS 27+).
     pub annotate_replay: bool,
     /// An OpenCode service running in the default WSL distribution is used
@@ -272,6 +278,9 @@ pub struct LabsSettings {
     /// The Vocabulary sheet imports terms from a CSV file and exports the
     /// list as one (Labs › Vocabulary files).
     pub vocabulary_files: bool,
+    /// The menu bar's Vocabulary submenu adds a term or opens the sheet, and
+    /// lists the last five saved terms (macOS; Labs › Vocabulary menu).
+    pub vocabulary_menu: bool,
     /// `hex annotate inspect`, `zoom`, `frames`, and `skill` read a capture
     /// bundle for a coding agent (Labs › Agent tools for captures).
     pub annotate_agent_tools: bool,
@@ -528,6 +537,7 @@ impl Default for LabsSettings {
             drop_transcribe: false,
             paste_last_picker: false,
             vocabulary_files: false,
+            vocabulary_menu: false,
             annotate_agent_tools: false,
             annotate_agent_install: false,
             dictate_while_annotating: false,
@@ -554,6 +564,8 @@ impl Default for LabsSettings {
             screenshots: false,
             copy_capture_zip: false,
             meeting_import: false,
+            transcript_edits: false,
+            stop_any_call_recording: false,
             groups: std::collections::BTreeMap::new(),
             stop_when_call_ends: None,
             meeting_descriptive_filenames: None,
