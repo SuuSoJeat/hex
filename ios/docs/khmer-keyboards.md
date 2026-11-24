@@ -7,6 +7,35 @@ arrangement under **Layout**, with the same editor, suggestion strip and
 language-switching gesture. The default for Khmer is the iPhone-style layout.
 This request concerns typing in the iOS keyboard extension.
 
+![The iPhone-style Khmer layout has a Khmer digit row. Khmerism shows a second character in each key’s corner. Both show ខ្ញុំ, សូម and តើ in the suggestion strip.](images/khmer/layouts.png)
+
+## Reading a Khmerism key
+
+Tap the large character. Hold the key for the small character in its upper-right
+corner. On the top-left key, tap for **ហ** or hold for **១**. Press Shift and
+those two labels trade places for one keystroke.
+
+![The top-left key has ហ in the center and ១ in the corner. After Shift, ១ moves to the center, ហ moves to the corner, and the key turns rose.](images/khmer/tap-hold.png)
+
+**The color follows the character you get on tap.** Khmerism uses **teal** for
+combining vowels and signs, including coeng, and for **។ ៕ ៖ ៗ**. It uses
+**green** for independent vowels such as **ឬ** and **rose** for Khmer digits
+**០–៩**. Consonants and other characters use the keyboard theme. The same
+groups appear in light and dark mode. The iPhone-style layout uses the
+keyboard theme throughout.
+
+![Four Khmerism keys in light and dark mode. The consonant ថ uses the theme color, the combining sign ◌៊ is teal, the independent vowel ឬ is green, and the Khmer digit ១ is rose.](images/khmer/colors.png)
+
+To use Khmerism, choose **ភាសាខ្មែរ** in **Settings › Keyboard › Languages**,
+then choose **Khmerism** under **Layout**. Its appearance controls are in
+**Settings › Experiments › Khmerism**. Both switches default off. **No colors**
+uses the keyboard theme for every key. **No superscripts** hides the corner
+labels. Holding a key still types its alternate.
+
+![The Languages screen offers Khmer and Khmerism. The Experiments screen shows separate No colors and No superscripts switches, both off.](images/khmer/settings.png)
+
+![The same four Khmerism keys with default appearance, No colors, and No superscripts. No colors keeps the corner characters visible. No superscripts keeps the teal keys.](images/khmer/appearance.png)
+
 ## Key maps
 
 Read each line from left to right. The first entry on each layer belongs to the
@@ -76,13 +105,22 @@ Usual key    ◌ោ ◌ែ ◌ិ ◌ី ◌េ ◌្ ◌ា ◌ះ ៗ ◌ុ 
 After coeng  ថ  ធ  ខ  ឃ  ឡ  ផ  ភ  ឆ  ឈ ឋ  ឍ
 ```
 
+![Two crops of the same Khmerism keys. After ស and coeng, the highlighted key offers ថ on tap. Tapping it completes ស្ថ and restores the vowel key with ថ in its corner.](images/khmer/coeng.png)
+
 **123** and **#+=** reuse Hex's English character rows. The number page adds
 **។** and **៕** beside Space. The symbol page adds **។** and **៖**, whose holds
 produce **៙** and **៚** respectively. Space, Return and **កខគ** return to letters.
 Khmerism stays joined on an unfolded keyboard and puts Hex and Globe in the
-strip to make room for its footer. Marks are teal, independent vowels green
-and Khmer digits rose. The **No colors** and **No superscripts** appearance
-options each default off. Hiding corner labels preserves hold-to-type.
+strip to make room for its footer.
+
+<details>
+<summary>See the Shift, number and symbol pages on both layouts</summary>
+
+![Both keyboards with Shift active. Khmer shows its second layer. Khmerism swaps main and corner characters, bringing Khmer digits onto the first two rows.](images/khmer/shift.png)
+
+![The 123 and #+= pages on both layouts. The Khmer layouts return to letters with ក or កខគ. Khmerism keeps two Khmer punctuation keys immediately to the right of Space.](images/khmer/pages.png)
+
+</details>
 
 ## Shared editing behavior
 
@@ -100,6 +138,9 @@ options each default off. Hiding corner labels preserves hold-to-type.
   the local word-pair model. Typing the start of the next word narrows those
   choices. Tapping **សូម**, **អរគុណ**, then **ច្រើន** writes **សូមអរគុណច្រើន**.
   Predictions and completions work with Autocorrect off.
+
+  ![Three successive suggestion strips highlight សូម, then អរគុណ, then ច្រើន. Each choice brings up the next word without a Space tap.](images/khmer/suggestions.png)
+
 - The first Khmer code point uses the smaller model's ranking on both layouts.
   Next-word choices and completions from the second code point can use a
   memory-mapped dictionary with 83,312 words and 404,360 word pairs. Khmer
@@ -111,6 +152,9 @@ options each default off. Hiding corner labels preserves hold-to-type.
   and Sanskrit. The added spellings complete from a prefix and count as valid
   words. Only terms with measured Khmer dictionary frequencies are eligible
   as dictionary spelling repairs. See the [data credits](acknowledgements.md).
+
+  ![After choosing ខ្ញុំ, typing ប offers បាន, បាទ and ប្រាប់. Adding ◌ា changes the middle suggestion to បានឃើញ.](images/khmer/completion.png)
+
 - With Autocorrect on, Space accepts a confident repair and leaves the next word
   joined. A second Space after that repair inserts a literal space. Closing punctuation
   accepts the repair and inserts the typed mark. The double-space punctuation
@@ -145,6 +189,9 @@ Both layouts use the existing **Autocorrect** and **Swipe typing** switches in
   **◌ោះ** respectively. An explicit register shifter goes after the base,
   replacing any prior shifter. A first vowel goes before trailing final signs.
   Address, credential and correction-disabled fields retain literal input.
+
+  ![The two highlighted Khmerism keys are ញ on the top row and ◌ំ beside Space. In an ordinary text field they produce ខ្ញុំ with Autocorrect on and ញំ with it off.](images/khmer/smart-typing.png)
+
 - With **Swipe typing** on, trace one
   word in encoded order, including coeng and vowel signs, on the selected
   layout. Personal words can be swiped too, including a single syllable
@@ -158,6 +205,8 @@ Both layouts use the existing **Autocorrect** and **Swipe typing** switches in
   available, including while VoiceOver is active or the caret follows coeng.
   In an identified field, Backspace can take back the last swipe as one word
   according to Hex's existing letter-by-letter deletion setting.
+
+  ![An illustrated swipe on the Khmerism layout starts at ប, turns at the vowel ◌ា, and ends at ន to trace បាន.](images/khmer/swipe.png)
 
 ## Acceptance examples
 
@@ -173,6 +222,12 @@ Both layouts use the existing **Autocorrect** and **Swipe typing** switches in
 | With Autocorrect on and no learned corrections, type **ចំនុច**. | Tap **ចំណុច** to accept the spelling suggestion. Pressing Space instead keeps **ចំនុច** and inserts a space. |
 | Swipe Backspace left one word at the end of **ខ្ញុំទៅសាលា។** followed by a space. Slide back before lifting. | The field first reads **ខ្ញុំទៅ**, then recovers the exact original text, including punctuation and space. |
 | With swipe enabled, trace **បាន** then **ខ្ញុំ**. With whole-word swipe deletion enabled, press Backspace. | **បានខ្ញុំ** becomes **បាន**. A preceding word survives. |
+
+The keyboard screenshots come from Hex’s interactive preview on iOS 27.2.
+The keys and suggestion strip respond to taps. The preview’s sample text is
+fixed. The smart-typing figure labels the expected field text, and the arrows
+in the swipe figure illustrate the finger movement. The settings screenshots
+show the app on an iPhone SE simulator.
 
 The reference tests exercise key maps, editor behavior with simulated host
 fields, and synthetic swipe paths. Recognition accuracy with Khmer typists on
