@@ -30,13 +30,7 @@ struct PrivacySettingsPage: View {
                     isOn: $learnTyping
                 )
 
-                if learnTyping {
-                    SettingsDivider()
-                    TypingInsightsView()
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 12)
-                }
+                TypingInsightsView(showsInsights: learnTyping)
             }
 
             SettingsSectionHeader(title: "Advanced")

@@ -3,6 +3,19 @@ import XCTest
 @testable import HEX
 
 extension FullKeyboardEngineTests {
+    func testKhmerLearningExportIncludesAllRetainedCounts() throws {
+        var learning = KhmerSuggestionLearning()
+        learning.record("សូម", after: nil)
+        learning.record("អរគុណ", after: "សូម")
+        learning.record("សូម", after: nil)
+
+        let document = try KhmerLearningDocument(learning: learning)
+        let json = try XCTUnwrap(JSONSerialization.jsonObject(with: document.data) as? [String: Any])
+        XCTAssertEqual(Set(json.keys), ["words", "pairs"])
+        XCTAssertEqual(json["words"] as? [String: Int], ["សូម": 2, "អរគុណ": 1])
+        XCTAssertEqual(json["pairs"] as? [String: [String: Int]], ["សូម": ["អរគុណ": 1]])
+    }
+
     func testKhmerPersonalSuggestionsLearnJoinedTypingAndPersistOnBothLayouts() async throws {
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)

@@ -1,12 +1,55 @@
 import SwiftUI
+import UniformTypeIdentifiers
 
-/// What Learn how I type has gathered so far, with a way to erase it.
+/// Learning insights and controls for retained data.
 struct TypingInsightsView: View {
+    let showsInsights: Bool
+
+    @Environment(\.scenePhase) private var scenePhase
     @State private var snapshot = TypingJournalSnapshot()
     @State private var disabledFixes: Set<String> = []
     @State private var confirmingDelete = false
+    @State private var exportDocument: KhmerLearningDocument?
+    @State private var showingExporter = false
+    @State private var exportFailed = false
 
     var body: some View {
+        VStack(spacing: 0) {
+            if showsInsights || !snapshot.khmerSuggestions.isEmpty {
+                SettingsDivider()
+                VStack(alignment: .leading, spacing: 10) {
+                    if showsInsights { insights }
+                    if !snapshot.khmerSuggestions.isEmpty {
+                        Button("Export Khmer learning data", action: export)
+                            .font(.system(size: 13, weight: .medium))
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 12)
+            }
+        }
+        .onAppear(perform: reload)
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .active { reload() }
+        }
+        .fileExporter(
+            isPresented: $showingExporter,
+            document: exportDocument,
+            contentTypes: [.json],
+            defaultFilename: "hex-khmer-learning.json"
+        ) { result in
+            exportDocument = nil
+            if case .failure = result { exportFailed = true }
+        } onCancellation: {
+            exportDocument = nil
+        }
+        .alert("Couldn’t export Khmer learning data", isPresented: $exportFailed) {
+            Button("OK", role: .cancel) {}
+        }
+    }
+
+    private var insights: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text(summary)
                 .font(.system(size: 12))
@@ -69,7 +112,17 @@ struct TypingInsightsView: View {
                 }
             }
         }
-        .onAppear(perform: reload)
+    }
+
+    private func export() {
+        reload()
+        guard !snapshot.khmerSuggestions.isEmpty else { return }
+        do {
+            exportDocument = try KhmerLearningDocument(learning: snapshot.khmerSuggestions)
+            showingExporter = true
+        } catch {
+            exportFailed = true
+        }
     }
 
     private var summary: String {
@@ -181,5 +234,28 @@ struct TypingInsightsView: View {
                 .font(.system(size: 12))
                 .foregroundStyle(HexTheme.textMuted)
         }
+    }
+}
+
+/// The aggregate Khmer counts alone, saved by the system document picker.
+nonisolated struct KhmerLearningDocument: FileDocument {
+    static let readableContentTypes: [UTType] = [.json]
+    let data: Data
+
+    init(learning: KhmerSuggestionLearning) throws {
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        data = try encoder.encode(learning)
+    }
+
+    init(configuration: ReadConfiguration) throws {
+        guard let data = configuration.file.regularFileContents else {
+            throw CocoaError(.fileReadCorruptFile)
+        }
+        self.data = data
+    }
+
+    func fileWrapper(configuration: WriteConfiguration) throws -> FileWrapper {
+        FileWrapper(regularFileWithContents: data)
     }
 }
