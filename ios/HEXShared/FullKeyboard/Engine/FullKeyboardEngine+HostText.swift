@@ -151,6 +151,7 @@ extension FullKeyboardEngine {
     /// host should report.
     func forgetTypingContext() {
         khmerPickedWord = nil
+        khmerTypedRun = nil
         clearKhmerSmartRun()
         clearKhmerSpatialTaps()
         expectedTypingContext = nil
@@ -169,6 +170,7 @@ extension FullKeyboardEngine {
     func settleTypingContext() {
         guard expectedTypingContext != nil, !hostIsBehind else { return }
         if khmerPickedWord != nil { _ = khmerPrefixAfterPick(at: khmerPredictionCaret(before: textBefore)) }
+        alignKhmerTypedRun(before: textBefore)
         expectedTypingContext = nil
     }
 

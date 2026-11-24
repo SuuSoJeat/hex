@@ -9,7 +9,8 @@ import UIKit
 /// per-key averages (where your finger lands relative to each key), so no sequence of letters
 /// is ever stored, and corrections are word-level pairs: a word you erased and retyped,
 /// autocorrect fixes, fixes you undid, suggestions you picked, and words you fixed in a
-/// dictation, with at most a word of context on each side. Nothing leaves the iPhone.
+/// dictation, with at most a word of context on each side. Khmer suggestions can also
+/// keep counts of words and word pairs. Nothing leaves the iPhone.
 struct TypingJournalSettings {
     private enum Key {
         static let enabled = "experiments.typingJournal"
@@ -102,6 +103,7 @@ nonisolated struct TypingJournalSnapshot: Codable, Equatable, Sendable {
 
     var keys: [String: TypingJournalKeyStats] = [:]
     var corrections: [TypingJournalCorrection] = []
+    var khmerSuggestions = KhmerSuggestionLearning()
     /// Word-level (heard → meant) pairs from dictations, with counts.
     var dictationFixes: [TypingJournalDictationFix] = []
     /// What happened to each dictation (kept, edited, …), without its text.
@@ -110,13 +112,13 @@ nonisolated struct TypingJournalSnapshot: Codable, Equatable, Sendable {
     var tapCount: Int { keys.values.reduce(0) { $0 + $1.count } }
 
     var isEmpty: Bool {
-        tapCount == 0 && corrections.isEmpty && dictationFixes.isEmpty && dictationOutcomes.isEmpty
+        tapCount == 0 && corrections.isEmpty && dictationFixes.isEmpty && dictationOutcomes.isEmpty && khmerSuggestions.isEmpty
     }
 }
 
 extension TypingJournalSnapshot {
     private enum CodingKeys: String, CodingKey {
-        case keys, corrections, dictationFixes, dictationOutcomes
+        case keys, corrections, dictationFixes, dictationOutcomes, khmerSuggestions
     }
 
     /// Journals written before dictation learning have only keys and corrections.
@@ -124,6 +126,7 @@ extension TypingJournalSnapshot {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         keys = try container.decodeIfPresent([String: TypingJournalKeyStats].self, forKey: .keys) ?? [:]
         corrections = try container.decodeIfPresent([TypingJournalCorrection].self, forKey: .corrections) ?? []
+        khmerSuggestions = try container.decodeIfPresent(KhmerSuggestionLearning.self, forKey: .khmerSuggestions) ?? .init()
         dictationFixes = try container.decodeIfPresent([TypingJournalDictationFix].self, forKey: .dictationFixes) ?? []
         dictationOutcomes = try container.decodeIfPresent([TypingJournalDictationOutcome].self, forKey: .dictationOutcomes) ?? []
     }
@@ -226,6 +229,21 @@ final class TypingJournal {
         var merged = snapshot
         Self.add(pendingKeys, to: &merged)
         return merged
+    }
+
+    var khmerSuggestions: KhmerSuggestionLearning {
+        refreshFromDisk()
+        return snapshot.khmerSuggestions
+    }
+
+    func recordKhmerWords(_ words: [String], after previous: String?) {
+        refreshFromDisk()
+        var previous = previous
+        for word in words {
+            snapshot.khmerSuggestions.record(word, after: previous)
+            previous = word
+        }
+        save()
     }
 
     /// Typo fixes and rejected autocorrections for the keys, derived once per change.

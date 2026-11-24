@@ -134,6 +134,9 @@ autocorrect count (`TypingJournal.allows`). Nothing leaves the iPhone.
   Typing insights lists these dictation fixes with a switch each and the share of
   dictations kept and edited; Delete what Hex learned erases everything,
   including what a running keyboard still holds.
+- **Personal Khmer suggestions** (Settings › Experiments › Languages, off by default)
+  uses this journal to count completed Khmer words and adjacent pairs on both layouts.
+  See [Personal Khmer suggestions](khmer-keyboards.md#personal-khmer-suggestions).
 - **Per language (Settings › Experiments › Learn each language separately):**
   Off by default (`experiments.learnPerLanguage`, App Group). Every correction and
   dictation fix is tagged with the language it was typed or dictated in either way,

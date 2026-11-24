@@ -132,6 +132,22 @@ The keyboard uses the SIL/Keyman Khmer word-frequency list for common completion
 spelling candidates and swipe vocabulary. Rarer entries from ICU, Google, and
 Wiktionary extend typing suggestions. [Data sources and notices](acknowledgements.md)
 
+## Personal Khmer suggestions
+
+Turn on **Settings › Experiments › Languages › Personal Khmer suggestions**
+on either layout. It is off by default and requires **Learn how I type**.
+After two uses, a word can rank higher in prefix completions, and a word
+pair can rank higher after its first word. Suggestions still require a tap.
+
+Hex counts words you pick from the strip and words you type and finish with
+a space, punctuation, or Return. Joined text teaches word pairs when Hex can
+find an unambiguous dictionary reading. Unknown spellings can be added through
+Custom vocabulary. Pasted text alone and secure fields teach nothing.
+Only bounded word and pair counts are stored on the iPhone. Turning the
+experiment off pauses learning and restores the usual suggestions.
+**Settings › Privacy › Learn how I type › Delete what Hex learned** clears
+the counts.
+
 ## Smart typing and swipe typing
 
 Both layouts use the existing **Autocorrect** and **Swipe typing** switches in

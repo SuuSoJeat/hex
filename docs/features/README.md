@@ -2977,6 +2977,13 @@ iOS prototype (`HEXMobile`) -> Record/transcribe/copy and keyboard handoff
 │   │   An ambiguous prefix waits for more input. Matching also works in long joined Khmer text.
 │   │   Tap to replace the matched text at the caret. Space keeps what you typed.
 │   │   The bundled lexicon covers app names, Cambodian services, and digital loanwords.
+│   ├── Experiments → Languages → Personal Khmer suggestions (off by default)
+│   │   With Learn how I type on, both layouts count completed words and adjacent pairs
+│   │   from typing and suggestion picks. Repeated words can move up in prefix completions,
+│   │   and repeated pairs in next-word predictions. The counts stay on the iPhone and
+│   │   Delete what Hex learned clears them. See ios/docs/khmer-keyboards.md.
+│   │   FullKeyboardEngineTests cover ranking, persistence, reset, both layouts and
+│   │   secure-field exclusion with simulated fields.
 │   ├── Khmerism → hold for corner characters; coeng brings subscript consonants onto the keys
 │   ├── Autocorrect → smart typing; Swipe typing → trace a word (both on by default)
 │   ├── Swipe in emoji search → only the query changes; Backspace on an uncommitted
