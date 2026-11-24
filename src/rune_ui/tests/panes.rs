@@ -1298,6 +1298,14 @@ fn the_explainer_picker_and_shortcut_recording_never_share_the_window() {
         rt.state.is_modal(Modal::Picker),
         "the picker replaces the explainer"
     );
+    picker::close(&mut rt.state);
+    tap(&mut rt, "dictation-hotkey");
+    assert!(matches!(
+        rt.state.capture,
+        settings::Capture::Listening { .. }
+    ));
+    picker::open(&mut rt.state);
+    assert!(matches!(rt.state.capture, settings::Capture::Idle));
     explainer::open(&mut rt.state);
     assert!(
         rt.state.is_modal(Modal::Explainer),
@@ -1655,7 +1663,7 @@ fn recording_starts_and_stops_from_the_header() {
     assert!(rt.find("stop-meeting").is_none(), "finalizing");
 
     let mut rt = runtime("meetings-empty", true, PANE_SIZE);
-    assert!(texts(&rt).iter().any(|text| text == "No meetings yet."));
+    assert!(texts(&rt).iter().any(|text| text == "No meetings yet"));
     tap(&mut rt, "start-meeting");
     assert_eq!(
         asked(&rt),
