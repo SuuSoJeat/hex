@@ -619,6 +619,7 @@ fn rows(ui: &Ui) -> Vec<Row> {
     rows.push(row(Feature::Appearance, Some(&PANEL)));
     if caps.meetings {
         rows.push(row(Feature::LiveChapters, None));
+        rows.push(row(Feature::StopAnyCallRecording, None));
         // macOS's status item lists them, from the meeting controller's own
         // calendar read.
         if cfg!(target_os = "macos") {
@@ -629,8 +630,13 @@ fn rows(ui: &Ui) -> Vec<Row> {
         if Feature::MeetingImport.on_this_os() {
             rows.push(row(Feature::MeetingImport, None));
         }
+        rows.push(row(Feature::TranscriptEdits, None));
     }
     rows.push(row(Feature::VocabularyFiles, Some(&BOOK)));
+    // macOS's menu-bar menu offers it, right under Speech Model.
+    if caps.os == super::platform::Os::Macos {
+        rows.push(row(Feature::VocabularyMenu, None));
+    }
     // macOS reads the focused window through Accessibility as a capture
     // becomes real.
     if caps.os == super::platform::Os::Macos {
@@ -997,6 +1003,7 @@ fn row_key(lab: Lab) -> &'static str {
         Feature::AnnotateAgentInstall => "lab-annotate-agent-install",
         Feature::DictateWhileAnnotating => "lab-dictate-while-annotating",
         Feature::MeetingImport => "lab-meeting-import",
+        Feature::TranscriptEdits => "lab-transcript-edits",
         Feature::OpenCodeInWsl => "lab-opencode-in-wsl",
         Feature::YoloMode => "lab-yolo-mode",
         Feature::ApiProcessing => "lab-api-processing",
@@ -1013,7 +1020,9 @@ fn row_key(lab: Lab) -> &'static str {
         Feature::ModesEditor => "lab-modes-editor",
         Feature::DropTranscribe => "lab-drop-transcribe",
         Feature::VocabularyFiles => "lab-vocabulary-files",
+        Feature::VocabularyMenu => "lab-vocabulary-menu",
         Feature::DictationStyle => "lab-dictation-style",
+        Feature::StopAnyCallRecording => "lab-stop-any-call-recording",
     }
 }
 
