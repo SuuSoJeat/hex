@@ -134,7 +134,7 @@ Wiktionary extend typing suggestions. [Data sources and notices](acknowledgement
 
 ## Personal Khmer suggestions
 
-Turn on **Settings › Experiments › Languages › Personal Khmer suggestions**
+Turn on **Settings › Labs › Languages › Personal Khmer suggestions**
 on either layout. It is off by default and requires **Learn how I type**.
 After two uses, a word can rank higher in prefix completions, and a word
 pair can rank higher after its first word. Suggestions still require a tap.
@@ -190,7 +190,7 @@ Both layouts use the existing **Autocorrect** and **Swipe typing** switches in
 
 ## English suggestions
 
-Turn on **Settings › Experiments › Languages › English suggestions in Khmer**
+Turn on **Settings › Labs › Languages › English suggestions in Khmer**
 to see English spellings for matched loanwords and app names on either layout.
 Type **តេឡេក្** to see both **តេឡេក្រាម** and **Telegram**. A partial spelling
 can qualify as soon as it identifies one English result. For example, **ម៉ៃក្រូ**

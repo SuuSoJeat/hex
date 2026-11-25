@@ -34,7 +34,7 @@ final class FullKeyboardView: UIView {
     var onReturnKey: (() -> Void)?
 
     let stripView = KeyboardStripView()
-    /// The strip's two-thumb selection: the range, then its actions (Settings › Experiments).
+    /// The strip's two-thumb selection: the range, then its actions (Settings › Labs).
     let selectionStrip = TrackpadSelectionStripView()
     /// The keys' touch surface; tests feed it touch samples.
     let plane: KeyboardKeyPlaneView
@@ -110,13 +110,13 @@ final class FullKeyboardView: UIView {
     let clipboard = KeyboardClipboardTracker()
     /// What the strip's Paste chip offers now.
     var stripOffer: KeyboardClipboardOffer?
-    /// Settings › Experiments › Hide word suggestions: the strip keeps its height, chips,
+    /// Settings › Labs › Hide word suggestions: the strip keeps its height, chips,
     /// status and notices but shows no words (`refreshStrip`).
     private var hidesWordSuggestions = false
-    /// Settings › Experiments › Emoji shortcodes, cached by `syncEmojiShortcodes`: the strip
+    /// Settings › Labs › Emoji shortcodes, cached by `syncEmojiShortcodes`: the strip
     /// offers emoji for a ":name" and the closing ":" completes one while it is on.
     private(set) var emojiShortcodesEnabled = false
-    /// Settings › Experiments › Key colors: Automatic keeps iOS's glass; another theme
+    /// Settings › Labs › Key colors: Automatic keeps iOS's glass; another theme
     /// paints the keyboard's own colours. Read again by `syncSettings`, which rebuilds the
     /// palette when it changes.
     private var keyboardTheme = FullKeyboardSettings().effectiveKeyboardTheme
@@ -312,7 +312,7 @@ final class FullKeyboardView: UIView {
 
     // MARK: - Typing logs
 
-    /// Record typing logs (Experiments): set by the keyboard while a session may be logged,
+    /// Record typing logs (Privacy › Advanced): set by the keyboard while a session may be logged,
     /// nil otherwise. The app's fixtures never set it.
     var typingLog: TypingLogger? {
         get { routedTarget.isSearching ? suspendedTypingLog : engine.typingLog }
@@ -554,7 +554,7 @@ final class FullKeyboardView: UIView {
         plane.spaceLabel = languages.spaceLabel ?? dictation ?? khmer
     }
 
-    /// Settings › Experiments › Emoji shortcodes, in the App Group: cached for the strip, and
+    /// Settings › Labs › Emoji shortcodes, in the App Group: cached for the strip, and
     /// the engine's closing ":" hook is set only while it is on, so an off keyboard types a
     /// colon exactly as it did before the experiment.
     private func syncEmojiShortcodes() {
@@ -657,7 +657,7 @@ final class FullKeyboardView: UIView {
 
     /// Settings › Keyboard › Spatial autocorrect (on by default): maps the layout language's
     /// bundled model when the keyboard opens (English, Spanish, French, and German while its experiment
-    /// in Settings › Experiments is on; others keep `UITextChecker`), and moves the keys'
+    /// in Settings › Labs is on; others keep `UITextChecker`), and moves the keys'
     /// centres to where Learn how I type saw you tap. The same word list lets the likely next
     /// letter claim a few points of its neighbour's touch target whether or not Spatial
     /// autocorrect is on (`FullKeyboardEngine.letterOdds`; only while autocorrecting).

@@ -1366,16 +1366,6 @@
         }
       }
     },
-    "Experiments" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "实验"
-          }
-        }
-      }
-    },
     "Failed" : {
       "localizations" : {
         "zh-Hans" : {
@@ -1829,6 +1819,16 @@
         }
       }
     },
+    "Labs" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "实验室"
+          }
+        }
+      }
+    },
     "Learn how I type" : {
       "localizations" : {
         "zh-Hans" : {
@@ -1979,12 +1979,12 @@
         }
       }
     },
-    "Remove from keyboard" : {
+    "Remove a quick-switch language" : {
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "从键盘中移除"
+            "value" : "移除快速切换语言"
           }
         }
       }
@@ -4760,16 +4760,6 @@
         }
       }
     },
-    "Getting ready in the keyboard" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "正在键盘中准备"
-          }
-        }
-      }
-    },
     "Ready in the keyboard" : {
       "localizations" : {
         "zh-Hans" : {
@@ -4796,16 +4786,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "切换到下一个键盘，iOS 会在那里提供你存储的密码"
-          }
-        }
-      }
-    },
-    "The keyboard can't use it right now, so it uses Apple's speech recognition." : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "键盘暂时无法使用它，因此使用 Apple 的语音识别。"
           }
         }
       }
@@ -5300,6 +5280,16 @@
         }
       }
     },
+    "Use mobile data" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "使用蜂窝数据"
+          }
+        }
+      }
+    },
     "The keyboard dictates with the model below. Until it's ready, it uses Apple's speech recognition." : {
       "localizations" : {
         "zh-Hans" : {
@@ -5340,12 +5330,12 @@
         }
       }
     },
-    "25 languages, even mixed in one sentence: %@. A %@ download as soon as you pick it. Hex dictates them with it too." : {
+    "25 languages, even mixed in one sentence: %@. A %@ download on Wi-Fi. Hex dictates them with it too." : {
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "支持 25 种语言，一句话里混着说也行：%1$@。选择后立即下载 %2$@。Hex 自己听写这些语言时也会使用它。"
+            "value" : "支持 25 种语言，一句话里混着说也行：%1$@。连接 Wi-Fi 后下载 %2$@。Hex 自己听写这些语言时也会使用它。"
           }
         }
       }
@@ -6216,6 +6206,66 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "%lld 项替换不写入任何内容，或只写入空格或换行，这台 iPhone 暂时做不到：%@"
+          }
+        }
+      }
+    },
+    "Getting ready in the keyboard. After a download or an update, this takes a little longer." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在键盘中准备。下载或更新后，这一步会久一点。"
+          }
+        }
+      }
+    },
+    "Not enough free memory when the keyboard last opened, so it used Apple's speech recognition. It tries again the next time it opens." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "键盘上次打开时可用内存不足，因此使用了 Apple 的语音识别。下次打开时会再试一次。"
+          }
+        }
+      }
+    },
+    "This iPhone can't run it in the keyboard, so the keyboard uses Apple's speech recognition." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "这台 iPhone 无法在键盘中运行它，因此键盘使用 Apple 的语音识别。"
+          }
+        }
+      }
+    },
+    "The keyboard couldn't load it, so it uses Apple's speech recognition." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "键盘未能载入它，因此使用 Apple 的语音识别。"
+          }
+        }
+      }
+    },
+    "The keyboard couldn't use it when it last opened, so it used Apple's speech recognition. It tries again the next time it opens." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "键盘上次打开时无法使用它，因此使用了 Apple 的语音识别。下次打开时会再试一次。"
+          }
+        }
+      }
+    },
+    "This iPhone's keyboard doesn't have the memory for it, so it uses Apple's speech recognition." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "这台 iPhone 的键盘内存不够运行它，因此使用 Apple 的语音识别。"
           }
         }
       }

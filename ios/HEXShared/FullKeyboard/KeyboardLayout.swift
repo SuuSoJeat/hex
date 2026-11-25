@@ -168,7 +168,7 @@ nonisolated enum KeyboardPosture: Equatable, Sendable {
     }
 
     /// Apple splits its keyboard on the Duo unfolded and held upright (the inner screen wider
-    /// than tall); Hex does too, unless Settings › Experiments › Join the keyboard when
+    /// than tall); Hex does too, unless Settings › Labs › Join the keyboard when
     /// unfolded asks for the joined one. Apple's Split Keyboard preference can't be read.
     var splitsKeyboard: Bool { self == .unfoldedWide }
 
@@ -392,7 +392,7 @@ nonisolated struct KeyboardMetrics: Equatable, Sendable {
     /// `windowInset` is how far iOS set the keyboard in from each side of the screen (the Duo).
     /// `pad` is the iPad keyboard to draw, nil on an iPhone. `numberRow` adds Settings ›
     /// Keyboard › Number row's band above row 1, on an iPhone only (the iPad keeps Apple's rows).
-    /// `joinsUnfoldedKeyboard` is Settings › Experiments › Join the keyboard when unfolded: the
+    /// `joinsUnfoldedKeyboard` is Settings › Labs › Join the keyboard when unfolded: the
     /// Duo unfolded upright draws its joined rows rather than the split keyboard's.
     static func `for`(
         _ orientation: KeyboardOrientation,
@@ -625,13 +625,13 @@ nonisolated struct KeyboardLayout: Equatable, Sendable {
     /// unless it offers the one asked for.
     let letters: KeyboardLetterLayout
     let posture: KeyboardPosture
-    /// Settings › Experiments › Join the keyboard when unfolded: the Duo unfolded upright
+    /// Settings › Labs › Join the keyboard when unfolded: the Duo unfolded upright
     /// draws one keyboard rather than Apple's split one.
     let joinsUnfoldedKeyboard: Bool
-    /// Settings › Experiments › Dvorak punctuation keys. False on every other arrangement,
+    /// Settings › Labs › Dvorak punctuation keys. False on every other arrangement,
     /// and on a docked iPad, so those layouts are the same with the experiment on or off.
     let dvorakPunctuation: Bool
-    /// Settings › Experiments › Comma and period keys: a comma just left of the space bar and a
+    /// Settings › Labs › Comma and period keys: a comma just left of the space bar and a
     /// period just right of it on an iPhone's letters page in a text field. False where the
     /// experiment never draws them (other pages and fields, web search's with its own `.` among
     /// them, an iPad, and Dvorak letters with Dvorak punctuation, which puts them on row 1). True
@@ -955,7 +955,7 @@ nonisolated struct KeyboardLayout: Equatable, Sendable {
         }
     }
 
-    /// `joinedUnfoldedWide` is the Duo unfolded upright with Settings › Experiments › Join the
+    /// `joinedUnfoldedWide` is the Duo unfolded upright with Settings › Labs › Join the
     /// keyboard when unfolded on: its rows keep the split keyboard's 39 pt keycaps, under the
     /// portrait bottom row's columns. `commaPeriodKeys` is already narrowed to the letters page
     /// in a text field on an iPhone.
@@ -977,7 +977,7 @@ nonisolated struct KeyboardLayout: Equatable, Sendable {
         let innerWidth = width - 2 * inset
         let rows = characterRows(for: layer, language: language, letters: letters)
         let dvorak = layer == .letters && letters == .dvorak
-        // Settings › Experiments › Dvorak punctuation: a URL, email or web search field keeps
+        // Settings › Labs › Dvorak punctuation: a URL, email or web search field keeps
         // its own `.` key by the space bar, so its row 1 stays Apple's rather than have a
         // second one.
         let punctuation = dvorak && dvorakPunctuation
@@ -1256,7 +1256,7 @@ nonisolated struct KeyboardLayout: Equatable, Sendable {
             }
         }
 
-        // Settings › Experiments › Comma and period keys: a comma just left of the space bar and
+        // Settings › Labs › Comma and period keys: a comma just left of the space bar and
         // a period just right of it, taking their width from it, where the bar still holds a
         // letter-wide key and a space besides both.
         if commaPeriodKeys { Self.addCommaPeriodKeys(to: &drawn, keyWidth: referenceW, gap: m.gap) }
@@ -1338,7 +1338,7 @@ extension KeyboardLayout {
             : khmerLetters.map { $0.map(\.text) }
         let footerRow = m.keyRowCount - 1
         let modifierRow = footerRow - 1
-        // Settings › Experiments › Dvorak punctuation, as on the joined keyboard: a URL, email or
+        // Settings › Labs › Dvorak punctuation, as on the joined keyboard: a URL, email or
         // web search field keeps its own `.` key, so its row 1 stays Apple's.
         let punctuation = layer == .letters && letters == .dvorak && dvorakPunctuation
         let punctuationRow = punctuation && field == .text
@@ -1452,7 +1452,7 @@ extension KeyboardLayout {
             x += w + G.gap
         }
 
-        // Settings › Experiments › Comma and period keys: a comma just left of the left half's
+        // Settings › Labs › Comma and period keys: a comma just left of the left half's
         // space bar and a period just right of the right half's, taking their width from the
         // bars, where each still holds a letter-wide key and a space besides it.
         if commaPeriodKeys {
