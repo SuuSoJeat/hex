@@ -195,6 +195,19 @@ pub(super) const KEYS: &[Key] = &[
          external keyboard (with labs.second_dictation_shortcut; Linux and Windows need a key); \
          none (the default) turns it off",
     ),
+    optional(
+        "model_switch_hotkey",
+        Kind::Shortcut(HotkeySlot::ModelSwitch),
+        "Labs: the shortcut that swaps dictation to the other speech model and language, \
+         and back (with labs.model_switch_shortcut and model_switch_other); none (the \
+         default) turns it off",
+    ),
+    optional(
+        "model_switch_other",
+        Kind::Json,
+        "Labs: the model and language the model switch shortcut swaps to, as \
+         {\"model\": ..., \"language\": ...}; none (the default) has no other model",
+    ),
     key(
         "extra_dictation_hotkeys",
         Kind::Json,
@@ -467,6 +480,11 @@ pub(super) const KEYS: &[Key] = &[
         "labs.second_dictation_shortcut",
         Kind::Bool,
         "Labs: second_dictation_hotkey dictates like the dictation shortcut",
+    ),
+    key(
+        "labs.model_switch_shortcut",
+        Kind::Bool,
+        "Labs: model_switch_hotkey swaps the dictation model with model_switch_other, and back",
     ),
     key(
         "labs.more_dictation_shortcuts",
@@ -850,6 +868,16 @@ pub(super) const KEYS: &[Key] = &[
          is on; polished by default",
     ),
     key(
+        "labs.meeting_audio_source",
+        Kind::Bool,
+        "Labs: a meeting's computer audio records one app or one output device instead of every output",
+    ),
+    key(
+        "labs.meeting_audio_source_choice",
+        Kind::Json,
+        "Labs: which source labs.meeting_audio_source records, as \"all\", {\"app\":{id,name}}, or {\"output\":{id,name}}; all by default",
+    ),
+    key(
         "meetings.enabled",
         Kind::Bool,
         "Labs: Meetings (beta), call detection, recording, and transcripts",
@@ -887,7 +915,7 @@ pub(super) const KEYS: &[Key] = &[
     optional(
         "meetings.retention",
         Kind::Choice(&["day", "week", "month", "forever"]),
-        "How long finished meetings are kept before they move to the Trash; none keeps new meetings 24 hours and older ones until you choose",
+        "How long finished meetings are kept before they move to the Trash; none keeps new meetings 7 days and older ones until you choose",
     ),
     optional(
         "meetings.audio_retention",

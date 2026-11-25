@@ -49,12 +49,7 @@ pub(super) fn main_panes(ui: &Ui) -> Vec<Pane> {
     }
     panes.push(Pane::History);
     #[cfg(hex_capture)]
-    let optional = [
-        Pane::Captures,
-        Pane::Meetings,
-        Pane::Annotate,
-        Pane::VoiceFilter,
-    ];
+    let optional = [Pane::Meetings, Pane::Annotate, Pane::VoiceFilter];
     #[cfg(not(hex_capture))]
     let optional = [Pane::Meetings, Pane::VoiceFilter];
     panes.extend(optional.into_iter().filter(|pane| pane.shown(ui)));
@@ -709,6 +704,7 @@ fn rows(ui: &Ui) -> Vec<Row> {
     rows.push(row(Feature::Appearance, Some(&PANEL)));
     if caps.meetings {
         rows.push(row(Feature::LiveChapters, None));
+        rows.push(row(Feature::MeetingAudioSource, None));
         rows.push(row(Feature::StopAnyCallRecording, None));
         // macOS's menu bar, capsule, and Meetings pane offer the switch.
         if cfg!(target_os = "macos") {
@@ -746,6 +742,8 @@ fn rows(ui: &Ui) -> Vec<Row> {
     if caps.keyboard_model_switching {
         rows.push(row(Feature::KeyboardModelSwitching, Some(&KEYBOARD)));
     }
+    // One key swaps the dictation model with the other saved one, and back.
+    rows.push(row(Feature::ModelSwitchShortcut, Some(&KEYBOARD)));
     // Every OS's paster can leave a dictation on the clipboard; only macOS's
     // and Windows' can skip the paste.
     rows.push(row(Feature::KeepOnClipboard, None));
@@ -1050,6 +1048,7 @@ fn row_key(lab: Lab) -> &'static str {
         Feature::LearnFromCorrections => "lab-learn-from-corrections",
         Feature::TerminalPaste => "lab-terminal-paste",
         Feature::KeyboardModelSwitching => "lab-keyboard-model-switching",
+        Feature::ModelSwitchShortcut => "lab-model-switch-shortcut",
         Feature::MouseShortcuts => "lab-mouse-shortcuts",
         Feature::PauseBrowser => "lab-pause-browser",
         Feature::ShareShortcut => "lab-share-shortcut",
@@ -1128,6 +1127,7 @@ fn row_key(lab: Lab) -> &'static str {
         Feature::ClipboardPhrase => "lab-clipboard-phrase",
         Feature::MeetingMicrophoneMute => "lab-meeting-microphone-mute",
         Feature::MeetingIndicatorDisplay => "lab-meeting-indicator-display",
+        Feature::MeetingAudioSource => "lab-meeting-audio-source",
     }
 }
 

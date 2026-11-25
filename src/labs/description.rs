@@ -64,6 +64,9 @@ impl Feature {
             Self::NeutralVoice => {
                 "Rewrite dictations in chosen modes into plain, neutral wording on this Mac, so your writing style doesn't show"
             }
+            Self::ModelSwitchShortcut => {
+                "One shortcut that swaps dictation to another model and language (model_switch_other), and back"
+            }
             Self::SecondDictationShortcut => {
                 "Another shortcut that dictates like the main one (second_dictation_hotkey), such as a key on an external keyboard"
             }
@@ -266,6 +269,9 @@ impl Feature {
             }
             Self::MeetingIndicatorDisplay => {
                 "Drag the meeting recording indicator to another display and it stays there, in the corner nearest where you let go. Off, it stays on the primary display (macOS and Windows)"
+            }
+            Self::MeetingAudioSource => {
+                "Record one app or one output device in a meeting instead of all computer audio (labs.meeting_audio_source_choice); a chosen source that isn't playing records silence until it returns"
             }
         }
     }

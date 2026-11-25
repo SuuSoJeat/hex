@@ -2762,6 +2762,10 @@ fn hand_off(how: HandOff, bundle: &Path) -> anyhow::Result<()> {
         // crate's own reads TIS off the main thread. A capture replaces what
         // a dictation watch has in front of it, as another paste would.
         HandOff::Paste => {
+            // macOS 27.3 refuses to post ⌘V without its keystroke grant, so
+            // fail before the clipboard changes instead of after.
+            crate::paste::ensure_keystroke_access()
+                .map_err(|error| anyhow::anyhow!("{error:#}"))?;
             crate::paste::note_paste();
             scrawl_capture::handoff::paste_bundle_with(bundle, &|| {
                 crate::keyboard::post_command('v').map_err(|error| anyhow::anyhow!("{error:#}"))
@@ -4993,7 +4997,19 @@ mod tests {
             cycle: false,
             search: false,
         });
+        let dir = temp_dir("grab-activity");
+        let audio = FakeTimeline::default();
+        let mut host = CaptureHost::with(
+            FakeEngine::new(Arc::new(FakeTranscriber)),
+            Some(dir.clone()),
+        )
+        .unwrap();
         assert!(suggesting() && !wants_escape() && !list_open());
+        assert_eq!(
+            host.shortcut_activity(CaptureInstant::now(), &audio),
+            ShortcutActivity::Capsule,
+            "compact/suggesting capsule claims the capture shortcut"
+        );
         assert!(!capsule_key(CapsuleKey::Escape));
         assert!(capsule_key(CapsuleKey::Press), "a press may fold them");
         assert!(capsule_key(CapsuleKey::Shift(true)), "Shift shows the rule");
@@ -5044,6 +5060,13 @@ mod tests {
         assert!(capsule_key(CapsuleKey::Press));
         // The search lets the capture shortcut through: it records anew.
         assert!(!capsule_key(CapsuleKey::Shortcut));
+        assert_eq!(
+            host.shortcut_activity(CaptureInstant::now(), &audio),
+            ShortcutActivity::Free,
+            "open search list lets the listener record anew"
+        );
+        host.shutdown(&audio);
+        fs::remove_dir_all(dir).ok();
         drop(second);
         assert!(!picking() && !list_open());
         assert!(!capsule_key(CapsuleKey::Escape));

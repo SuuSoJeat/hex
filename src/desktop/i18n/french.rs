@@ -15,6 +15,7 @@ pub(super) fn table() -> &'static HashMap<&'static str, &'static str> {
 
 #[rustfmt::skip]
 const TRANSLATIONS: &[(&str, &str)] = &[
+    ("macOS isn't letting Hex paste. Add Hex in System Settings > Privacy & Security > System & App Protection Override, then restart Hex.", "macOS empêche Hex de coller. Ajoutez Hex dans Réglages Système > Confidentialité et sécurité > Dérogation à la protection du système et des apps, puis relancez Hex."),
     ("Sent to", "Envoyé à"),
     ("Nothing here yet", "Rien ici pour l’instant"),
     ("Dictations, annotations, and captures show here.", "Les dictées, les annotations et les captures apparaissent ici."),
@@ -138,7 +139,6 @@ const TRANSLATIONS: &[(&str, &str)] = &[
     ("The mic opens only while you dictate; the first moment can be clipped", "Le micro ne s'ouvre que pendant la dictée ; le tout début peut être coupé"),
     ("The mic stays ready so dictation starts instantly; your system shows it in use", "Le micro reste prêt pour que la dictée démarre aussitôt ; votre système l'indique comme utilisé"),
     ("Hex can't listen until the speech model has downloaded", "Hex ne peut pas écouter tant que le modèle vocal n'est pas téléchargé"),
-    ("Don't switch", "Ne pas changer"),
     ("Your desktop assigns this key itself, so Hex can't confirm it", "Votre bureau attribue cette touche lui-même, Hex ne peut donc pas la confirmer"),
     ("Not installed", "Non installé"),
     ("Switch model with keyboard language", "Changer de modèle avec la langue du clavier"),
@@ -816,6 +816,7 @@ const TRANSLATIONS: &[(&str, &str)] = &[
     ("Context", "Contexte"),
     ("Current context", "Contexte actuel"),
     ("None", "Aucun"),
+    ("Don't switch", "Ne pas changer"),
     ("Keyboard", "Clavier"),
     ("Browser navigation", "Navigation dans le navigateur"),
     ("Application navigation", "Navigation dans l'application"),

@@ -32,7 +32,9 @@ pub(super) fn merged(
             super::calls::FRENCH,
             super::transcript_edits::FRENCH,
             super::routing::FRENCH,
+            super::meeting_audio_source::FRENCH,
             super::meeting_mute::FRENCH,
+            super::model_switch::FRENCH,
         ],
         Language::Portuguese => &[
             PORTUGUESE,
@@ -46,7 +48,9 @@ pub(super) fn merged(
             super::calls::PORTUGUESE,
             super::transcript_edits::PORTUGUESE,
             super::routing::PORTUGUESE,
+            super::meeting_audio_source::PORTUGUESE,
             super::meeting_mute::PORTUGUESE,
+            super::model_switch::PORTUGUESE,
         ],
         Language::Russian => &[
             RUSSIAN,
@@ -60,7 +64,9 @@ pub(super) fn merged(
             super::calls::RUSSIAN,
             super::transcript_edits::RUSSIAN,
             super::routing::RUSSIAN,
+            super::meeting_audio_source::RUSSIAN,
             super::meeting_mute::RUSSIAN,
+            super::model_switch::RUSSIAN,
         ],
         Language::Hungarian => &[
             HUNGARIAN,
@@ -74,7 +80,9 @@ pub(super) fn merged(
             super::calls::HUNGARIAN,
             super::transcript_edits::HUNGARIAN,
             super::routing::HUNGARIAN,
+            super::meeting_audio_source::HUNGARIAN,
             super::meeting_mute::HUNGARIAN,
+            super::model_switch::HUNGARIAN,
         ],
     };
 

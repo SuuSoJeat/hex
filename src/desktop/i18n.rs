@@ -22,9 +22,11 @@ mod history;
 mod hud_height;
 mod hungarian;
 mod labs;
+mod meeting_audio_source;
 mod meeting_mute;
 mod meetings;
 mod menu;
+mod model_switch;
 pub(crate) mod numbers;
 mod onboarding;
 mod portuguese;
@@ -403,6 +405,7 @@ pub(super) fn all_translations() -> impl Iterator<Item = &'static (&'static str,
         .iter()
         .chain(meetings::TRANSLATIONS)
         .chain(labs::TRANSLATIONS)
+        .chain(meeting_audio_source::TRANSLATIONS)
         .chain(meeting_mute::TRANSLATIONS)
         .chain(style::TRANSLATIONS)
         .chain(signature::TRANSLATIONS)
@@ -779,6 +782,22 @@ mod tests {
             }
         }
         assert!(checked > 300, "only {checked} translated strings found");
+    }
+
+    /// The refused-paste notice is looked up through a constant, not a `tr`
+    /// literal at its call site, so its table entry is checked here.
+    #[test]
+    fn the_refused_paste_notice_has_every_language() {
+        let table: std::collections::HashMap<_, _> = all_translations().copied().collect();
+        let translations = table
+            .get(crate::paste::POST_EVENT_REFUSED)
+            .expect("the refused paste notice is translated");
+        assert!(
+            translations
+                .iter()
+                .all(|translation| !translation.is_empty()),
+            "the refused paste notice is missing a language"
+        );
     }
 
     /// The sound picker translates each set's name and character, which are

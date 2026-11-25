@@ -44,6 +44,9 @@ nonisolated struct KeyboardKey: Equatable, Sendable {
     /// What holding a Khmerism key types on each letter layer.
     var alternate: String?
     var shiftedAlternate: String?
+    /// What pulling the key down types, drawn small above its label: Apple's key flicks on a
+    /// docked iPad (`KeyboardFlicks`); nil elsewhere.
+    var flick: String?
 
     var character: String? {
         if case .character(let text) = kind { return text }
@@ -704,10 +707,22 @@ nonisolated struct KeyboardLayout: Equatable, Sendable {
         )
         if let availableHeight { metrics = metrics.fitted(toHeight: availableHeight) }
         self.metrics = metrics
+        if field.isNumberPad, metrics.pad == nil {
+            padLetterWidth = nil
+            split = nil
+            keys = Self.buildNumberPadKeys(
+                width: width, metrics: metrics, orientation: orientation, posture: posture, phoneSize: phoneSize,
+                decimal: field == .decimalPad, showsGlobe: showsGlobe, inset: self.horizontalInset, hexPlacement: hexPlacement,
+                joinsUnfoldedKeyboard: joinsUnfoldedKeyboard
+            )
+            return
+        }
+        // An iPad's number fields keep the 123 page, as Apple's iPad keyboard does.
+        let rowsField: KeyboardFieldKind = field.isNumberPad ? .text : field
         if metrics.pad?.isDocked == true, language != .khmer {
             padLetterWidth = Self.padLetterWidth(innerWidth: innerWidth, metrics: metrics, layer: layer, language: language, letters: letters)
             self.keys = Self.buildPadKeys(
-                width: width, metrics: metrics, orientation: orientation, layer: layer, field: field,
+                width: width, metrics: metrics, orientation: orientation, layer: layer, field: rowsField,
                 showsGlobe: showsGlobe, showsEmoji: showsEmoji, inset: self.horizontalInset, language: language, letters: letters
             )
             self.split = nil
@@ -719,7 +734,7 @@ nonisolated struct KeyboardLayout: Equatable, Sendable {
                 width: width,
                 metrics: metrics,
                 layer: layer,
-                field: field,
+                field: rowsField,
                 showsGlobe: showsGlobe,
                 showsEmoji: showsEmoji,
                 inset: self.horizontalInset,
@@ -736,7 +751,7 @@ nonisolated struct KeyboardLayout: Equatable, Sendable {
                 width: width,
                 metrics: metrics,
                 layer: layer,
-                field: field,
+                field: rowsField,
                 showsGlobe: showsGlobe,
                 showsEmoji: showsEmoji,
                 inset: self.horizontalInset,

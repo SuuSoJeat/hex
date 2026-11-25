@@ -264,6 +264,13 @@ pub struct LabsSettings {
     /// The meeting recording indicator stays on the display it was dragged
     /// to, instead of only the primary display (macOS and Windows).
     pub meeting_indicator_display: bool,
+    /// A meeting's computer audio records one app or one output device
+    /// instead of every output (every OS; Labs › Choose meeting audio).
+    pub meeting_audio_source: bool,
+    /// Which app or output that is while `meeting_audio_source` is on. A
+    /// malformed saved value is dropped by the settings loader, so this
+    /// reads as all computer audio.
+    pub meeting_audio_source_choice: crate::meeting::audio_source::SourceChoice,
     /// With `labs.annotate_replay` on, keeps a rolling 15 s display buffer via `SCClipBufferingOutput` (macOS 27+).
     pub annotate_replay: bool,
     /// An OpenCode service running in the default WSL distribution is used
@@ -310,6 +317,9 @@ pub struct LabsSettings {
     /// A dictation mode's speech model and language follow the foreground
     /// application (macOS and Windows).
     pub app_model_switching: bool,
+    /// `model_switch_hotkey` swaps the dictation selection with the saved
+    /// other model and language, and back.
+    pub model_switch_shortcut: bool,
     /// The menu bar lists the next calendar meetings, each a local start and
     /// end time and title; choosing one with a call link opens it (macOS,
     /// with Meetings on and a calendar connected).
@@ -561,6 +571,7 @@ impl Default for LabsSettings {
             api_timestamps: false,
             speakers_only: false,
             app_model_switching: false,
+            model_switch_shortcut: false,
             calendar_menu: false,
             calendar_bulk_select: false,
             pause_menu: false,
@@ -586,6 +597,8 @@ impl Default for LabsSettings {
             stop_any_call_recording: false,
             meeting_microphone_mute: false,
             meeting_indicator_display: false,
+            meeting_audio_source: false,
+            meeting_audio_source_choice: crate::meeting::audio_source::SourceChoice::All,
             groups: std::collections::BTreeMap::new(),
             stop_when_call_ends: None,
             meeting_descriptive_filenames: None,

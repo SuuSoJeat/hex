@@ -302,7 +302,15 @@ On Windows                               // capture.windows
     cross-compiling (`cargo xwin clippy`, x86_64 and aarch64); never run on
     a Windows machine
 
-Settings › Annotate                      // capture.pane
+Annotate pane                            // capture.pane
+├── Header switch: `Annotations | Settings` (`Captures | Settings` while Labs ›
+│   Screenshots is on; hidden while both Annotate and Screenshots are off),
+│   matching Meetings' `Recordings | Settings` segmented switch. There is no
+│   separate Captures sidebar item
+│   ├── Annotations / Captures tab -> past annotations (and Screenshots shots /
+│   │   recordings while that Lab is on) from the last 30 days, searchable with
+│   │   Copy, Show in Finder, and two-step Move to Trash (rune_ui::captures)
+│   └── Settings tab ->
 ├── Annotate (capture.enabled, default on) -> off: no host, shortcut,
 │   input, retention, or folder, and the pane shows only the top card. On
 │   (with shortcuts), its second line names the bound shortcut ("Tap ⌥⇧S,
@@ -350,6 +358,10 @@ Settings › Annotate                      // capture.pane
 │   │   windows and a recording capture
 │   └── Replay last 15 s (capture.replay_hotkey, when Labs › Annotate last
 │       15 seconds is on)
+├── macOS menu bar (`macos_rune/status_item.rs`) -> `Annotate` (showing the
+│   saved shortcut, e.g. `⌥⇧S`, or `Stop Annotating` while recording) beside
+│   Paste Last Dictation whenever `capture.enabled` is on and Scrawl.app is not
+│   running; clicking toggles recording just like `hex annotate toggle`
 ├── Scrawl.app running -> "Scrawl is running" card + Use Hex for captures
 │   └── Click -> asks Scrawl to quit (nothing else quits it); Hex takes the
 │       shortcut within 2 s of Scrawl leaving
@@ -614,13 +626,17 @@ The capsule                              // capture.capsule (rune_ui/capture_cap
 │   "Try again" (never offers Paste) and Inspect
 │   ├── Saved with a suggestion (`Route::Guess`, default `list` flow) ->
 │   │   compact bar: `[thumb] Copied  [→ X  ⌄]  ✕` (one unified split-chip fill,
-│   │   no divider; clicking left sends to X at once, `⌄` opens the searchable
-│   │   Send-to list whose footer carries `All rules…` opening Settings › Annotate ›
-│   │   Auto-send rules). Nothing sends until picked; `Shift`-click in the list
-│   │   still saves a rule.
+│   │   no divider; clicking left sends to X at once, `⌄` or pressing the Annotate
+│   │   shortcut again opens the searchable Send-to list whose footer carries
+│   │   `All rules…` opening Settings › Annotate › Auto-send rules). Once search
+│   │   is already open, pressing the shortcut again starts a new recording.
+│   │   Clipboard-only (no sessions) and unreachable capsules never claim the
+│   │   shortcut. Nothing sends until picked; `Shift`-click in the list still
+│   │   saves a rule.
 │   ├── Queued (`RouteDelivery::Queued`) -> `[thumb] Queued  [⏱ X  ⌄]  ✕`
 │   │   naming the target session, with the hover tooltip carrying `why`, and `⌄`
-│   │   opening the Send-to list to redirect or `Cancel send`
+│   │   or pressing the Annotate shortcut again opening the Send-to list to
+│   │   redirect or `Cancel send`
 │   ├── Post-send `Always…` configurator -> on a manual send without an existing
 │   │   rule (`[thumb] Sent to X  [Always…]  [Undo]  ✕`), clicking `Always…`
 │   │   pauses dismiss/countdown and opens an inline popover under the capsule:
@@ -1113,7 +1129,12 @@ Where it goes                            // capture.route; capture.routing's aut
 │   │   stacked rule-type icons + rule count; sheet shows one `Auto-send with Jev`
 │   │   toggle card only when Jev has an active credential (otherwise omitted,
 │   │   leaving Rules + the 3-second Undo hold note), plus CRUD for site/subpath,
-│   │   terminal-folder, and non-general app rules targeting a session or project folder
+│   │   terminal-folder, and non-general app rules targeting a session or project
+│   │   folder. Turning it on sets AutoSend::Confident with jevRouting +
+│   │   smartRouting; turning it off returns autoSend to Rules and clears
+│   │   jevRouting (smartRouting stays: it only weighs evidence locally). The
+│   │   hosted Jev lookup runs only while the switch is on, so a settings file an
+│   │   older build left with jevRouting on and autoSend rules makes no request
 │   ├── Rule -> a saved rule (`routing.sites`, `routing.apps`, `routing.terminals`)
 │   │   or a confident Jev pick when `Auto-send with Jev` (`AutoSend::Confident`)
 │   │   is on: a three-second countdown begins when shown, with `AutoSendBy::Rule`
@@ -1136,9 +1157,10 @@ Where it goes                            // capture.route; capture.routing's aut
 │   │   reason as the row's word ("dev server", "same page", "mentioned"; none
 │   │   for Jev's pick or fallback), then
 │   │   the runners-up and recent sessions; nothing sent until one is picked.
-│   │   The deterministic guess publishes first. Model refinement has one
-│   │   three-second budget including recent messages and credential lookup;
-│   │   a timeout keeps the first guess. A later result cannot override a pick or Undo.
+│   │   The deterministic guess publishes first. With `Auto-send with Jev` on,
+│   │   model refinement has one three-second budget including recent messages and
+│   │   credential lookup; a timeout keeps the first guess. A later result cannot
+│   │   override a pick or Undo.
 │   │   `site` names what a Shift pick (Shift+click, ⇧⏎ in the list,
 │   │   or `send --always`) would save, after which that site's captures are Rules;
 │   │   ⇧⏎ in a Rule's list saves the rule for the session picked instead

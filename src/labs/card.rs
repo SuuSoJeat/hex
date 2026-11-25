@@ -20,6 +20,7 @@ impl Feature {
             Self::LearnFromCorrections => "Learn from corrections",
             Self::TerminalPaste => "Terminal paste",
             Self::KeyboardModelSwitching => "Switch model with keyboard language",
+            Self::ModelSwitchShortcut => "Model switch shortcut",
             Self::MouseShortcuts => "Mouse shortcuts",
             Self::PauseBrowser => "Also pause the browser",
             Self::ShareShortcut => "Share dictation shortcut with other apps",
@@ -98,6 +99,7 @@ impl Feature {
             Self::ClipboardPhrase => "Clipboard phrase",
             Self::MeetingMicrophoneMute => "Mute the microphone while recording",
             Self::MeetingIndicatorDisplay => "Indicator on any display",
+            Self::MeetingAudioSource => "Choose meeting audio",
         }
     }
 
@@ -129,6 +131,9 @@ impl Feature {
             Self::TerminalPaste => "Paste with Ctrl+Shift+V so terminals accept it",
             Self::KeyboardModelSwitching => {
                 "When you switch keyboard language, Hex switches to the speech model you picked for it"
+            }
+            Self::ModelSwitchShortcut => {
+                "One shortcut swaps dictation to another model and language, and pressing it again swaps back"
             }
             Self::MouseShortcuts => "Use a mouse button, such as a side button, as a shortcut",
             Self::PauseBrowser => {
@@ -362,6 +367,9 @@ impl Feature {
             }
             Self::MeetingIndicatorDisplay => {
                 "Drag the meeting recording indicator to another display and it stays there"
+            }
+            Self::MeetingAudioSource => {
+                "Record one app or one output device in meetings instead of all computer audio"
             }
         }
     }

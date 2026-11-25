@@ -2,6 +2,8 @@ package ly.anoma.hex.typing
 
 import android.content.Context
 import java.security.MessageDigest
+import ly.anoma.hex.keyboard.KeyboardHeight
+import ly.anoma.hex.keyboard.KeyColor
 import ly.anoma.hex.speech.Spoken
 
 internal class TypingPreferences(context: Context) {
@@ -58,16 +60,45 @@ internal class TypingPreferences(context: Context) {
     var smartQuotes: Boolean
         get() = prefs.getBoolean(SMART_QUOTES, false)
         set(value) { prefs.edit().putBoolean(SMART_QUOTES, value).apply() }
+    /** Labs › Keyboard › Delete swiped words letter by letter: delete right after a swipe removes one letter
+     * instead of taking the word back, as iPhone Hex's experiment (#2323). Off by default. */
+    var swipeDeleteLetters: Boolean
+        get() = prefs.getBoolean(SWIPE_DELETE_LETTERS, false)
+        set(value) { prefs.edit().putBoolean(SWIPE_DELETE_LETTERS, value).apply() }
+    /** Labs › Keyboard › Adaptive touch: the decoder reads taps with your own key centres once it has learned them
+     * ([AdaptiveTouch], kept by [AdaptiveTouchStore]). Off by default. */
+    var adaptiveTouch: Boolean
+        get() = prefs.getBoolean(ADAPTIVE_TOUCH, false)
+        set(value) { prefs.edit().putBoolean(ADAPTIVE_TOUCH, value).apply() }
     /** Labs › Keyboard › Password manager suggestions: Android's inline autofill suggestions in the
      * strip, off by default. Hex shows the service's own chips and never reads them. */
     var passwordManagerSuggestions: Boolean
         get() = prefs.getBoolean(PASSWORD_MANAGER_SUGGESTIONS, false)
         set(value) { prefs.edit().putBoolean(PASSWORD_MANAGER_SUGGESTIONS, value).apply() }
+    /** Labs › Keyboard › Hex key on the left: the strip's Hex key, ✕ and the recording bar at its left end instead
+     * of its right, for the other hand (#2800). Off by default. */
+    var hexKeyLeft: Boolean
+        get() = prefs.getBoolean(HEX_KEY_LEFT, false)
+        set(value) { prefs.edit().putBoolean(HEX_KEY_LEFT, value).apply() }
     /** Labs › Keyboard › Voice-only mode: a "voice" subtype other keyboards switch to for dictation
      * alone, off by default. */
     var voiceOnly: Boolean
         get() = prefs.getBoolean(VOICE_ONLY, false)
         set(value) { prefs.edit().putBoolean(VOICE_ONLY, value).apply() }
+    /** Settings › Keyboard › Height: Normal until another step is chosen. */
+    var height: KeyboardHeight
+        get() = KeyboardHeight.of(prefs.getString(HEIGHT, null))
+        set(value) { prefs.edit().putString(HEIGHT, value.key).apply() }
+    /** Labs › Keyboard › Key colors: the keys in [keyColor]'s colours, off by default. */
+    var keyColors: Boolean
+        get() = prefs.getBoolean(KEY_COLORS, false)
+        set(value) { prefs.edit().putBoolean(KEY_COLORS, value).apply() }
+    /** Labs › Keyboard › Key colors › Color: Automatic until a theme is chosen; kept while the lab is off. */
+    var keyColor: KeyColor
+        get() = KeyColor.of(prefs.getString(KEY_COLOR, null))
+        set(value) { prefs.edit().putString(KEY_COLOR, value.key).apply() }
+    /** The colours the keys are drawn in: [keyColor] while the lab is on, else Automatic. */
+    val drawnKeyColor get() = if (keyColors) keyColor else KeyColor.Automatic
 
     // Remember only explicit rejection of this exact pair in this language; never save typed text.
     private fun pair(language: String, original: String, replacement: String): String {
@@ -90,7 +121,13 @@ internal class TypingPreferences(context: Context) {
         const val EMOJI_SUGGESTIONS = "emojiSuggestions"
         const val KEYBOARD_TOOLS = "keyboardTools"
         const val SMART_QUOTES = "smartQuotes"
+        const val SWIPE_DELETE_LETTERS = "swipeDeleteLetters"
+        const val ADAPTIVE_TOUCH = "adaptiveTouch"
         const val PASSWORD_MANAGER_SUGGESTIONS = "passwordManagerSuggestions"
         const val VOICE_ONLY = "voiceOnly"
+        const val HEIGHT = "keyboardHeight"
+        const val HEX_KEY_LEFT = "hexKeyLeft"
+        const val KEY_COLORS = "keyColors"
+        const val KEY_COLOR = "keyColor"
     }
 }

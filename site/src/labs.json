@@ -123,6 +123,19 @@
       "title": "Switch model with keyboard language"
     },
     {
+      "added": "2026-11-24",
+      "group": "models",
+      "groupTitle": "Models",
+      "id": "model-switch-shortcut",
+      "oses": [
+        "macos",
+        "windows",
+        "linux"
+      ],
+      "summary": "One shortcut swaps dictation to another model and language, and pressing it again swaps back",
+      "title": "Model switch shortcut"
+    },
+    {
       "added": "2026-10-30",
       "group": "shortcuts",
       "groupTitle": "Shortcuts",
@@ -963,6 +976,19 @@
       ],
       "summary": "Drag the meeting recording indicator to another display and it stays there",
       "title": "Indicator on any display"
+    },
+    {
+      "added": "2026-11-24",
+      "group": "meetings",
+      "groupTitle": "Meetings",
+      "id": "meeting-audio-source",
+      "oses": [
+        "macos",
+        "windows",
+        "linux"
+      ],
+      "summary": "Record one app or one output device in meetings instead of all computer audio",
+      "title": "Choose meeting audio"
     }
   ]
 }

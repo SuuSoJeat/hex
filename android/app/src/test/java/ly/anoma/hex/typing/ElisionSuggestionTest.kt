@@ -1,6 +1,7 @@
 package ly.anoma.hex.typing
 
 import java.io.File
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -155,6 +156,37 @@ class ElisionSuggestionTest {
         assertTrue("dont -> " + w.slots(), "don't" in w.slots())
         w.type(keys, "lheure")
         assertFalse("l'heure" in w.slots())
+    }
+
+    // Contractions with no word of their own without the apostrophe: space puts them in ("itd" read as "its" before).
+    @Test fun englishContractionsWithoutTheirApostrophe() {
+        val keys = layout("en")
+        val w = word("en")
+        for ((typed, fixed) in listOf("itd" to "it'd", "thatd" to "that'd", "whod" to "who'd", "thered" to "there'd",
+                "whatd" to "what'd", "thatll" to "that'll", "therell" to "there'll", "shant" to "shan't")) {
+            w.type(keys, typed)
+            assertEquals(typed, fixed, w.replacement())
+        }
+        // A word of its own keeps its spelling on space; the strip offers the contraction.
+        for ((typed, offered) in listOf("shell" to "she'll", "well" to "we'll", "were" to "we're")) {
+            w.type(keys, typed)
+            assertNull(typed, w.replacement())
+            assertTrue(typed + " -> " + w.slots(), offered in w.slots())
+        }
+    }
+
+    // Keyboard › Autocorrect off: after the pause the strip still offers what space would have put in and the
+    // decoder's near words, never as a fix; the strip shown at once keeps to completions, as before.
+    @Test fun withAutocorrectOffTheStripStillOffersNearWords() {
+        val keys = layout("en")
+        val w = word("en")
+        w.type(keys, "diagnostucs")
+        val off = w.strip(autocorrect = false, nearWords = true)
+        assertTrue(off.toString(), off.none { it.kind == Suggestion.Kind.Fix })
+        assertEquals(listOf("diagnostucs", "diagnostics"), off.map { it.text })
+        assertEquals(listOf("diagnostucs"), w.strip(autocorrect = false).map { it.text })
+        w.type(keys, "dont")
+        assertTrue("don't" in w.strip(autocorrect = false, nearWords = true).map { it.text })
     }
 
     @Test fun aPickedElisionIsLeftAsItIs() {

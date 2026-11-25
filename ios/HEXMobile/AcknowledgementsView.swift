@@ -108,7 +108,7 @@ struct AcknowledgementsView: View {
         Entry(
             title: "Parakeet Ultra",
             body: """
-            Experiments › Multilingual model downloads Parakeet Ultra by Moondream \
+            Settings › Dictation › Model: Multilingual downloads Parakeet Ultra by Moondream \
             (huggingface.co/moondream/parakeet-ultra), a post-training of NVIDIA's Parakeet \
             TDT 0.6B v3 (huggingface.co/nvidia/parakeet-tdt-0.6b-v3), both licensed under \
             Creative Commons Attribution 4.0 International \
