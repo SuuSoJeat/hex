@@ -65,11 +65,26 @@ internal class TypingPreferences(context: Context) {
     var swipeDeleteLetters: Boolean
         get() = prefs.getBoolean(SWIPE_DELETE_LETTERS, false)
         set(value) { prefs.edit().putBoolean(SWIPE_DELETE_LETTERS, value).apply() }
+    /** Labs › Keyboard › SwiftKey words: the words imported from another keyboard's export ([ImportedWords])
+     * join your own words in suggestions. Off by default; the imported list stays on the phone while off. */
+    var importedWords: Boolean
+        get() = prefs.getBoolean(USE_IMPORTED_WORDS, false)
+        set(value) { prefs.edit().putBoolean(USE_IMPORTED_WORDS, value).apply() }
+    /** Labs › Keyboard › Punctuation after autocorrect: a clause mark typed right after an autocorrection or a text
+     * replacement on space takes the space it typed, as one does after a pick (#2813). Off by default. */
+    var marksTakeFixSpace: Boolean
+        get() = prefs.getBoolean(MARKS_TAKE_FIX_SPACE, false)
+        set(value) { prefs.edit().putBoolean(MARKS_TAKE_FIX_SPACE, value).apply() }
     /** Labs › Keyboard › Adaptive touch: the decoder reads taps with your own key centres once it has learned them
      * ([AdaptiveTouch], kept by [AdaptiveTouchStore]). Off by default. */
     var adaptiveTouch: Boolean
         get() = prefs.getBoolean(ADAPTIVE_TOUCH, false)
         set(value) { prefs.edit().putBoolean(ADAPTIVE_TOUCH, value).apply() }
+    /** Labs › Keyboard › Clipboard history: the last texts copied, kept on this phone and offered in the Hex menu
+     * ([ly.anoma.hex.keyboard.ClipboardHistory]). Off by default; off, the clipboard is never read for it. */
+    var clipboardHistory: Boolean
+        get() = prefs.getBoolean(CLIPBOARD_HISTORY, false)
+        set(value) { prefs.edit().putBoolean(CLIPBOARD_HISTORY, value).apply() }
     /** Labs › Keyboard › Password manager suggestions: Android's inline autofill suggestions in the
      * strip, off by default. Hex shows the service's own chips and never reads them. */
     var passwordManagerSuggestions: Boolean
@@ -99,6 +114,10 @@ internal class TypingPreferences(context: Context) {
         set(value) { prefs.edit().putString(KEY_COLOR, value.key).apply() }
     /** The colours the keys are drawn in: [keyColor] while the lab is on, else Automatic. */
     val drawnKeyColor get() = if (keyColors) keyColor else KeyColor.Automatic
+    /** Labs › Keyboard › Test keyboard on Home: the practice field moves from Keyboard to Home (#2801). Off by default. */
+    var testKeyboardOnHome: Boolean
+        get() = prefs.getBoolean(TEST_KEYBOARD_ON_HOME, false)
+        set(value) { prefs.edit().putBoolean(TEST_KEYBOARD_ON_HOME, value).apply() }
 
     // Remember only explicit rejection of this exact pair in this language; never save typed text.
     private fun pair(language: String, original: String, replacement: String): String {
@@ -122,12 +141,20 @@ internal class TypingPreferences(context: Context) {
         const val KEYBOARD_TOOLS = "keyboardTools"
         const val SMART_QUOTES = "smartQuotes"
         const val SWIPE_DELETE_LETTERS = "swipeDeleteLetters"
+        const val MARKS_TAKE_FIX_SPACE = "marksTakeFixSpace"
         const val ADAPTIVE_TOUCH = "adaptiveTouch"
+        const val USE_IMPORTED_WORDS = "importedWords"
+        /** A counter [ImportedWords] bumps whenever the imported list changes, so the keyboard reads it again. */
+        const val IMPORTED_WORDS = "importedWordsRevision"
+        /** How many imported words are kept, saved with them. */
+        const val IMPORTED_WORDS_COUNT = "importedWordsCount"
         const val PASSWORD_MANAGER_SUGGESTIONS = "passwordManagerSuggestions"
+        const val CLIPBOARD_HISTORY = "clipboardHistory"
         const val VOICE_ONLY = "voiceOnly"
         const val HEIGHT = "keyboardHeight"
         const val HEX_KEY_LEFT = "hexKeyLeft"
         const val KEY_COLORS = "keyColors"
         const val KEY_COLOR = "keyColor"
+        const val TEST_KEYBOARD_ON_HOME = "testKeyboardOnHome"
     }
 }

@@ -1,7 +1,6 @@
 package ly.anoma.hex
 
 import android.app.Activity
-import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
@@ -44,6 +43,8 @@ import ly.anoma.hex.diagnostics.DiagnosticsPage
 import ly.anoma.hex.feedback.Feedback
 import ly.anoma.hex.feedback.FeedbackForm
 import ly.anoma.hex.keyboard.KeyColor
+import ly.anoma.hex.keyboard.ClipboardHistory
+import ly.anoma.hex.keyboard.hexClip
 import ly.anoma.hex.keyboard.VoiceOnly
 import ly.anoma.hex.keyboard.KeyboardHeight
 import ly.anoma.hex.speech.*
@@ -51,6 +52,7 @@ import ly.anoma.hex.typing.AdaptiveTouchModel
 import ly.anoma.hex.typing.AdaptiveTouchStore
 import ly.anoma.hex.typing.TypingPreferences
 import ly.anoma.hex.updates.Updates
+import ly.anoma.hex.words.ImportedWordsRows
 import ly.anoma.hex.words.WordReplacementsPage
 import ly.anoma.hex.words.WordsFilePage
 import ly.anoma.hex.words.WordsRows
@@ -93,6 +95,13 @@ internal val KeyboardHeight.label get() = when (this) {
     KeyboardHeight.ExtraTall -> R.string.keyboard_height_extra_tall
 }
 
+/** Faster English dictation's download problem, on its Labs row and the Dictation page's line. */
+private fun fastEnglishProblem(problem: ModelStore.Problem) = when (problem) {
+    ModelStore.Problem.Connection -> R.string.fast_english_no_connection
+    ModelStore.Problem.Space -> R.string.fast_english_no_space
+    ModelStore.Problem.Server -> R.string.fast_english_stopped
+}
+
 /** Licence files the credits name, in the order they appear in assets/licenses. */
 private fun licenceFiles(context: Context) =
     context.assets.list("licenses").orEmpty().filter { it != "credits.txt" }.sorted()
@@ -116,7 +125,7 @@ internal fun HexSettings(setup: Setup, speech: SpeechPreferences, typing: Typing
     // Observe them even while trying the keyboard inside this page.
     var revision by remember { mutableIntStateOf(0) }
     DisposableEffect(context) {
-        val stores = listOf("speech", "typing", AdaptiveTouchStore.FILE).map { context.getSharedPreferences(it, Context.MODE_PRIVATE) }
+        val stores = listOf("speech", "typing", AdaptiveTouchStore.FILE, ModelChoiceStore.FILE).map { context.getSharedPreferences(it, Context.MODE_PRIVATE) }
         val changed = SharedPreferences.OnSharedPreferenceChangeListener { _, _ -> revision++ }
         stores.forEach { it.registerOnSharedPreferenceChangeListener(changed) }
         onDispose { stores.forEach { it.unregisterOnSharedPreferenceChangeListener(changed) } }
@@ -145,6 +154,9 @@ internal fun HexSettings(setup: Setup, speech: SpeechPreferences, typing: Typing
     var vocabularyDraft by remember(imports) { mutableStateOf(speech.vocabularyTerms.joinToString("\n")) }
     val signature = remember(revision) { speech.signature }
     val fastEnglish = remember(revision) { speech.fastEnglish }
+    val pickModel = remember(revision) { speech.pickModel }
+    // Labs › Pick the English model for this phone chose faster English dictation, and nobody turned it off since.
+    val chosenForPhone = remember(revision) { pickModel && !speech.fastEnglishOffByHand && ModelChoiceStore(context).state.decided }
     val learnFixes = remember(revision) { speech.learnFixes }
     val fixStore = remember(context) { DictationFixStore(context) }
     val learnedFixes = remember(revision, learnFixes) { if (learnFixes) fixStore.learned() else emptyList() }
@@ -156,8 +168,10 @@ internal fun HexSettings(setup: Setup, speech: SpeechPreferences, typing: Typing
     var signatureDraft by remember { mutableStateOf(speech.signatureText) }
     val emojiSuggestions = remember(revision) { typing.emojiSuggestions }
     val keyboardTools = remember(revision) { typing.keyboardTools }
+    val clipboardHistory = remember(revision) { typing.clipboardHistory }
     val smartQuotes = remember(revision) { typing.smartQuotes }
     val swipeDeleteLetters = remember(revision) { typing.swipeDeleteLetters }
+    val marksTakeFixSpace = remember(revision) { typing.marksTakeFixSpace }
     val adaptiveTouch = remember(revision) { typing.adaptiveTouch }
     // Labs › Keyboard › Adaptive touch: how far it has learned (labelled taps on one key plane, and whether any reads your
     // own centres), and whether the phone keeps averages, which Reset touch learning removes even with the lab off.
@@ -173,6 +187,7 @@ internal fun HexSettings(setup: Setup, speech: SpeechPreferences, typing: Typing
     var quickDictation by remember { mutableStateOf(QuickDictation.enabled(context)) }
     val keyColors = remember(revision) { typing.keyColors }
     val keyColor = remember(revision) { typing.keyColor }
+    val testOnHome = remember(revision) { typing.testKeyboardOnHome }
     // A hidden field or leaving Labs shows the saved line again, never an unsaved draft.
     LaunchedEffect(page, signature) { if (page != Page.Labs || !signature) signatureDraft = speech.signatureText }
     LaunchedEffect(page, learnFixes) { if (page != Page.Labs || !learnFixes) forgetting = false }
@@ -197,16 +212,21 @@ internal fun HexSettings(setup: Setup, speech: SpeechPreferences, typing: Typing
     // Home's dictation result, painted over in the form's picture of Hex: a transcript never leaves the phone.
     var transcriptCard by remember { mutableStateOf<androidx.compose.ui.geometry.Rect?>(null) }
     var transcriptCut by remember { mutableStateOf(false) }
+    // With Labs › Keyboard › Test keyboard on Home, what was typed there is painted over too.
+    var practiceCard by remember { mutableStateOf<androidx.compose.ui.geometry.Rect?>(null) }
+    var practiceCut by remember { mutableStateOf(false) }
     var capturing by remember { mutableStateOf(false) }
     val cardRadius = with(LocalDensity.current) { 14.dp.toPx() }
     fun sendFeedback() {
         val activity = context as? Activity ?: return
         if (capturing) return
         capturing = true
-        val hide = transcriptCard?.takeIf { transcript.isNotEmpty() }
         // Square when scrolled part out of view, so the cut edge's corners are covered too.
-        Feedback.captureWindow(activity, hide?.let { android.graphics.RectF(it.left, it.top, it.right, it.bottom) },
-            if (transcriptCut) 0f else cardRadius) { picture ->
+        val hide = listOfNotNull(
+            transcriptCard?.takeIf { transcript.isNotEmpty() }?.let { it to transcriptCut },
+            practiceCard?.takeIf { testOnHome && practice.isNotEmpty() }?.let { it to practiceCut },
+        ).map { (r, cut) -> android.graphics.RectF(r.left, r.top, r.right, r.bottom) to if (cut) 0f else cardRadius }
+        Feedback.captureWindow(activity, hide) { picture ->
             capturing = false
             Feedback.start("Home", picture)
             open(Page.Feedback)
@@ -277,13 +297,17 @@ internal fun HexSettings(setup: Setup, speech: SpeechPreferences, typing: Typing
                             Row(Modifier.padding(horizontal = 4.dp)) {
                                 Action(stringResource(if (copied) R.string.home_copied else R.string.home_copy)) {
                                     context.getSystemService(ClipboardManager::class.java)
-                                        ?.setPrimaryClip(ClipData.newPlainText(context.getString(R.string.app_name), transcript))
+                                        ?.setPrimaryClip(hexClip(context.getString(R.string.app_name), transcript))
                                     copied = Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU
                                 }
                                 Action(stringResource(R.string.home_clear), clear)
                             }
                         }
                         if (notice != null) Label(notice, muted = true, size = 14, lines = 3)
+                        if (testOnHome) PracticeCard(practice, Modifier.onGloballyPositioned {
+                            practiceCard = it.boundsInWindow()
+                            practiceCut = practiceCard!!.height < it.size.height - 1 || practiceCard!!.width < it.size.width - 1
+                        }) { practice = it }
                         Updates.HomeCard()
                         Card {
                             listOf(Page.Dictation, Page.Keyboard, Page.Privacy, Page.Labs).forEachIndexed { i, dest ->
@@ -341,9 +365,17 @@ internal fun HexSettings(setup: Setup, speech: SpeechPreferences, typing: Typing
                             Entry(stringResource(R.string.model_title), modelStatus(model), action?.let { stringResource(it) } ?: "",
                                 if (action != null) download else null)
                             // Not while Automatic chooses among several languages: those dictations all use today's model.
-                            if (fastEnglish && english == ModelStore.State.Ready && !listening) {
-                                Rule(); Entry(stringResource(R.string.fast_english_in_use), action = { open(Page.Labs) })
-                            }
+                            // Chosen for this phone (Labs › Pick the English model for this phone), the line says what is
+                            // true now: waiting for Wi-Fi, downloading, stopped, or in use.
+                            val size = ModelStore.english.megabytes
+                            val line = if (!fastEnglish || listening) null else if (chosenForPhone) when (english) {
+                                ModelStore.State.Ready -> stringResource(R.string.fast_english_chosen)
+                                ModelStore.State.WaitingForWifi -> stringResource(R.string.fast_english_chosen_waiting, size)
+                                is ModelStore.State.Loading -> stringResource(R.string.fast_english_chosen_loading, size, english.percent)
+                                is ModelStore.State.Retry -> stringResource(R.string.fast_english_chosen_problem, stringResource(fastEnglishProblem(english.problem)))
+                                ModelStore.State.Available -> null
+                            } else if (english == ModelStore.State.Ready) stringResource(R.string.fast_english_in_use) else null
+                            if (line != null) { Rule(); Entry(line, action = { open(Page.Labs) }, titleLines = 3) }
                         }
                     }
                     Page.Keyboard -> {
@@ -365,23 +397,35 @@ internal fun HexSettings(setup: Setup, speech: SpeechPreferences, typing: Typing
                             Rule(); Toggle(stringResource(R.string.settings_popups), stringResource(R.string.settings_popups_detail), popups) { typing.popups = it }
                             Rule(); Toggle(stringResource(R.string.settings_haptics), stringResource(R.string.settings_haptics_detail), haptics) { typing.haptics = it }
                         }
-                        val ink = colorResource(R.color.ink)
-                        Card {
-                            BasicTextField(value = practice, onValueChange = { practice = it }, maxLines = 4,
-                                modifier = Modifier.fillMaxWidth().padding(16.dp),
-                                textStyle = TextStyle(color = ink, fontFamily = inter, fontSize = 16.sp),
-                                cursorBrush = SolidColor(ink), decorationBox = { field ->
-                                    Box { if (practice.isEmpty()) Label(stringResource(R.string.settings_test_keyboard), muted = true); field() }
-                                })
-                        }
+                        // With Labs › Keyboard › Test keyboard on Home, the field is on Home instead.
+                        if (!testOnHome) PracticeCard(practice) { practice = it }
                     }
                     Page.Privacy -> {
                         // A statement, not rows that look tappable.
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Image(painterResource(R.drawable.ic_lock), null, Modifier.size(15.dp), colorFilter = ColorFilter.tint(colorResource(R.color.ink)))
-                            Spacer(Modifier.width(8.dp)); Label(stringResource(R.string.settings_privacy_line), weight = FontWeight.Medium)
+                        // The promise is never cut short: it wraps, with the lock beside its first line.
+                        Row(verticalAlignment = Alignment.Top) {
+                            Image(painterResource(R.drawable.ic_lock), null, Modifier.padding(top = 3.dp).size(15.dp), colorFilter = ColorFilter.tint(colorResource(R.color.ink)))
+                            Spacer(Modifier.width(8.dp)); Label(stringResource(R.string.settings_privacy_line), weight = FontWeight.Medium, lines = Int.MAX_VALUE)
                         }
                         Label(stringResource(R.string.settings_privacy_detail), muted = true, size = 14, lines = Int.MAX_VALUE)
+                        // What each lab keeps, one row per lab under its own name: rows with no arrow, so they read as a
+                        // list, not as links. The policy, one tap below, keeps the long form.
+                        Label(stringResource(R.string.settings_privacy_labs), muted = true, size = 14, lines = Int.MAX_VALUE)
+                        Card {
+                            listOf(R.string.learn_fixes to R.string.settings_privacy_lab_fixes,
+                                R.string.adaptive_touch to R.string.settings_privacy_lab_touch,
+                                R.string.pick_model to R.string.settings_privacy_lab_model,
+                                R.string.clipboard_history to R.string.settings_privacy_lab_clipboard,
+                                R.string.imported_words to R.string.settings_privacy_lab_words).forEachIndexed { i, (name, keeps) ->
+                                if (i != 0) Rule()
+                                Entry(stringResource(name), stringResource(keeps), titleLines = Int.MAX_VALUE, noteLines = Int.MAX_VALUE)
+                            }
+                        }
+                        Label(stringResource(R.string.settings_privacy_feedback), muted = true, size = 14, lines = Int.MAX_VALUE)
+                        // Hex Preview's update check; Play builds have none.
+                        stringResource(R.string.settings_privacy_updates).takeIf { it.isNotEmpty() }?.let {
+                            Label(it, muted = true, size = 14, lines = Int.MAX_VALUE)
+                        }
                         Card {
                             Entry(stringResource(R.string.settings_privacy_policy), action = { open(Page.Policy) })
                             Rule(); Entry(stringResource(R.string.settings_licences), action = { open(Page.Licences) })
@@ -402,27 +446,43 @@ internal fun HexSettings(setup: Setup, speech: SpeechPreferences, typing: Typing
                                 Toggle(stringResource(R.string.fast_english), stringResource(R.string.fast_english_detail, size),
                                     fastEnglish, noteLines = Int.MAX_VALUE) {
                                     speech.fastEnglish = it
+                                    // Off is the person's choice: Labs › Pick the English model for this phone never turns it
+                                    // on again.
+                                    speech.fastEnglishOffByHand = ModelChoice.offByHandWhenFasterEnglishTurned(it, speech.fastEnglishOffByHand)
                                     // Off stops a download under way and drops its partial file; a finished one stays
                                     // until Delete download.
                                     if (!it && english != ModelStore.State.Ready) ModelStore.english.delete(context)
                                 }
                                 if (fastEnglish) {
                                     Rule()
-                                    // The download starts only on this tap, with its size on the row.
+                                    // The download starts on this tap, with its size on the row, or by itself when Labs › Pick the
+                                    // English model for this phone chose it. Like the first model's, it waits for Wi-Fi on a
+                                    // network that charges for data, unless the person taps Use mobile data.
                                     when (english) {
-                                        // Labs' download starts on the tap, on any network: it never waits for Wi-Fi.
-                                        ModelStore.State.Available, ModelStore.State.WaitingForWifi -> Entry(stringResource(R.string.fast_english_download, size), value = "",
+                                        ModelStore.State.Available -> Entry(stringResource(R.string.fast_english_download, size), value = "",
                                             action = { ModelStore.english.download(context) })
+                                        ModelStore.State.WaitingForWifi -> Entry(stringResource(R.string.fast_english_waiting_wifi, size),
+                                            value = stringResource(R.string.model_use_mobile_data), action = { ModelStore.english.useMobileData(context) }, titleLines = 2)
                                         is ModelStore.State.Loading -> Entry(stringResource(R.string.fast_english_loading, size, english.percent))
-                                        is ModelStore.State.Retry -> Entry(stringResource(when (english.problem) {
-                                            ModelStore.Problem.Connection -> R.string.fast_english_no_connection
-                                            ModelStore.Problem.Space -> R.string.fast_english_no_space
-                                            ModelStore.Problem.Server -> R.string.fast_english_stopped
-                                        }), value = stringResource(R.string.model_try_again), action = { ModelStore.english.download(context) })
+                                        is ModelStore.State.Retry -> Entry(stringResource(fastEnglishProblem(english.problem)),
+                                            value = stringResource(R.string.model_try_again), action = { ModelStore.english.download(context) })
                                         ModelStore.State.Ready -> Entry(stringResource(R.string.fast_english_ready, size),
                                             value = stringResource(R.string.fast_english_delete),
-                                            action = { ModelStore.english.delete(context); speech.fastEnglish = false })
+                                            action = {
+                                                ModelStore.english.delete(context); speech.fastEnglish = false
+                                                speech.fastEnglishOffByHand = ModelChoice.offByHandWhenFasterEnglishTurned(false, speech.fastEnglishOffByHand)
+                                            })
                                     }
+                                }
+                                Rule()
+                                // Labs › Pick the English model for this phone: off, nothing is measured or kept, and turning it
+                                // off deletes its numbers. A setting or download it already made stays, as an ordinary one.
+                                // On is a new request: an earlier by-hand off of faster English dictation no longer holds it.
+                                Toggle(stringResource(R.string.pick_model), stringResource(R.string.pick_model_detail, size),
+                                    pickModel, noteLines = Int.MAX_VALUE) {
+                                    speech.fastEnglishOffByHand = ModelChoice.offByHandWhenLabTurned(it, speech.fastEnglishOffByHand)
+                                    speech.pickModel = it
+                                    if (!it) ModelChoiceStore(context).clear()
                                 }
                                 Rule()
                                 // Labs › Automatic listens for the language: off, Automatic dictates in one language, as before.
@@ -524,6 +584,11 @@ internal fun HexSettings(setup: Setup, speech: SpeechPreferences, typing: Typing
                                 Toggle(stringResource(R.string.swipe_delete_letters), stringResource(R.string.swipe_delete_letters_detail),
                                     swipeDeleteLetters) { typing.swipeDeleteLetters = it }
                                 Rule()
+                                ImportedWordsRows(typing, revision)
+                                Rule()
+                                Toggle(stringResource(R.string.marks_take_fix_space), stringResource(R.string.marks_take_fix_space_detail),
+                                    marksTakeFixSpace) { typing.marksTakeFixSpace = it }
+                                Rule()
                                 // Labs › Keyboard › Adaptive touch: off, the keys read the drawn centres and learn nothing;
                                 // what was learned stays on the phone until Reset touch learning or Delete what Hex learned.
                                 Toggle(stringResource(R.string.adaptive_touch), stringResource(R.string.adaptive_touch_detail),
@@ -550,6 +615,13 @@ internal fun HexSettings(setup: Setup, speech: SpeechPreferences, typing: Typing
                                     }
                                 }
                                 Rule()
+                                // Labs › Keyboard › Clipboard history: off deletes every kept text at once, as its line says.
+                                Toggle(stringResource(R.string.clipboard_history), stringResource(R.string.clipboard_history_detail),
+                                    clipboardHistory, noteLines = Int.MAX_VALUE) {
+                                    typing.clipboardHistory = it
+                                    if (it) ClipboardHistory.begin(context) else ClipboardHistory.deleteAll(context)
+                                }
+                                Rule()
                                 Toggle(stringResource(R.string.password_manager_suggestions),
                                     stringResource(R.string.password_manager_suggestions_detail),
                                     passwordManager) { typing.passwordManagerSuggestions = it }
@@ -569,6 +641,9 @@ internal fun HexSettings(setup: Setup, speech: SpeechPreferences, typing: Typing
                                     Entry(stringResource(R.string.key_color), value = stringResource(keyColor.label),
                                         action = { open(Page.KeyColors) })
                                 }
+                                Rule()
+                                Toggle(stringResource(R.string.test_keyboard_on_home), stringResource(R.string.test_keyboard_on_home_detail),
+                                    testOnHome) { typing.testKeyboardOnHome = it }
                             }
                             // Hex Preview and debug builds only.
                             if (BuildConfig.DIAGNOSTICS) {
@@ -671,17 +746,18 @@ private fun reflow(lines: List<String>) = buildString {
 @Composable internal fun Rule() {
     Spacer(Modifier.fillMaxWidth().padding(start = 16.dp).height(1.dp).background(colorResource(R.color.rule)))
 }
-@Composable private fun RowScope.RowTitle(title: String, note: String?, noteLines: Int = 2) {
+@Composable private fun RowScope.RowTitle(title: String, note: String?, noteLines: Int = 2, titleLines: Int = 1) {
     Column(Modifier.weight(1f)) {
-        Label(title, weight = FontWeight.Medium)
+        Label(title, weight = FontWeight.Medium, lines = titleLines)
         if (note != null) Label(note, size = 13, muted = true, lines = noteLines)
     }
 }
-@Composable internal fun Entry(title: String, note: String? = null, value: String = "›", action: (() -> Unit)? = null) {
+@Composable internal fun Entry(title: String, note: String? = null, value: String = "›", action: (() -> Unit)? = null,
+                               titleLines: Int = 1, noteLines: Int = 2) {
     val click = if (action != null) Modifier.clickable(role = Role.Button, onClick = action) else Modifier
     Row(Modifier.fillMaxWidth().then(click).heightIn(min = 52.dp).padding(horizontal = 16.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-        RowTitle(title, note)
+        RowTitle(title, note, noteLines, titleLines)
         if (action != null && value.isNotEmpty()) Label(value, muted = true, size = if (value == "›") 22 else 15)
     }
 }
@@ -695,5 +771,19 @@ private fun reflow(lines: List<String>) = buildString {
             .padding(3.dp), contentAlignment = if (on) Alignment.CenterEnd else Alignment.CenterStart) {
             Spacer(Modifier.size(17.dp).background(colorResource(if (on) R.color.page else R.color.key), RoundedCornerShape(50)))
         }
+    }
+}
+
+/** The Test keyboard… field: Keyboard's practice field, or Home's with Labs › Keyboard › Test keyboard on Home. */
+@Composable
+private fun PracticeCard(practice: String, mod: Modifier = Modifier, change: (String) -> Unit) {
+    val ink = colorResource(R.color.ink)
+    Card(mod) {
+        BasicTextField(value = practice, onValueChange = change, maxLines = 4,
+            modifier = Modifier.fillMaxWidth().padding(16.dp),
+            textStyle = TextStyle(color = ink, fontFamily = inter, fontSize = 16.sp),
+            cursorBrush = SolidColor(ink), decorationBox = { field ->
+                Box { if (practice.isEmpty()) Label(stringResource(R.string.settings_test_keyboard), muted = true); field() }
+            })
     }
 }

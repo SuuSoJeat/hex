@@ -116,6 +116,7 @@ Download Hex                              // setup.download-recovery
 Install on Windows                        // setup.windows-installer
 ├── Setup.exe, per user, no admin -> managed versions\<version>\hex.exe
 │   ├── x64 without a Vulkan 1.2 driver -> installs; speech on the CPU + Settings note (#1240)
+│   ├── OBS Studio installed -> Hex skips OBS's Vulkan hook, so OBS updates while Hex runs (#2818)
 │   ├── another version installed (e.g. self-updated) -> install this one over it
 │   ├── the setup engine is signed -> Smart App Control runs the copy extracted to %TEMP%
 │   │   (unsigned, it blocks setup: "Unable to execute file in the temporary directory", error 4551)
@@ -929,6 +930,18 @@ Labs > Caps Lock dictation (macOS, off)   // labs.md
      Lock capture; the normal shortcut stands down while one runs; off or
      quit clears the light and restores Caps Lock
 
+Labs > Middle mouse dictation (macOS, off)   // labs.md; issue 2838
+  -> holding the middle button 500 ms starts a hands-free capture; the next
+     long press finishes it; shorter clicks do nothing
+  -> a middle-button drag past a few points (panning, autoscroll) is the
+     app's and never toggles dictation
+  -> every middle click still reaches the app; a middle button bound as a
+     shortcut is left to that shortcut
+  -> the dictation shortcut can finish a mouse-started capture, and a long
+     press finishes one the shortcut locked, keeping its output settings
+  -> Escape cancels any hands-free capture in every mode and stays out of the
+     app; off, the usual cancel rules apply
+
 Labs > Free memory when idle (off; 5/15/30/60 min, default 15)   // labs.md; transcription/engine
   -> nothing used the model that long and nothing records -> the model unloads
   -> next press, meeting chunk, or API request -> reloads first; audio waits, nothing lost
@@ -1172,7 +1185,10 @@ Pause media + Also pause the browser     // browser_media
 ├── No browser process has its audio output open -> leave it alone (no tap)
 ├── Listen to those processes' own output (private process tap), 3 windows of 100 ms
 │   └── Any window at or below -60 dBFS, or no level -> leave it alone
-├── Send the system pause command (MediaRemote 1; never the toggle)
+├── Send pause (MediaRemote 1; never the toggle) to each browser with open output, by bundle ID
+│   ├── Not the Now Playing app: that is whichever app started last, often a player Hex resumed (#2825)
+│   ├── This macOS cannot send by name, or the playing browsers cannot be listed -> the system pause command
+│   └── No browser took it by name (an error, no answer in 500 ms, or no handler status 0) -> the system pause command
 ├── Poll 5 windows of 100 ms
 │   ├── 2 windows in a row below -90 dBFS -> Hex paused it
 │   └── Otherwise (another tab, a sound that ended later, or the pause went elsewhere) -> no play later
@@ -1181,7 +1197,7 @@ Pause media + Also pause the browser     // browser_media
     ├── No level, a browser runs and every one has closed its output -> still paused: play
     │   (a pause longer than about 10 s closes the output; a tap on it delivers nothing)
     ├── No level otherwise (browser quit, tap failed) -> no play
-    └── Otherwise -> send the system play command (MediaRemote 0), then poll 20 windows of 100 ms
+    └── Otherwise -> send play (MediaRemote 0) only to the browsers Hex paused (the system play only when this macOS cannot send by name or none was recorded; a play no browser took by name goes nowhere), then poll 20 windows of 100 ms
         ├── A window above -60 dBFS -> resumed
         ├── No level before the first level (the output is opening again) -> keep polling
         ├── No level after a level -> stop listening
@@ -1485,6 +1501,16 @@ rewrite and pastes after corrections as heard; transformations still run.
 Check: `numbers_only_transcripts_skip_the_rewrite` in
 [dictation/processor.rs](../../src/dictation/processor.rs). The prompt rules
 were not run against a live model.
+
+**Fixed November 25, 2026 (issue 2849):** a rewrite whose mode names a model
+that OpenCode answers "Model not found" for, as it can while that provider is
+still loading at startup, waits briefly and asks once more within the same
+deadline, as "Model unavailable" already did; a second failure still pastes
+the corrected transcript. A rewrite naming no model is not retried on it.
+Check: `a_chosen_model_not_found_at_startup_is_retried_once` and
+`only_model_unavailability_is_retried` in
+[dictation/processor.rs](../../src/dictation/processor.rs); not run against a
+live OpenCode startup.
 
 Built-in text transformations run natively. Custom transformations come from
 `~/.config/hex/hex.config.ts` and run in Hex's embedded script engine, each
@@ -3526,6 +3552,16 @@ Android keyboard -> English, Spanish, German, Bokmål, French and Italian typing
     than the next reading, and what's left is ordinary text. Held, Delete repeats letter by letter
     from the first; its slide still selects whole words. Off, Delete takes the word back as before
     (`SwipeText.takesBack`).
+├── Labs > Keyboard > Punctuation after autocorrect (off, #2813) -> a clause mark (, . ! ? ; : ))
+    typed right after an autocorrection on space, or one of your text replacements on space, takes
+    the space it typed ("keyboadr", space, "." -> "keyboard."), as one already did after a picked
+    suggestion (`KeyboardEngine.fixedAnchor`, `SpaceRules.takesPickedSpace`, read through
+    `TypingPreferences.marksTakeFixSpace`). A space you typed after a word left as it was keeps the
+    mark apart, and any other key, Delete or a cursor move in between cancels it. Off, the anchor is
+    never set, so a mark after an autocorrection goes after its space as before ("keyboard ."). Picks
+    already took their space, and swipes never type one after the word. Checks: none automated (no
+    test drives `KeyboardEngine`'s typing); it was not compiled here (no Android SDK) and nothing was
+    tried on a device or emulator. The repo has no Android CI.
 ├── Labs > Keyboard > Adaptive touch (off) -> iPhone Hex's experiment (#2146) on Android: the keyboard
     learns where you land on each letter key, on this phone, and the decoder reads your taps with
     those centres once it has 400 labelled taps over three sessions and they fit your recent taps
@@ -3557,6 +3593,27 @@ Android keyboard -> English, Spanish, German, Bokmål, French and Italian typing
     table was seeded through run-as as the unit tests seed it. With it on, English, French and
     Portuguese text typed off the centres came out as with it off. Not tried on a real device; the
     time per letter is not yet measured.
+├── Labs > Keyboard > SwiftKey words (off) -> #2802: Import words... (`ACTION_OPEN_DOCUMENT`, `*/*`,
+    read on a background thread, at most 16 MiB) takes SwiftKey's data portal export (View data >
+    Export all: the ZIP, whose `services/sync_words.json` is `{"terms": [...]}`, or that JSON alone)
+    or any plain list of words, whose other columns (counts) drop out. A ZIP's other entries, and a
+    ZIP inside one, give no words. Only
+    single words are kept (letters and apostrophes, 2 to 32 letters, ’ made '), so numbers, links,
+    addresses and phrases are left out. They merge into Hex's own list (`typing/ImportedWords.kt`,
+    `imported-words.txt` in the app's files, at most 50,000): what is there stays, each word is kept
+    once whatever its case (a lowercase spelling preferred among the new ones), the same file twice
+    adds nothing, and the row says how many new words were added, how many were already there and
+    how many a full list left out. With the toggle on the keyboard reads them after Android's
+    personal dictionary (every layout, each keeping only the words in its alphabet, and none the
+    layout's model already has), so they complete, swipe and are read from taps as your own words
+    are; an import or the toggle reads them again at once. Remove imported words (confirmed) shows
+    while any are kept, toggle on or off. Off, the keyboard reads the personal dictionary alone, as
+    before. Checks: `ImportedWordsTest` (android/app/src/test) covers the JSON, ZIP and plain
+    lists, a ZIP inside the export, the merge, a 10,043-word list, the limit and the model's words.
+    The count Settings shows is saved with the list (`importedWordsCount` in the `typing` prefs), so
+    it never reads the list. `./gradlew --no-daemon :app:testDebugUnitTest -x prepareSpeechModel`
+    passed 331 tests, `ImportedWordsTest`'s 9 among them, on 2026-11-25 (Temurin JDK 21, Android SDK
+    36). Not tried on a device or emulator, and not tried with a real SwiftKey export.
 ├── Labs > Keyboard > Password manager suggestions (off) -> while Android's autofill service —
     Bitwarden, 1Password or Google Password Manager, which must itself support Android 11's inline
     suggestions — offers logins, one-time codes or cards for the focused field, its own chips take
@@ -3599,6 +3656,13 @@ Android keyboard -> English, Spanish, German, Bokmål, French and Italian typing
     build-tools 36.0.0, NDK 27.2.12479018); `VoiceOnlyTest` covers the bar-or-keyboard and restart
     decisions, `python3 scripts/code-shape.py --check` and `git diff --check` pass, and the repo has
     no Android CI; nothing was tried on a device or emulator.
+├── Labs > Keyboard > Test keyboard on Home (off, #2801) -> Keyboard's Test keyboard… field moves to
+    Home, below the Dictate bar and its result, so tapping it brings up the Hex keyboard there with
+    the current settings; the Keyboard page no longer shows it while the lab is on. Both places share
+    one field's text for the session. Home's Send feedback picture paints that field over too while
+    it holds text, as it does the dictation result. Off, Home and Keyboard are exactly as before.
+    Checks: none run; no Android SDK was available, so it is not compiled, and nothing was tried on
+    a device or emulator.
 ├── Dictation > Custom vocabulary (off) > Word replacements and Words file -> the Android side of
 │   Hex words files (`.hexwords`, [docs/specs/hex-words.md](../specs/hex-words.md)). Everything sits
 │   behind the existing Custom vocabulary switch: off, dictation, Settings and the keyboard are as
@@ -3659,6 +3723,31 @@ Android keyboard -> English, Spanish, German, Bokmål, French and Italian typing
 │   alternating, 20 of 20 in their own language, one process, no crash; ✕ while recording and while
 │   transcribing left the field empty; custom vocabulary "stadium" on a 1.6 s clip was decoded again
 │   without it and stayed English. All voices are synthetic.
+├── Labs > Dictation > Pick the English model for this phone (off, L135) -> Hex times English
+│   dictations on the standard model and chooses faster English dictation where they are slow.
+│   It measures only while faster English dictation is off, with the dictation's own durations
+│   (`MicCapture` hands them to `Recognizer.timed`): a dictation that went in and would go to the
+│   faster model were it on (English, not translated, Automatic with one candidate), with at least
+│   6 s kept, the model loaded before ✓ (already loaded, or loaded while the person spoke) and no
+│   second decode without the custom words, counts its decode's wall time per second kept. Once the
+│   median of the last 5 is at least 0.5 and the last 20 dictations would all have gone English,
+│   `ModelChoice.after` records the choice and its date, once. The keyboard only records: the next
+│   time Hex opens (`MainActivity.onResume`, `ModelChoice.whenOpened`) it turns faster English
+│   dictation on and starts its 135 MB download, which, like the first model's, waits for Wi-Fi on a
+│   metered network (a hand tap too: "135 MB. Starts by itself on Wi-Fi." with Use mobile data).
+│   Dictation's speech model card says what is true: waiting, downloading with its percentage,
+│   stopped, or "English uses faster dictation, chosen for this phone." Turning faster English
+│   dictation off by hand, or Delete download, sets `fastEnglishOffByHand`, and the rule never turns
+│   it on again; turning the lab on, a new request, clears an earlier one. Kept: the private `modelChoice` preferences (last 5 ratios, English dictations in
+│   a row up to 20, counts by reason, the choice's date and median); turning the lab off deletes the
+│   file and leaves a setting or download it made. Diagnostics' "Model choice:" line gives the
+│   median and the ratios it is taken over, the threshold, the decision and date, "N of 20 English dictations
+│   in a row", and the counts not counted by reason. Debug builds only: `setprop
+│   log.tag.HexDecodeScale DEBUG` (×10) or `VERBOSE` (×0.5) scales the measured time; the minified
+│   release and preview dex don't contain the tag. Checks: `ModelChoiceTest` in SignatureTest.kt
+│   (20 tests: the OnePlus 12's two reports, the OnePlus 13's range and the emulator's speed as
+│   dictation sequences, each thing it must never do); emulator results are in
+│   the pull request.
 └── Labs > Dictation > Learn from my fixes (off) -> an Android-only port of iPhone Hex's dictation
     correction learning, with no typing side. Off, the keyboard tracks nothing, applies nothing and
     adds no hints. On, each keyboard dictation in a non-secure words field that the field lets Hex
