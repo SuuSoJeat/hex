@@ -31,7 +31,7 @@ final class FullKeyboardEngine {
     var shift = ShiftStateMachine()
     var layerState = KeyboardLayerState()
     private(set) var field: KeyboardFieldKind = .text
-    private(set) var touches: [Int: ActiveTouch] = [:]
+    var touches: [Int: ActiveTouch] = [:]
     /// Touch ids in the order they went down.
     private var touchOrder: [Int] = []
     var lastSpaceAt: TimeInterval?
@@ -292,7 +292,7 @@ final class FullKeyboardEngine {
     /// The balloon for the newest character held, including the corner character if it typed
     /// on hold. A 123, #+= or shift slide previews its target. An accent menu hides the balloon.
     var keyPreview: (key: KeyboardKey, label: String)? {
-        guard activeAccentMenu == nil else { return nil }
+        guard activeAccentMenu == nil, !layout.isNumberPad else { return nil }
         for id in touchOrder.reversed() {
             guard let touch = touches[id] else { continue }
             if let slid = touch.slideKey { return (slid, displayLabel(for: slid)) }
@@ -310,13 +310,9 @@ final class FullKeyboardEngine {
 
     /// Call when the keyboard appears or the field changes.
     func configureForField() {
-        switch KeyboardFieldRouting.route(for: target.keyboardType) {
-        case .keys(let kind, let initialLayer):
+        if case .keys(let kind, let initialLayer) = KeyboardFieldRouting.route(for: target.keyboardType) {
             field = kind
             layerState.reset(to: initialLayer)
-        case .handOff:
-            field = .text
-            layerState.reset(to: .numbers)
         }
         shift.reset()
         korean.reset()
@@ -557,7 +553,7 @@ final class FullKeyboardEngine {
                 commitAccentSelection(menu.selectedOption)
                 activeAccentMenu = nil
                 activeAccentTouchID = nil
-            } else {
+            } else if !commitFlick(touch) {
                 commitCharacter(touch.key, at: touch.startPoint, down: touch.downPoint)
             }
             touch.committed = true
@@ -737,6 +733,7 @@ final class FullKeyboardEngine {
             return
         }
 
+        if moveFlick(&touch, id: id, to: point) { return }
         // 4. Sliding across character keys updates the active key and re-anchors the hold timer.
         // A letter the next-letter odds claimed keeps the touch while it stays within reach.
         if touch.key.character != nil, !touch.committed,
@@ -810,7 +807,7 @@ final class FullKeyboardEngine {
 
         switch touch.key.kind {
         case .character:
-            if !touch.committed {
+            if !touch.committed, !commitFlick(touch) {
                 commitCharacter(touch.key, at: touch.startPoint, down: touch.downPoint)
             }
         case .shift:
