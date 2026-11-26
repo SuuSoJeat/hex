@@ -199,7 +199,7 @@ Launch Hex, setup incomplete              // setup.tour; every build and OS, ful
 ├── 2.3.1 or Swift Hex -> Sparkle offers the new Hex -> Install Update   // setup.legacy-update; macOS
 │   ├── Replaces the old app in place (its file name kept) and opens the new one
 │   ├── Accepted only because app/Info.plist keeps the old SUPublicEDKey;
-│   │   scripts/validate-app.sh requires it. Feed items: docs/plans/swift-app-handoff.md
+│   │   scripts/validate-app.sh requires it. See docs/releasing.md
 │   └── No automated check; a clean-Mac install from each old app is the proof
 ├── 2.3.1 Linux or Windows updates into this build     // setup.legacy-adopt
 │   ├── It lands in <data>/voice-control/versions/<version>; its first app or
@@ -350,6 +350,7 @@ Run setup again (Labs) or `hex onboarding reset` -> the same story from the star
 on every build; settings, models, and permissions stay, so their pages pass
 ```
 
+```ts
 General > Speech model, selected model not downloaded     // settings.model-missing (#676)
 ├── Muted "Hex can't listen until the speech model has downloaded"
 ├── Downloading -> progress bar beside the model
@@ -1563,10 +1564,12 @@ and the `output-trust` golden cover the prompt. Windows `cmd` quoting is a
 pure-function test only; the job object and macOS paths compile on CI but are
 not run against real programs there. No check reaches a remote TLS host.
 
-The built-ins are Lowercase, SpongeBob case, and No trailing punctuation. The
-last removes only the final contiguous run of sentence marks (including
-full-width marks), preserving internal punctuation, trailing whitespace, and
-closing quotes/brackets. Punctuation inside a final closing quote is preserved.
+The built-ins are Lowercase, SpongeBob case, and No final period
+(`no-trailing-punctuation`). The last removes only the final contiguous run
+of full stops, commas, semicolons, and colons (including full-width marks),
+preserving internal punctuation, trailing whitespace, and closing
+quotes/brackets. A final `?`, `!`, or ellipsis (`…` or `...`) stays, since
+it changes what the message says. Punctuation inside a final closing quote is preserved.
 Select it after Lowercase for lowercase messages without the final period.
 The `no_trailing_punctuation_*` and `built_in_transformations_chain_in_selected_order`
 tests in [personal_commands.rs](../../src/personal_commands.rs) cover text behavior
@@ -2113,12 +2116,6 @@ path was exercised on the installed local 2.1.11 build and opened the native
 Software Update window; no installation was performed. That path remains the
 workaround for older versions, including after Remind Me Later. A repaired
 installed-sidebar click remains unverified.
-
-The [historical release verification](release-verification.md) records publication
-evidence through 2.1.20, including signing, artifact checks, CI results, and skipped
-native checks. Those release-specific results do not verify the current working
-tree, installed-app behavior, or physical Linux compatibility; retain each entry's
-stated limits when using it as evidence.
 
 [Recovery](recovery.md) separates supported recovery from known defects.
 [desktop/login_item.rs](../../src/desktop/login_item.rs), [macos_rune/status_item.rs](../../src/macos_rune/status_item.rs),
@@ -2800,10 +2797,6 @@ harness does not compile the Linux application or prove its runtime integration;
 the test has **not been executed on Linux**. These checks do not exercise physical
 devices or persistence failure on disk.
 
-The [September 4 service-build evidence](release-verification.md#linux-service-build)
-records an Arch/i3 client-independent ownership check, not transcription accuracy
-or physical logout, Wayland, or signed cross-version update proof.
-
 ```ts
 Linux General > Sounds > Sound volume     // dictate.feedback.linux; X11 + Wayland
 ├── Default / older settings -> 50%
@@ -2848,10 +2841,6 @@ path with a sound spy: immediate feedback without any audio, while a 100 ms tap
 still discards. Existing timing checks in [dictation.rs](../../src/dictation.rs)
 cover the unchanged intentional-hold boundary. These are not proof of audible
 native playback or physical hotkey-to-sound timing.
-
-The [September 4 sound-build evidence](release-verification.md#linux-recording-sounds-builds)
-records the initial and immediate-start builds. It does not establish audible
-native playback, measured physical key-to-sound latency, or Wayland UI behavior.
 
 Both Linux CI triggers include `tests/**`, and the
 [Nix source fileset](../../nix/package.nix) includes those sources. The
@@ -3632,7 +3621,10 @@ Android keyboard -> English, Spanish, German, Bokmål, French and Italian typing
     Bitwarden, 1Password or Google Password Manager, which must itself support Android 11's inline
     suggestions — offers logins, one-time codes or cards for the focused field, its own chips take
     the word slots' place in the strip: up to six, in the service's order, the pinned ones held at
-    the edge outside the scroll. A tap lets Android fill the field; Hex lays the service's views out
+    the edge outside the scroll. Hex asks for each chip in its key colour (a pill tinted with
+    `key`), with the strip's `ink` and `quiet` text, so a chip reads in light and dark mode (#2888:
+    without the background, services drew their white pill under dark mode's light text). A tap
+    lets Android fill the field; Hex lays the service's views out
     and never reads a login, a code or a card, and nothing is logged or sent. A new field, the
     keyboard hiding or the toggle turning off clears them. Off, Hex makes no inline request, so
     Android's normal autofill dropdown is exactly as before.
@@ -3640,7 +3632,8 @@ Android keyboard -> English, Spanish, German, Bokmål, French and Italian typing
     prepareSpeechModel` passed 178 tests, `InlineAutofillTest`'s 3 among them (the pinned split and
     the chip sizes), on 2026-11-24 on OpenJDK 21 (Arch Linux 21.0.13) and
     Android SDK 36 (platform 36, build-tools 35.0.0, NDK 27.2.12479018) with compileSdk 36 and
-    minSdk 31; the repo has no Android CI, and nothing was tried on a device or emulator.
+    minSdk 31; the repo has no Android CI, and nothing was tried on a device or emulator. The chip
+    background (#2888) was not compiled or tried on a device: no Android toolchain was at hand.
 ├── Labs > Keyboard > Voice-only mode (off) -> a "Voice only" subtype of Hex, registered at runtime
     with `InputMethodManager.setAdditionalInputMethodSubtypes` (never in input_method.xml), that
     replaces the keyboard with one compact dictation bar: the strip's dot waveform and a status
@@ -3871,8 +3864,7 @@ Windows requests are recorded, never performed; the macOS native host
 (`dev.rune-ui-macos`) has no automated test of its own. They skip the goldens without a GPU
 adapter and do not prove a real window, input method, or physical shortcut.
 Before the single-process change, a headless script against an isolated
-service saved a new mode and a correction. See
-[the Rune port plan](../plans/rune-ui.md) for what was observed.
+service saved a new mode and a correction.
 
 `dev.rune-ui-macos` lives in [macos_rune.rs](../../src/macos_rune.rs) and
 [rune_ui/macos_host.rs](../../src/rune_ui/macos_host.rs). On hailmary
