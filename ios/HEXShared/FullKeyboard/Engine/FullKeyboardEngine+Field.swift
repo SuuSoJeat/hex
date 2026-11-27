@@ -4,6 +4,30 @@ import UIKit
 /// `FullKeyboardEngine.swift` stays readable.
 @MainActor
 extension FullKeyboardEngine {
+    /// What the field asks for, or no automatic capitals with Auto-capitalization off.
+    var autoCapitalizationMode: AutoCapitalization.Mode {
+        guard language.supportsAutoCapitalization, layout.language != .khmer, autoCapitalizes else { return .none }
+        return AutoCapitalization.Mode(target.autocapitalizationType)
+    }
+
+    func refreshAutoCapitalization() {
+        // Khmer uses Shift for alternate characters, without automatic capitalization.
+        guard layout.language != .khmer else { return }
+        let before = shift
+        shift.refreshAutoCapitalization(
+            AutoCapitalization.shouldCapitalize(
+                mode: autoCapitalizationMode,
+                before: typingContext,
+                hasText: target.hasText,
+                language: layout.language
+            )
+        )
+        if shift != before {
+            logState("auto")
+            onChange?()
+        }
+    }
+
     enum EditKind {
         case normal
         case resolvingObscuredSwipe

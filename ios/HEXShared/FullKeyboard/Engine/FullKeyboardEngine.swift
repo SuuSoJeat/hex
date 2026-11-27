@@ -283,12 +283,6 @@ final class FullKeyboardEngine {
         }
     }
 
-    /// What the field asks for, or no automatic capitals with Auto-capitalization off.
-    var autoCapitalizationMode: AutoCapitalization.Mode {
-        guard language.supportsAutoCapitalization, layout.language != .khmer, autoCapitalizes else { return .none }
-        return AutoCapitalization.Mode(target.autocapitalizationType)
-    }
-
     /// The balloon for the newest character held, including the corner character if it typed
     /// on hold. A 123, #+= or shift slide previews its target. An accent menu hides the balloon.
     var keyPreview: (key: KeyboardKey, label: String)? {
@@ -366,24 +360,6 @@ final class FullKeyboardEngine {
         forgetTypingContext()
         swipedWord = nil
         swipeRetries.forget()
-    }
-
-    func refreshAutoCapitalization() {
-        // Khmer uses Shift for alternate characters, without automatic capitalization.
-        guard layout.language != .khmer else { return }
-        let before = shift
-        shift.refreshAutoCapitalization(
-            AutoCapitalization.shouldCapitalize(
-                mode: autoCapitalizationMode,
-                before: typingContext,
-                hasText: target.hasText,
-                language: layout.language
-            )
-        )
-        if shift != before {
-            logState("auto")
-            onChange?()
-        }
     }
 
     func refreshSuggestions() {
