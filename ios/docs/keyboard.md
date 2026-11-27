@@ -634,8 +634,8 @@ A Ä À…, O Ö…, U Ü…; Spanish QWERTY: N Ñ Ń). Apple's Dvorak is P Y F 
 A O E U I D H T N S from the edge, shift and Q J K X B M W V Z, on keys narrowed so that
 row fits (38.3 pt pitch on a 402 pt iPhone); split on the Duo it keeps delete on row 3
 (Apple's split Dvorak unobserved). Settings › Labs › Dvorak punctuation keys
-(off by default, `experiments.dvorakPunctuation`) adds an alternate layout for plain text on
-the joined keyboard. The [feature map](../../docs/features/README.md#developer-and-prototype-surfaces)
+(off by default, `experiments.dvorakPunctuation`) adds an alternate joined layout for plain text,
+web search, URL and email fields. The [feature map](../../docs/features/README.md#developer-and-prototype-surfaces)
 lists its key positions and the layouts used in split, URL and email fields. Kept per
 language in the App Group
 (`settings.keyboardLanguages.layouts`, `LanguageSettings.letterLayout(for:)`); unset,

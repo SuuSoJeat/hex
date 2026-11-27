@@ -3193,14 +3193,16 @@ iOS prototype (`HEXMobile`) -> Record/transcribe/copy and keyboard handoff
 │   preference can't be read by a keyboard extension. Off, the split keyboard is unchanged.
 │   Unit tests only: no CI compiles the iOS targets, and no physical iPhone run checks it
 ├── Dvorak punctuation keys (off by default, `experiments.dvorakPunctuation`): English Dvorak
-│   in a plain text field on the joined keyboard (including a floating iPad) starts row 1 with
+│   on the joined keyboard (including a floating iPad) starts row 1 with
 │   apostrophe, comma and period. Row 3 ends with W, V and Delete. The bottom row puts Q
 │   and Z beside a wider space bar, with semicolon available on the numbers layer. Manual
 │   shift or caps lock types a double quote, < or > from the top-row punctuation keys.
 │   Auto-capitalization leaves punctuation alone.
-│   On the split Duo, comma and period join the left half's top row and semicolon fits beside
-│   the left space bar. URL and email fields keep their own period and add semicolon where it
-│   fits. Docked iPads keep the system layout. Adaptive touch learns the alternate key positions
+│   The joined layout also applies to web search, URL and email fields, with / for URLs
+│   and @ for email in the bottom row. On the split Duo, comma and period join the left half's
+│   top row in plain text, and semicolon fits beside the left space bar where there is room.
+│   Split web search, URL and email fields keep period beside space. Docked iPads keep the
+│   system layout. Adaptive touch learns the alternate key positions
 │   separately. `KeyboardLayoutTests` check rows, bounds and hit targets across keyboard shapes.
 │   `FullKeyboardEngineTests` check typing and shift. Physical iPhone coverage is pending.
 ├── Comma and period keys (off by default, `experiments.commaPeriodKeys`): a comma just left

@@ -944,7 +944,7 @@ final class KeyboardLayoutTests: XCTestCase {
                             )
                             XCTAssertEqual(
                                 on.hasDvorakPunctuationRow,
-                                layer == .letters && letters == .dvorak && field == .text,
+                                layer == .letters && letters == .dvorak,
                                 label
                             )
                             if layer == .letters, letters == .dvorak {
@@ -1092,10 +1092,12 @@ final class KeyboardLayoutTests: XCTestCase {
             let letterWidth = on.isSplit ? SplitGeometry.keyWidth : on.letterWidth
             let offSpace = try XCTUnwrap(off.keys.first { $0.row == 3 && $0.kind == .space })
             let wideEnough = offSpace.frame.width >= 2 * letterWidth + gap
-            let revised = !on.isSplit && on.field == .text
+            let revised = !on.isSplit
             XCTAssertEqual(on.key(.character(";")) != nil, !revised && wideEnough, label)
             let space = try XCTUnwrap(on.key(.space))
             if revised {
+                XCTAssertEqual(on.key(.delete)?.row, 2, label)
+                XCTAssertEqual(on.key(.character("."))?.row, 0, label)
                 let q = try XCTUnwrap(on.key(.character("q")))
                 let z = try XCTUnwrap(on.key(.character("z")))
                 XCTAssertEqual(q.row, 3, label)
@@ -1127,9 +1129,7 @@ final class KeyboardLayoutTests: XCTestCase {
         }
     }
 
-    /// Adaptive touch learns the punctuated row apart from Apple's Dvorak, and only where that
-    /// row is drawn: a QWERTY keyboard, a non-letter page and a Dvorak URL or email field keep
-    /// every centre they learned with the experiment on.
+    /// Adaptive touch learns the revised rows separately in every field that draws them.
     func testDvorakPunctuationOnlyThePunctuatedRowIsItsOwnAdaptiveTouchPlane() throws {
         func plane(_ layout: KeyboardLayout) throws -> UInt64 {
             try XCTUnwrap(AdaptiveTouchGeometry(layout: layout)).key
@@ -1138,11 +1138,11 @@ final class KeyboardLayoutTests: XCTestCase {
         let qwertyOn = KeyboardLayout(width: 402, language: .english, dvorakPunctuation: true)
         XCTAssertEqual(try plane(qwertyOn), try plane(qwerty), "QWERTY doesn't move")
         XCTAssertFalse(qwertyOn.dvorakPunctuation, "the flag means nothing on QWERTY")
-        for field in [KeyboardFieldKind.url, .email] {
+        for field in fields {
             let off = KeyboardLayout(width: 402, field: field, language: .english, letters: .dvorak)
             let on = KeyboardLayout(width: 402, field: field, language: .english, letters: .dvorak, dvorakPunctuation: true)
-            XCTAssertFalse(on.hasDvorakPunctuationRow, "\(field): no row 1 punctuation")
-            XCTAssertEqual(try plane(on), try plane(off), "\(field): its letters are the same plane")
+            XCTAssertTrue(on.hasDvorakPunctuationRow, "\(field): row 1 has punctuation")
+            XCTAssertNotEqual(try plane(on), try plane(off), "\(field): the learned positions must match the revised layout")
         }
         for layer in [KeyboardLayer.numbers, .symbols] {
             let off = KeyboardLayout(width: 402, layer: layer, language: .english, letters: .dvorak)
@@ -1151,10 +1151,6 @@ final class KeyboardLayoutTests: XCTestCase {
             XCTAssertNil(AdaptiveTouchGeometry(layout: on))
             XCTAssertNil(AdaptiveTouchGeometry(layout: off))
         }
-        let apple = KeyboardLayout(width: 402, language: .english, letters: .dvorak)
-        let punctuated = KeyboardLayout(width: 402, language: .english, letters: .dvorak, dvorakPunctuation: true)
-        XCTAssertTrue(punctuated.hasDvorakPunctuationRow)
-        XCTAssertNotEqual(try plane(punctuated), try plane(apple), "the revised rows have their own plane")
     }
 
     /// Settings › Labs › Comma and period keys changes only an iPhone's letters page in a

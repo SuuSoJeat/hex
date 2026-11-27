@@ -393,8 +393,8 @@ struct FullKeyboardSettings {
         nonmutating set { defaults?.set(newValue, forKey: Key.joinKeyboardWhenUnfolded) }
     }
 
-    /// Settings › Labs › Dvorak punctuation keys (off by default). In joined text
-    /// fields, adds apostrophe, comma and period and puts Q and Z around the space bar.
+    /// Settings › Labs › Dvorak punctuation keys (off by default). On the joined
+    /// keyboard, adds apostrophe, comma and period and puts Q and Z around the space bar.
     var dvorakPunctuation: Bool {
         get { defaults?.bool(forKey: Key.dvorakPunctuation) ?? false }
         nonmutating set { defaults?.set(newValue, forKey: Key.dvorakPunctuation) }

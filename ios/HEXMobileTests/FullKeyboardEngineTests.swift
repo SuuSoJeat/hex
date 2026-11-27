@@ -298,22 +298,25 @@ final class FullKeyboardEngineTests: XCTestCase {
         XCTAssertNotEqual(try XCTUnwrap(AdaptiveTouchGeometry(layout: engine.layout)).key, punctuation)
     }
 
-    /// Settings › Labs › Dvorak punctuation keys: a URL or email field already has its own
-    /// `.` key on the bottom row, so its Dvorak row 1 stays Apple's rather than have two keys
-    /// that type the same character, while the semicolon still joins the space bar.
-    func testDvorakPunctuationKeepsFieldsOwnPeriodKey() throws {
+    func testDvorakPunctuationKeepsRevisedRowsInAddressAndSearchFields() throws {
         engine.width = 402
         engine.letterLayout = .dvorak
         engine.dvorakPunctuation = true
-        for keyboardType in [UIKeyboardType.URL, .emailAddress, .webSearch] {
+        let fields: [(UIKeyboardType, KeyboardFieldKind, String?)] = [
+            (.URL, .url, "/"), (.emailAddress, .email, "@"), (.webSearch, .webSearch, nil),
+        ]
+        for (keyboardType, field, extra) in fields {
             target.keyboardType = keyboardType
             engine.configureForField()
-            XCTAssertNotEqual(engine.layout.field, .text, "\(keyboardType.rawValue)")
-            XCTAssertEqual(engine.layout.keys.filter { $0.kind == .character(".") }.count, 1, "the field's own . only")
-            XCTAssertNil(engine.layout.key(.character(",")), "row 1 stays Apple's")
-            XCTAssertEqual(engine.layout.key(.character("."))?.row, 3)
-            XCTAssertEqual(engine.layout.key(.character(";"))?.shifted, ":")
-            XCTAssertEqual(engine.layout.key(.character(";"))?.row, 3)
+            XCTAssertEqual(engine.layout.field, field)
+            XCTAssertEqual(engine.layout.keys.filter { $0.kind == .character(".") }.count, 1)
+            XCTAssertEqual(engine.layout.key(.character(","))?.row, 0)
+            XCTAssertEqual(engine.layout.key(.character("."))?.row, 0)
+            XCTAssertEqual(engine.layout.key(.delete)?.row, 2)
+            XCTAssertNil(engine.layout.key(.character(";")))
+            if let extra {
+                XCTAssertEqual(engine.layout.key(.character(extra))?.row, 3)
+            }
         }
     }
 

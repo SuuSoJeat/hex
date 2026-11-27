@@ -184,8 +184,8 @@ final class FullKeyboardEngine {
     var joinsUnfoldedKeyboard = false {
         didSet { if joinsUnfoldedKeyboard != oldValue { rebuildLayout(cause: "join_unfolded") } }
     }
-    /// Settings › Labs › Dvorak punctuation keys (off by default). In joined text
-    /// fields, adds apostrophe, comma and period and puts Q and Z around the space bar.
+    /// Settings › Labs › Dvorak punctuation keys (off by default). On the joined
+    /// keyboard, adds apostrophe, comma and period and puts Q and Z around the space bar.
     var dvorakPunctuation = false {
         didSet { if dvorakPunctuation != oldValue { rebuildLayout(cause: "dvorak_punctuation") } }
     }
