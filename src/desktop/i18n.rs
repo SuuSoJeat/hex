@@ -12,7 +12,6 @@ use std::sync::atomic::{AtomicU8, Ordering};
 use strings::TRANSLATIONS;
 
 mod agents;
-mod annotate_dictation;
 mod calls;
 mod clipboard_phrase;
 mod clock;
@@ -414,7 +413,6 @@ pub(super) fn all_translations() -> impl Iterator<Item = &'static (&'static str,
         .chain(style::TRANSLATIONS)
         .chain(signature::TRANSLATIONS)
         .chain(clipboard_phrase::TRANSLATIONS)
-        .chain(annotate_dictation::TRANSLATIONS)
         .chain(agents::TRANSLATIONS)
         .chain(failures::TRANSLATIONS)
         .chain(onboarding::TRANSLATIONS)
@@ -888,7 +886,7 @@ mod tests {
         ];
         for english in [
             "Use Menu, Pause, or Scroll Lock as a shortcut by itself, such as Caps Lock remapped to Menu",
-            "Use Insert, Home, End, Page Up, or Page Down as a shortcut by itself",
+            "Use Caps Lock, Insert, Home, End, Page Up, or Page Down as a shortcut by itself",
         ] {
             let translations = table
                 .get(english)

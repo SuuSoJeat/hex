@@ -2569,8 +2569,9 @@ Windows beta                             // x64 (Vulkan GPU) and ARM64 (CPU)
 │   │   the recorder runs its own keyboard hook for them (`NumpadWatch`), so
 │   │   Num Lock off records Num 8, not Up (#815)
 │   ├── Menu, Pause, Scroll Lock -> may stand alone
-│   ├── Insert, Home, End, Page Up, Page Down alone -> Labs › Special keys
-│   │   alone; off, a saved one goes back to its default
+│   ├── Caps Lock, Insert, Home, End, Page Up, Page Down alone -> Labs ›
+│   │   Special keys alone; off, a saved one goes back to its default. Hex
+│   │   keeps a Caps Lock press it records or fires on, so the lock never flips
 │   └── Any other key -> the recorder says "Unsupported key" and starts over
 ├── Left Alt -> Hold or Toggle -> Capture -> Stream (GPU) -> Paste
 ├── Toggle's cancel shortcut (Escape by default) -> Discards a toggled recording;
@@ -3353,7 +3354,18 @@ Android keyboard -> English, Spanish, German, Bokmål, French and Italian typing
 │   drawn twice on a page) and `./gradlew :app:testDebugUnitTest :app:compileDebugKotlin` passed
 │   175 tests on 2026-11-24 on OpenJDK 21 and Android SDK 36 (offline, `-x prepareSpeechModel`);
 │   the repo has no Android CI, and nothing was tried on a device or emulator.
-├── Nederlands, Polski or Русский with no pinned layout -> English's keys and
+├── Русский -> ЙЦУКЕН (`KeyboardLetters` "ru": 11, 11 and 9 letters, so shift and delete
+│   are one letter wide), ё held on е and ъ on ь (`LetterFeedback` "ru"), picked by Automatic
+│   while Русский is dictated and listed in Keyboard > Keyboard layout (#2915). No typing model
+│   yet (`Spoken.hasModel` false, dictated or pinned): no word is read, so letters type as
+│   tapped and double-space period and capitals stay, but there are no strip words, text
+│   shortcuts, corrections or swipes; a swipe puts "Swipe typing isn't available in Русский
+│   yet" in the strip. Latin letters are a layout away (the space bar's hold).
+│   Checks: `russianIsYcukenWithShiftAndDeleteOneLetterWide` in KeyboardPageTest.kt,
+│   InsertionTest's layout, typing-model and swipe-note cases, and SymbolPagesTest's ASCII
+│   check (non-letters only for ЙЦУКЕН); not compiled here (no Android SDK) and not tried on
+│   a device. The repo has no Android CI.
+├── Nederlands or Polski with no pinned layout -> English's keys and
 │   accents (DictationLanguage.layout is null), with English's word list only standing in for
 │   the keys' geometry: the strip keeps what was typed and your own dictionary words as
 │   completions, and text shortcuts, double-space period, capitals and the literal chip stay.
