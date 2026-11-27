@@ -55,11 +55,14 @@ Draw                                     // capture.draw (capture_host::drawing)
 ├── Esc while drawing -> stops drawing, never the recording (recognition.rs
 │   on macOS; the Escape grab on X11 (Wayland binds no Escape); the keyboard
 │   hook on Windows, when no dictation records; and the overlay's own key
-│   handler where it gets the keyboard)
+│   handler where it gets the keyboard, never on Windows or XWayland)
 ├── macOS and Windows -> Shift held alone still draws, as in Scrawl
 ├── While drawing -> the ink overlay takes the pointer with a pen cursor, so
 │   clicks never reach the app; the capsule stays clickable above it (macOS:
-│   its level; Linux: the overlay leaves a hole over the capsule's pill).
+│   its level; Linux: the overlay leaves a hole over the capsule's pill;
+│   Windows: its level, kept because the overlay never asks for the keyboard,
+│   whose activation raised it over the capsule and ate the pen's second
+│   click, #2955).
 │   Every move draws ink; there are no pins and no undo
 ├── `hex annotate draw` (Linux) -> the pen on or off, for desktops without
 │   the portal (it starts a recording drawing)
@@ -339,6 +342,15 @@ Annotate pane                            // capture.pane
 │   ├── Annotations / Captures tab -> past annotations (and Screenshots shots /
 │   │   recordings while that Lab is on) from the last 30 days, searchable with
 │   │   Copy, Show in Finder, and two-step Move to Trash (rune_ui::captures)
+│   │   ├── Copy -> an annotation's summary as Annotate's own Copy puts it;
+│   │   │   a saved shot or recording as a file (macOS: picture and file;
+│   │   │   Windows: a file drop; Linux: a file URI)
+│   │   ├── Show in Finder -> "Show in folder" on Windows (Explorer with the
+│   │   │   item selected) and Linux (xdg-open on its folder), through
+│   │   │   meeting::reveal
+│   │   └── Move to Trash -> the Trash, the Recycle Bin on Windows, or Linux's
+│   │       freedesktop Trash (meeting::move_to_trash); not observed on a
+│   │       Windows PC
 │   └── Settings tab ->
 ├── Annotate (capture.enabled, default on) -> off: no host, shortcut,
 │   input, retention, or folder, and the pane shows only the top card. On
@@ -1068,9 +1080,10 @@ hex capture stop                         // capture.stop
     │   missing -> the 480 px sampled frames
     ├── Spoken cues (look, now, here, this…) pick the keyframe the screen
     │   changes to; they also count in Spanish (mira, ahora, aquí, esto…),
-    │   French, German, Portuguese, and Italian, whatever the dictation
-    │   language. Check: scrawl-capture keyframes
-    │   spoken_cues_count_in_other_languages
+    │   French, German, Portuguese, Italian, and Turkish (şimdi, bakın, işte,
+    │   burası…; a capital İ still matches), whatever the dictation language.
+    │   Check: scrawl-capture keyframes spoken_cues_count_in_other_languages,
+    │   turkish_spoken_cues_match_with_a_dotted_capital_i
     ├── Transcription fails -> logged; the bundle has no words, and the outcome says why
     ├── Written -> image and text copied to the clipboard (Scrawl's handoff),
     │   or the light zip alone with Labs › Copy a capture as one file (capture.copy)
@@ -1383,6 +1396,7 @@ Checks:
   `controls_are_idempotent_and_stop_writes_a_scrawl_bundle`,
   `an_engine_that_cannot_start_leaves_nothing_behind`,
   `a_screen_source_that_gives_up_ends_the_capture`,
+  `a_finisher_failure_reaches_the_capsule_with_its_reason`,
   `scrawls_engine_claims_nothing_machine_wide`,
   `the_timeline_resamples_pads_gaps_and_ends_at_the_stop`,
   `a_pending_gap_and_a_stalled_tail_come_back_from_the_closed_sink`,

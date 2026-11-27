@@ -2324,7 +2324,8 @@ Final publication                                   // meetings.output
 │   // a_meeting_with_speech_or_a_failure_is_never_discarded,
 │   // a_meeting_that_dropped_echo_is_kept_even_with_no_entries
 └── Markdown copy -> <folder>/<YYYY-MM-DD HHMM> <title>.md
-    ├── Title, date, duration, app, You / Them turns
+    ├── Title, date, duration, app, You / Them turns (a named remote
+    │   speaker's turn carries the name; see [Speaker names](#speaker-names))
     ├── Never overwrites; adds " (2)"
     ├── Export › Descriptive meeting file names on (off by default;
     │   meetings.export.descriptive_filenames) -> applying notes, refining chapters, or a rename renames it in place to
@@ -2411,6 +2412,9 @@ Rename -> inline field; Enter or Save          // meetings.rename
      names on it follows a changed title only when the heading did too,
      keeping the date and time prefix
   -> empty title refused
+  -> busy refusal while notes or transcript edits hold the process-local
+     writer slot; rename claims before reading and holds through export and
+     manifest publication. Active-recording rename remains available.
 Delete… (overflow menu) -> "Trash recording & Markdown" (or "Trash recording")
   / Cancel, under the title in place of the icons until answered
   -> exported Markdown, then its tracked notes file, then
@@ -2449,6 +2453,9 @@ path automatically and never appears in the pane (check:
 `renaming_updates_the_manifest_and_an_unedited_markdown_heading`,
 `a_rename_follows_the_title_when_descriptive_file_names_are_on`,
 `a_rename_without_descriptive_names_still_retitles_the_notes_file`,
+`rename_and_notes_refuse_both_publication_windows_then_preserve_all_metadata`,
+`rename_claims_before_read_and_releases_after_read_failure`,
+`active_recording_rename_still_saves_the_user_title`,
 `notes_rename_the_export_only_with_descriptive_file_names`,
 `retitling_replaces_only_a_matching_first_heading`,
 `the_exported_markdown_is_the_reveal_target_only_while_it_exists`,
@@ -2588,7 +2595,8 @@ Final publication complete                               // meetings.notes
      │   may appear: …" (≤30 vocabulary terms, read at each generation,
      │   Regenerate included) ahead of the calendar context; its length comes
      │   out of the budget. No vocabulary -> no line
-     ├── Lines "[mm:ss] You|Them: text" (long turns split at 600 chars)
+     ├── Lines "[mm:ss] You|Them: text" (long turns split at 600 chars); a
+     │   named remote speaker's lines carry the name instead of Them
      ├── Whole transcript when it fits; otherwise opening 30 %, up to six
      │   evenly spaced middle passages, ending 20 %, "[…]" between them
      ├── Budget = min(12,000 chars, (context − 1,000 tokens) × 3 chars)
@@ -2671,6 +2679,23 @@ transcript link follow notes, a rename, or chapter retitles
 keeps its own `<!-- hex:notes -->` summary block and footer throughout. A notes
 file the user deletes stops being tracked and is never written back, even by a
 later regeneration.
+
+Markdown updates share an observed-bytes recheck after the temporary file is
+synced. A separate notes file is replaced whole only while its ownership hash
+matches; transcript heading/notes merges preserve other sections even in an
+edited file, without advancing its ownership hash. A detected editor save
+leaves the external bytes and ownership hash untouched and removes the
+temporary. This is best-effort protection: the final read and rename are not
+a filesystem compare-and-swap. The meeting writer claim is process-local,
+not cross-process locking. Deterministic checks inject saves during rendering
+and after temporary-file sync:
+`notes_file_refresh_preserves_an_editor_save_during_temporary_write`,
+`merge_preserves_an_editor_save_during_temporary_write_and_its_ownership`,
+`a_save_during_render_preserves_the_external_bytes_and_hash`, and
+`a_new_notes_file_does_not_replace_an_editor_save_at_the_selected_path`.
+`merge_keeps_user_sections_without_acquiring_their_ownership` covers the
+distinct merge policy. These are filesystem fixtures, not a physical-editor
+or multi-process proof.
 
 Action items and decisions are gone: other agents read the transcript for
 details (MCP). Older manifests still decode: a list summary is joined into one
@@ -2802,6 +2827,212 @@ The second change landed at 11:02 in 3 runs and one line late (11:24) in 2; the
 first at 05:32 in 2 runs and stayed at the live 06:38 in 3. The model's
 same-topic flag was close to random ("same" for unrelated names, "new" for the
 current one), which is why Rust's name overlap decides.
+
+### Speaker Names
+
+Implemented: the data model, every reader of it, the rules that work out
+names from what a call app shows, and on macOS the reader that writes down
+what a call app shows ([Working out names](#working-out-names)).
+Not implemented: an adapter for any call app, or anything that starts the
+reader, so nothing runs those rules.
+No build writes a `speaker` or a `speakers` table yet, so every remote line
+is still `Them` and every saved file, prompt, and JSON response is what it
+was before.
+
+```ts
+manifest.json -> speakers?: [{ id, name, from }]     // omitted when empty
+├── id: per meeting, short and opaque ("s1", "s2"); a call app's own user id
+│   is never an id and never reaches the disk
+├── name: the display name, cleaned (below)
+└── from: "call_app" | "calendar" | "user"
+transcript.ndjson, transcript.rolling.ndjson -> speaker?: "s1"
+└── An id in that table; omitted when Hex is not sure, which is every line
+    today. The schema versions stay 1: both fields are additive
+What a line is called -> one rule (src/meeting/speakers.rs, Labels::of)
+├── A remote line whose speaker the table knows -> the name
+├── Otherwise exactly as before: You, Them, or Speaker where an imported
+│   file's one track already said Speaker
+├── A microphone line is always You, whatever its speaker field says
+├── An id the table does not know -> the track's label
+└── A saved speaker that is not an id Hex could have minted (`s` and a
+    number), or a table row whose id, name or origin does not parse -> read
+    as absent; the line is called by its track and the meeting still opens
+Turns -> adjacent lines join only on the same track and the same speaker; a
+         named line never merges into an unnamed one
+Readers that show the name
+├── Exported Markdown, Copy transcript, Copy section, the folder's own
+│   transcript.md
+├── Notes prompt lines "[mm:ss] Priya Nair: …"
+├── hex meetings show (Markdown; --json meeting.speakers and
+│   entries[].speaker; --srt and --vtt cues), list --json (meeting.speakers)
+├── MCP: get_transcript turns, search_transcripts speakers and context
+│   lines, list_meetings participants "You, Them, Priya Nair (Zoom)"
+└── Meetings pane turns (a name is shown as is, never translated)
+Readers that stay You / Them
+├── Chapter prompts: where a topic changes does not depend on who speaks,
+│   so no name goes to that model
+├── The provisional-title prompt and the recording capsule: a recording
+│   under way has no names
+└── get_transcript's speaker filter (you | them | all)
+Names are untrusted: other people choose them, and models and agents read them
+├── A name exists in the code only as a cleaned value (SpeakerName), made
+│   from call-app text or from a manifest the same way:
+│   one line, single spaces, no control characters, zero-width spaces,
+│   direction overrides or Unicode tags, none of * ` [ ] < > \, 64 characters
+├── Refused: nothing left, or You / Them / Speaker / Notes in any case, so
+│   nobody on a call can make their words read as You. The line stays Them
+└── Never logged: a table prints its ids and origins, not its names
+Debug Markdown parser (hex meeting summarize|chapters <path>) -> any turn
+    heading is a turn; You is the microphone, a name or Speaker is remote
+```
+
+Checks: `an_old_manifest_and_transcript_round_trip_byte_for_byte`,
+`speakers_are_saved_as_a_table_and_an_id_on_each_named_line`,
+`a_hostile_name_comes_out_clean`,
+`a_name_can_never_be_one_of_hexs_own_labels_or_nothing`,
+`a_table_read_from_disk_is_cleaned_like_one_built_here`,
+`a_saved_line_whose_speaker_is_not_an_id_reads_as_unnamed`,
+`printing_a_table_for_a_log_never_prints_a_name`,
+`a_line_is_called_by_its_speakers_name_or_else_what_it_always_was`,
+`a_turn_splits_where_the_speaker_changes`,
+`markdown_shows_the_name_in_the_export_a_section_and_the_folders_own_file`,
+`the_notes_prompt_gives_each_line_its_speaker`,
+`agents_and_the_cli_read_the_name_in_transcripts_search_and_the_list`,
+`a_named_speaker_shows_in_meeting_json_and_subtitles`,
+`a_named_speaker_gets_their_own_turn_under_their_name`, and
+`meeting_json_contract_snapshot` (unnamed JSON is unchanged). All run on
+hand-built tables; no recorded meeting has a named speaker.
+
+#### Working Out Names
+
+Exists (`src/meeting/speakers/`), tested, and called by nothing: the evidence
+a reader saves, a calibration, the resolver, the step that turns its answer
+into the table and ids above, and on macOS the reader itself with the seam a
+call app's adapter plugs into. Does not exist: an adapter for any call app
+(each is written against a live read of that app), anything that starts the
+reader with a recording, the wiring into the transcript worker, a Labs
+switch, the pane's corrections, any voice model. No file is written and no
+name appears.
+
+```ts
+speakers.ndjson (meeting folder, owner-only, to the Trash with the folder)
+├── The one record of who spoke. The manifest's table and each line's
+│   speaker are rebuilt whole from it and are never edited themselves
+├── participant: key ("p1", "p2": opaque, per meeting, never a call app's
+│   user id), cleaned name or none, whether they are the user, first seen
+├── floor: one look at the call app -> who it marked as speaking, or nobody
+├── untrusted: one look that counts as no look -> cut_short | window_hidden
+│   | two_windows | failed_health_check
+├── correction: the user says these words were this person's, or "not
+│   sure", or this person goes by this name here. Rewritten atomically; a
+│   later correction replaces the ones it covers
+└── Times are ms from the start of the recording. A line this build cannot
+    read is skipped and kept
+Calibration (pure) -> the user's own tile against the user's own microphone
+├── Fewer than 5 lit stretches -> unproven: names still worked out, on an
+│   assumed 0.5 s to come on and 1.5 s to go off
+├── 4 in 5 lit stretches have the user's speech under them -> healthy,
+│   with the middle lag and a long tail measured on this call
+└── Fewer, or 8 turns of 2 s with the tile never lit -> unhealthy: nobody
+    is named from what the reader saw
+Resolver (pure) -> (remote words' times, evidence, calibration, strictness)
+    -> spans of remote speech, each one person's or nobody's, with a reason
+├── 1. A correction stands, whatever else is true
+├── 2. An unhealthy call names nobody
+├── 3. One remote person on the whole call -> every remote word is theirs
+├── 4. Otherwise the floor decides. Looks become stretches (held, lingering,
+│      coming on, passing over, nobody, unknown), moved back by the lag; two
+│      looks more than 0.75 s apart leave the time between them unknown
+│   ├── as seen: each word takes the holder at its own moment
+│   ├── steady window (default): a span between pauses of 0.3 s is one
+│   │   person's when they alone show across it; where the floor changes
+│   │   inside continuous speech the words within 0.75 s go unnamed, and so
+│   │   do words under a mark that is only lingering
+│   └── whole segment: a stretch between pauses of 0.6 s (10 s at most) is
+│       named whole when one person holds 4 words in 5, else not at all
+└── 5. Everything else is nobody's (Them), with why: no evidence, untrusted
+       look, nobody held the floor, the user held it, floor changed, mixed
+Lines -> a remote line takes a speaker only when everything it overlaps was
+    said by one person the call app showed, with a usable name; ids s1, s2
+    in the order people first speak; a name the user gave is from "user"
+Reader (macOS only: it reads accessibility::tree snapshots) -> speakers.ndjson
+├── Adapter, one per call app (pure) -> a snapshot of the app's windows ->
+│   active { roster, floor } | no call window | untrusted(reason). Found by
+│   canonical bundle id or by the call page's host. None is listed yet
+├── Before any adapter is asked: a snapshot a budget cut short -> untrusted
+│   cut_short; an app with no window -> no call window
+├── Poll state (pure) -> one look in, the lines it adds out
+│   ├── The app's own id for a person never leaves memory: each gets the
+│   │   next key (p1, p2) when first seen, after any the meeting holds
+│   ├── participant: when first seen, and again when the app shows them
+│   │   differently (cleaned name, whether they are the user). Two tiles
+│   │   of one person are one person
+│   ├── floor: every look at a call read whole -> the one marked, or nobody
+│   ├── untrusted: the adapter's reason, or cut_short
+│   └── Nothing for no call window, or for a mark on someone never shown
+├── Loop -> a look every 0.5 s on the recording's clock, stamped when it
+│   starts; a look that overran -> a 0.25 s rest and one look, not the ones
+│   missed; ends with the recording, with nothing read or written after
+├── A write that fails -> those lines are lost and counted, and everyone
+│   is written again at their next look
+└── Logs -> what a look came to when that changes (debug), one warning for
+    a run of failed writes, counts at the end. Never a name or an app id
+```
+
+Not reconciled yet: when the app shows someone differently the reader writes
+a second participant line, and the resolver still takes the first line for
+each key, so a name that arrives after the tile does names nobody.
+
+The accepted limit: a call app marks one speaker at a time, so words said
+over the person holding the floor take that person's name, at every
+strictness. A reply within half a second of someone stopping can too.
+
+Measured (research simulation, not this code and not a live call):
+`measurements-indicator-sim.md` ran this kind of rule over word timings from
+16 recorded in-room meetings with a modelled call app. Where one person
+talks at a time, its steady-window rule named 90.5% of words right and 0.1%
+wrong; on words spoken over someone else it was wrong on 27.2%. Over all
+words its rules ranged from 79.8% right / 11.9% wrong (as seen) to 61.3% /
+4.5% (whole segments). `measurements-voice-hybrid.md` added a per-meeting
+voice check on real audio: 85.1% right / 10.3% wrong against 80.8% / 8.5%,
+with 95.6% of its wrong names on overlapped words, so no voice model is
+planned here. The resolver's own constants have not been run against that
+corpus, and nothing has been measured on a real call.
+
+Checks: `people_taking_turns_are_each_named_for_every_word`,
+`a_change_of_floor_in_a_pause_keeps_the_words_on_both_sides`,
+`a_change_of_floor_inside_continuous_speech_leaves_the_words_beside_it_unnamed`,
+`words_said_over_the_person_holding_the_floor_take_that_persons_name` (the
+limit, as a test), `a_reply_under_a_lingering_mark_is_not_named_unless_read_as_seen`,
+`looks_that_could_not_be_trusted_count_as_no_look`,
+`a_reader_watching_the_wrong_tile_names_nobody`, and four properties over
+random calls: `with_no_evidence_nobody_is_named`,
+`taking_evidence_away_never_adds_a_name` (at the reader's pace of a look
+every half second), `an_unhealthy_calibration_names_nobody`,
+`a_correction_always_wins`. The call app in them is a port of the
+simulation's model, not a real one. File handling:
+`the_file_is_readable_by_its_owner_only_before_and_after_a_correction`,
+`a_line_cut_short_by_a_crash_spoils_only_itself`,
+`a_line_from_a_newer_build_is_skipped_and_survives_a_correction`.
+
+Reader checks (macOS; an invented call app read from hand-written snapshots,
+a clock that moves only when waited on, no real app):
+`people_are_written_once_under_keys_in_the_order_they_are_first_seen`,
+`someone_the_app_comes_to_show_differently_is_written_again_under_their_key`,
+`the_floor_is_written_at_every_look_as_it_passes_from_one_to_another`,
+`a_snapshot_cut_short_is_an_untrusted_look_and_names_nobody_new`,
+`two_call_windows_are_an_untrusted_look`,
+`a_hidden_call_window_is_an_untrusted_look_for_as_long_as_it_is_hidden`,
+`the_file_holds_keys_and_names_and_never_an_app_id` (the real file),
+`the_log_holds_counts_and_reasons_and_never_a_name_or_an_app_id` (everything
+logged at every level), `lines_that_were_not_saved_are_counted_and_everyone_is_written_again`,
+`a_slow_look_is_followed_by_a_rest_and_one_look_not_by_the_ones_it_missed`,
+`stopping_ends_the_reader_with_nothing_read_or_written_afterwards`, and one
+property over random looks:
+`whatever_an_app_shows_every_key_is_introduced_before_it_is_used_and_no_id_is_written`.
+Seam: `a_snapshot_cut_short_is_never_shown_to_an_adapter`,
+`an_app_is_read_by_the_adapter_listed_under_its_key`, `no_app_is_listed_twice`.
+Nothing has read a real call app through it.
 
 ### Agent Access (MCP)
 

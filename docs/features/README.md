@@ -52,6 +52,11 @@ byte unchanged. Its Clean up with Apple Intelligence toggle (off by default,
 macOS) gives each dictation its mode does not rewrite one short on-device pass
 that fixes clearly misheard words and spoken self-corrections, pasting the
 corrected text whenever Apple Intelligence is unavailable, slow, or refuses.
+Its Clean up what I say toggle (off by default, macOS) takes ums, repeats,
+false starts, and spoken corrections out of each English dictation with a
+small model that runs on this Mac and can only remove words; the model
+downloads the first time a dictation starts with the toggle on, and a model
+that is missing, slow, or failing pastes the words as heard.
 Its Neutral voice toggle (off by default, macOS) rewrites a chosen mode's
 dictations into plain, neutral wording on this Mac instead of that mode's
 OpenCode rewrite and the cleanup, so the neutral pass never sends the text to
@@ -1477,6 +1482,7 @@ Selected mode                            // replaces Global's rewrite and transf
   -> Speech Labs preparation              // formatting, symbols, English filler removal
   -> Global's corrections, then the mode's  // every OS
   -> Labs > Neutral voice, in a mode that opts in  // macOS; replaces the rewrite and cleanup; transformations still run
+  -> Labs > Clean up what I say          // macOS, English; a small on-device model removes ums, repeats, and spoken corrections (labs.md)
   -> Labs > Rewrite by voice's phrase          // Labs off, or no phrase, processes as before
      -> one spoken instruction replaces the rewrite, with the mode's model and deadline (labs.md)
   -> OpenCode transformation             // optional provider-backed rewrite; an unset model is Hex's ranked pick, shown Automatic
@@ -2569,9 +2575,10 @@ Windows beta                             // x64 (Vulkan GPU) and ARM64 (CPU)
 │   │   the recorder runs its own keyboard hook for them (`NumpadWatch`), so
 │   │   Num Lock off records Num 8, not Up (#815)
 │   ├── Menu, Pause, Scroll Lock -> may stand alone
-│   ├── Caps Lock, Insert, Home, End, Page Up, Page Down alone -> Labs ›
-│   │   Special keys alone; off, a saved one goes back to its default. Hex
-│   │   keeps a Caps Lock press it records or fires on, so the lock never flips
+│   ├── Caps Lock alone -> works out of the box; Hex keeps a press it
+│   │   records or fires on, so the lock never flips
+│   ├── Insert, Home, End, Page Up, Page Down alone -> Labs › Special keys
+│   │   alone; off, a saved one goes back to its default
 │   └── Any other key -> the recorder says "Unsupported key" and starts over
 ├── Left Alt -> Hold or Toggle -> Capture -> Stream (GPU) -> Paste
 ├── Toggle's cancel shortcut (Escape by default) -> Discards a toggled recording;
@@ -3290,6 +3297,13 @@ iOS prototype (`HEXMobile`) -> Record/transcribe/copy and keyboard handoff
 │   path receives none
 └── Proof limits: unit tests only; no CI compiles the iOS targets
 Android keyboard -> English, Spanish, German, Bokmål, French and Italian typing assistance
+├── The bar under the keys follows light and dark mode -> the keyboard theme's navigation bar
+│   colour and light-icon flag reach the IME window only when it is made, and the service usually
+│   outlives a light/dark switch, so the bar holding Android's back and switcher buttons kept the
+│   old mode under the rebuilt keys (#2943). `HexKeyboard` sets the window's navigation bar colour
+│   (`R.color.keyboard`) and `APPEARANCE_LIGHT_NAVIGATION_BARS` (`R.bool.light_bars`) again after
+│   each configuration change and each time the keys show. Checks: none automated; no test covers
+│   the bar, and nothing was tried on a device or emulator. The repo has no Android CI.
 ├── Hands-free dictation keeps the screen on -> the keyboard's window and Home's add Android's
 │   `FLAG_KEEP_SCREEN_ON` (no permission) while a dictation is opening, listening or transcribing,
 │   and clear it once idle, so the display timing out can't hide the IME, whose leave cancels the

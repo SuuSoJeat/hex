@@ -124,19 +124,26 @@ recorder refuses them, and a saved shortcut on one goes back to its default
 when settings load or the toggle turns off. On, the window's recorder takes
 them too (#1187). Details and checks in [labs.md](labs.md).
 
-Windows with the same toggle on: Caps Lock may be a shortcut's key alone, as
-Insert, Home, End, Page Up, and Page Down may (`hex settings set
+Windows: Caps Lock may be a shortcut's key alone out of the box, with
+Labs › Special keys alone off (`hex settings set
 dictation_hotkey capslock`, or press it in the window's recorder). The
 listener keeps every Caps Lock press the shortcut fires on, and the recorder's
 own hook keeps a press made in Hex's window, so the lock never flips; with
-other modifiers held, Caps Lock still reaches Windows. Off, the recorder
-shows "Add a modifier", `hex settings` refuses it, and a saved one goes back
-to its default. Caps Lock with a modifier needs no toggle. Implemented
+other modifiers held, Caps Lock still reaches Windows unless that chord is
+bound too. Saving, loading, or turning the Lab off keeps a Caps Lock shortcut.
+Insert, Home, End, Page Up, and Page Down alone still need the Lab: off, the
+recorder shows "Add a modifier", `hex settings` refuses them, and a saved
+one goes back to its default. Implemented
 November 26, 2026 from a user report; not yet run on a Windows keyboard.
 Checks: `the_recorder_keeps_a_whole_caps_lock_press_made_in_hexs_window`
 (`windows/input/chord.rs`) and
 `pause_and_scroll_lock_stand_alone_but_numpad_keys_need_a_modifier`
-(`windows/input.rs`).
+(`windows/input.rs`). Labs-off acceptance and repair checks:
+`recorder_accepts_caps_lock_without_the_special_keys_lab` (`rune_ui/settings.rs`),
+`caps_lock_alone_needs_no_lab_on_windows_but_navigation_still_does`
+(`control/settings.rs`), and
+`caps_lock_survives_save_and_load_with_the_special_keys_lab_off`
+(`app_settings/shortcut_repair.rs`).
 
 Linux and macOS with Labs › § key alone on (`labs.section_key_alone`,
 off by default; issue 1050): the ISO section key, left of 1, may be a
@@ -596,9 +603,10 @@ was not compiled or run here (Linux check, Windows cross-clippy only).
 
 On macOS a raw capture never reaches the processing worker at all
 (`parakeet::run_inference_worker` queues only Paste, Copy only, and Print; the
-raw targets go straight to output), so it also skips Labs › Clean up with
-Apple Intelligence and Labs › Neutral voice ([labs.md](labs.md)); elsewhere
-that stage is macOS-only, so it never runs on the shared pipeline either.
+raw targets go straight to output), so it also skips Labs › Clean up what I
+say, Labs › Clean up with Apple Intelligence, and Labs › Neutral voice
+([labs.md](labs.md)); elsewhere those stages are macOS-only, so they never run
+on the shared pipeline either.
 
 ### Transform Typed Text (Labs, Linux)
 
@@ -679,6 +687,36 @@ text is read through `wl-paste`, which may briefly take focus. Proof limits: no
 shortcut press against a real target application was run; the flow is covered
 by unit tests only.
 
+### Clean Up What I Say (Labs, macOS)
+
+While Labs › Clean up what I say is on (`labs.cleanup_tagger`, off by
+default), each English dictation loses its ums, repeated words, false starts,
+and spoken corrections on this Mac, with the small cleanup model the iPhone
+app uses.
+
+```text
+Corrected transcript (speech Labs, then Global's and the mode's corrections)
+  -> Labs > Clean up what I say          // macOS, English only
+     ├── Not English ("auto" too), Verbatim style, numbers alone, typed text,
+     │   Neutral voice, a voice prompt   -> skipped, nothing recorded
+     ├── Words -> chunks -> tagger (Core ML, CPU only, 150 ms)
+     │   -> guard (keeps names, numbers, and vocabulary terms that were not
+     │      corrected out loud) -> render
+     ├── Model still downloading, late, or failing
+     │   -> the corrected words as heard, and History says why
+     └── Only ever removes words that were heard
+  -> Clean up with Apple Intelligence, or the mode's OpenCode rewrite
+  -> Dictation style -> Transformations -> Paste
+```
+
+The model (26 MB) is not in the app: it downloads from Hex's GitHub release
+the first time a capture starts with the lab on, is checked against a pinned
+SHA-256 before it is unpacked, and lives in `<models>/cleanup/`. With the lab
+off nothing is fetched or loaded. One copy stays loaded while the lab is on,
+and Labs › Free memory when idle frees it with the speech model. See
+[labs.md](labs.md) for the stage, the install, the fallbacks, and the checks.
+Not observed: a real dictation through the running app with the lab on.
+
 ### Rewrite With Nearby Text (Labs, macOS)
 
 While Labs › Rewrite reads nearby text is on (`labs.cursor_context`, off by
@@ -714,8 +752,8 @@ do they say Default and Use OpenCode default, because then OpenCode's own
 default answers. `live.ndjson` and History's processing observation record the
 rewrite model as `provider/id` in a `model` field, omitted when no model was
 named (OpenCode's own default answered, Hex's automatic choice failed before any
-model answered, or the on-device Apple Intelligence cleanup or Neutral voice
-pass ran). The "dictation
+model answered, or the on-device Apple Intelligence cleanup, Neutral voice
+pass, or cleanup tagger ran). The "dictation
 post-processing" and "voice prompt" completed and failed log lines name it too:
 `provider/id` for the named model that answered, or on failure the one the
 request asked for; `opencode default` when no model was named and OpenCode's
@@ -2693,8 +2731,9 @@ as flags-changed events 15 ms apart did not help. When the frontmost app has
 one of those identifiers, Hex types the dictation instead: one Unicode scalar
 per key down/up pair, each carrying the key the active layout types that
 character with, Shift as its own flags-changed events around a character that
-needs it, 4 ms between every posted event, and every line break as
-Shift-Return. Nothing is captured for a clipboard restore, so the clipboard is
+needs it, 50 ms before the first posted event so the client and the
+session's focused control have settled and keep the first character (#2942),
+4 ms between every later event, and every line break as Shift-Return. Nothing is captured for a clipboard restore, so the clipboard is
 left as it was; Labs › Keep dictation on clipboard still writes the typed text
 to it. Ordering, continuation joins, Send's trailing Return, and Paste Last
 behave as for a paste. Typing stops between characters when another app comes

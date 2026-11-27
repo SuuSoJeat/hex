@@ -137,6 +137,14 @@ Feature             Pane  Toggle (settings.json, hex settings)   On: what it doe
 │                                        left alone, and an unavailable, late, refused, or over-reaching answer pastes the
 │                                        corrected text; its card says why Apple Intelligence can't run here, and the
 │                                        switch still turns off
+├── Clean up what I say no labs.cleanup_tagger (macOS)
+│                                        Hex's own small model takes ums, repeats, false starts, and spoken corrections
+│                                        ("Tuesday, no wait, Thursday" → "Thursday") out of each English dictation on this
+│                                        Mac, after the corrections and ahead of the Apple Intelligence pass or the mode's
+│                                        rewrite; it can only remove words, and a guard keeps names, numbers, and vocabulary
+│                                        terms that were not corrected out loud; the 26 MB model downloads the first time a
+│                                        dictation starts with the lab on, and a model still downloading, slower than
+│                                        150 ms, or failing pastes the words as heard
 ├── Neutral voice   no    labs.neutral_voice             (macOS)
 │                                        a mode that turns it on gets each dictation rewritten into plain, standard, neutral
 │                                        wording on this Mac, instead of the OpenCode rewrite and the Apple Intelligence
@@ -162,7 +170,7 @@ Feature             Pane  Toggle (settings.json, hex settings)   On: what it doe
 ├── Sort and filter models no labs.picker_sort_filter   the Local transcription picker sorts by recommendation, size, or name and can show only models for the saved language (#645)
 ├── Model test details no  labs.benchmark_details        picker rows show raw WER/CER (lower is better), language, dataset, source, and conditions; incomparable "Most accurate" badges drop (#647)
 ├── Parakeet Ultra  no    labs.parakeet_ultra          the picker offers Moondream's Parakeet Ultra (pinned Q8_0, CC BY 4.0) with a details view; stays on while it dictates (#648)
-├── Special keys alone no labs.standalone_special_keys (Linux, Windows) Linux: Menu, Pause, Scroll Lock may be a shortcut's key, alone or with modifiers (#767); Windows: Caps Lock, Insert, Home, End, Page Up, Page Down may stand alone (#794)
+├── Special keys alone no labs.standalone_special_keys (Linux, Windows) Linux: Menu, Pause, Scroll Lock may be a shortcut's key, alone or with modifiers (#767); Windows: Insert, Home, End, Page Up, Page Down may stand alone (#794)
 ├── § key alone no  labs.section_key_alone       (Linux, macOS) the key left of 1 on ISO keyboards, § or a dead key such as ^, may be a shortcut with no modifier (#1050)
 ├── Microphone key alone no labs.microphone_key        (macOS) the microphone (dictation) key in a laptop keyboard's top row, always reported as Fn with key code 176, may be a shortcut with no modifier (#181)
 ├── Dictation stats no    labs.history_stats           History's Stats button opens a summary of retained dictations, with headline tiles, a typing-speed slider and time saved, the busiest-hour strip, a daily chart, app and Output bars, and Output time; an owner-only daily rollup (counts only, no text or app names) outlives retention, so the dialog also charts a 53-week heatmap and its headline totals cover all time; Clear all history deletes the rollup even with no entries; hex history stats prints it (#790)
@@ -1728,6 +1736,142 @@ real-Mac run of the new Swift bridge — this host and CI compile it, but no one
 has dictated through it yet. The Labs page goldens were regenerated on Linux
 with the new row.
 
+Clean up what I say (`clean-up-what-i-say`, `labs.cleanup_tagger`, macOS,
+off by default): while on, each English dictation loses its ums, repeated
+words, false starts, and spoken corrections before anything else rewrites it.
+The work is done by the cleanup tagger the iPhone app ships
+(`ios-model-cleanup-tagger-1`, a four-layer BERT with int8 weights, 26 MB to
+download and 28.5 MB on disk), which reads the words and says, for each one,
+how sure it is that the word should go. It writes nothing: every edit is the
+removal of a word that was heard, so the step cannot answer a question, follow
+a dictated instruction, or add a word.
+
+The stage is `dictation::cleanup::stage`
+([dictation/cleanup/stage.rs](../../src/dictation/cleanup/stage.rs)), read in
+`Profiles::process_cancellable_inner`
+([dictation/processor.rs](../../src/dictation/processor.rs)) after the speech
+Labs and the Global and mode corrections, and before Labs › Clean up with
+Apple Intelligence, the mode's OpenCode rewrite, Labs › Dictation style, and
+the transformations, which all read its text. The lab's switch is read once as
+the dictation's processing starts. The words go through
+`Words → Tokenizer::chunks → tagger → Chunk::proposals → CleanupGuard → render`:
+the transcript is split into words once, the words become chunks of at most
+128 tokens that never split a word, one model run per chunk gives a DELETE
+logit per word, and the guard admits a proposed removal only when it is a
+disfluency it knows (a filler, a repeat, a false start, or a correction with
+its cue). The guard runs with `Policy::DESKTOP`, the iOS guard plus four rules
+that only keep more (emphatic repeats, fillers that are being talked about,
+negations, and never an empty result), and with the mode's vocabulary and the
+shared one as protected terms. Each line is cleaned on its own and keeps the
+space around it, so the line breaks Labs › Spoken formatting wrote survive.
+
+The stage does not run for a language other than English (the primary subtag
+must be `en`; on Spanish the model dropped negations, and `auto` says nothing
+about the language, so it stays as heard too), for Labs › Dictation style's
+Verbatim, for a transcript of nothing but numbers, for typed text (Labs ›
+Transform typed text), for an empty or cancelled dictation, for a mode's
+Neutral voice pass, or for a dictation a voice prompt answered. Dictate
+without processing never reaches the processor on macOS, so it skips this
+too. The local API's `process=global` transcripts run the same pipeline and
+get the stage while the lab is on.
+
+The model is not in the app. It is the release asset
+`HexCleanupTagger-1.mlpackage.zip` of `anomalyco/hex`'s
+`ios-model-cleanup-tagger-1` release, pinned by size and SHA-256
+([dictation/cleanup/model.rs](../../src/dictation/cleanup/model.rs)). With the
+lab off Hex never fetches or loads it, at launch or later. With it on, the
+start of a capture (`cleanup::prepare` in
+[recognition/capture_actions.rs](../../src/recognition/capture_actions.rs))
+warms the model, and a missing one starts one background install
+(`hex-cleanup-model`): the archive downloads through `net` into
+`<models>/cleanup/HexCleanupTagger-1.mlpackage.zip.partial`, which a later
+try resumes; nothing is unpacked unless its size and SHA-256 match; Hex's own
+zip reader ([archive.rs](../../src/dictation/cleanup/archive.rs)) unpacks it
+into a staging folder and refuses an entry that would land outside the
+package, a symbolic link, an encrypted or unknown-method entry, a file named
+twice, more or larger files than the pin allows, and bytes whose CRC is
+wrong; Core ML compiles the package once; and the package and the compiled
+model each arrive by one rename, as
+`HexCleanupTagger-1.mlpackage` and `HexCleanupTagger-1.<sha256 prefix>.mlmodelc`.
+A lock file keeps two Hex processes from installing at once. A failed
+download, check, or compile installs nothing and is tried again when the next
+dictation starts. Turning the lab off keeps the files and frees the memory.
+
+One model is loaded, on a thread of its own (`hex-cleanup-tagger`,
+[tagger.rs](../../src/dictation/cleanup/tagger.rs)), through a small Swift
+bridge ([cleanup_tagger.swift](../../src/cleanup_tagger.swift)) that asks
+Core ML for the CPU only (`.cpuOnly`), so it never competes with the speech
+model for the GPU. A dictation waits at most 150 ms for its answer (the
+iPhone app's budget). Whatever happens the dictation pastes: a model that is
+still downloading, an answer that is late (a first load counts), and a load
+or run that fails all keep the corrected words as heard, and a late load
+finishes behind the dictation so the next one finds the model ready. Turning
+the lab off releases the model (`labs::apply` → `cleanup::reconcile`), and
+Labs › Free memory when idle frees it after the same quiet time as the speech
+model; the next dictation loads it again.
+
+A dictation the tagger was asked about records
+`profile: "Clean up what I say"` with its latency in the NDJSON `processing`
+field and History's Processing line, and `fallback` when it pasted as heard:
+"the cleanup model is still downloading", "the cleanup took longer than
+150 ms", or the load or run error. There is one observation per dictation, so
+when the Apple Intelligence pass or the mode's rewrite also runs, theirs is
+the one recorded. The log lines carry the latency, the word count, and how
+many fillers, repeats, false starts, and corrections went, never a word of
+the dictation. The step usually takes a few milliseconds, so it shows no
+processing stage in the HUD.
+
+The Labs row is added only in a macOS build, so the Linux renders of the
+macOS Labs scenes, and their goldens, do not change.
+
+Checks: `a_file_that_would_land_outside_the_package_is_refused`,
+`a_symbolic_link_or_an_unreadable_entry_is_refused`,
+`an_archive_larger_than_it_says_or_than_allowed_is_refused`,
+`damaged_bytes_and_a_file_named_twice_are_refused`, and
+`a_model_package_unpacks_with_its_folders_and_bytes` in
+[archive.rs](../../src/dictation/cleanup/archive.rs);
+`the_pin_names_the_release_asset_the_iphone_app_ships`,
+`a_verified_archive_is_unpacked_and_compiled_once`,
+`an_archive_that_is_not_the_pinned_one_is_never_unpacked`,
+`a_failed_download_keeps_its_partial_file_and_installs_nothing`,
+`a_package_that_does_not_compile_is_fetched_again_next_time`, and
+`an_archive_holding_another_folder_installs_nothing` in
+[model.rs](../../src/dictation/cleanup/model.rs);
+`one_model_is_loaded_once_and_answers_every_chunk`,
+`turning_the_lab_off_frees_the_model_and_on_loads_it_again`,
+`a_model_left_idle_is_freed_and_loads_again_when_wanted`,
+`a_model_that_is_not_installed_or_cannot_run_says_so`, and
+`a_late_answer_is_given_up_on_and_the_load_still_finishes` in
+[tagger.rs](../../src/dictation/cleanup/tagger.rs);
+`only_an_english_dictation_with_words_to_clean_is_cleaned`,
+`every_language_but_english_stays_as_heard`,
+`the_lab_off_asks_no_tagger_and_changes_nothing`,
+`the_taggers_deletions_pass_the_guard_and_are_rendered`,
+`the_guard_keeps_what_the_tagger_may_not_remove`,
+`a_clean_dictation_comes_back_exactly_as_it_was`,
+`each_line_is_cleaned_and_the_line_breaks_stay`,
+`a_long_dictation_is_scored_in_chunks_of_whole_words`,
+`a_missing_late_or_failing_model_keeps_the_words_as_heard`, and
+`the_tagger_is_given_the_time_budget_as_its_deadline` in
+[stage.rs](../../src/dictation/cleanup/stage.rs), all with a stand-in tagger;
+`the_cleanup_tagger_cleans_an_english_dictation_and_nothing_else` and
+`a_tagger_that_cannot_answer_keeps_the_corrected_transcript` in
+[processor.rs](../../src/dictation/processor.rs); and
+`the_cleanup_tagger_is_a_macos_output_lab_off_by_default` in
+[labs.rs](../../src/labs.rs). The real model is covered by one test that is
+run by hand because it needs the network and Core ML,
+`the_real_tagger_cleans_the_handwritten_sentences_as_the_iphone_app_does`
+([real_model_tests.rs](../../src/dictation/cleanup/real_model_tests.rs)): it
+downloads the pinned archive through `net`, checks, unpacks, compiles, and
+loads it, and runs the iPhone app's 137 hand-written sentences through the
+stage. On an Apple silicon Mac in November 2026 it installed in 2.2 s, loaded
+and answered the first sentence in 117 ms, put 129 of the 137 sentences
+exactly on target (the number the model's recorded answers give through the
+same guard), took 0.75 ms per sentence at the median and 2.6 ms at the
+slowest, and cleaned a 400-word dictation in 10 ms. Not yet observed: a real
+dictation through the running app with the lab on, the download on a managed
+network, or an Intel Mac.
+
 Neutral voice (`neutral-voice`, macOS, off by default): while on, a mode that
 turns on its own **Neutral voice** switch gets each of its dictations
 rewritten on this Mac into plain, standard, neutral wording with the same
@@ -2496,16 +2640,8 @@ hex settings set dictation_hotkey menu        // labs.special-keys
 │   └── Wayland portal -> preferred trigger Menu, Pause, Scroll_Lock
 ├── Toggle off -> "menu needs Labs › Special keys alone: hex labs on special-keys"
 ├── Windows -> Menu, Pause, Scroll Lock always allowed, alone too; the toggle
-│   instead lets Caps Lock, Insert, Home, End, Page Up, Page Down stand alone
-│   ("home alone needs Labs › Special keys alone" while off), and off puts a
-│   saved one back
-│   └── Caps Lock (`capslock`) -> the recorder's hook keeps a press made in
-│       Hex's window, and a shortcut keeps every press it fires on, so the lock
-│       never flips; Caps Lock with other modifiers held still reaches Windows.
-│       Checks: `the_recorder_keeps_a_whole_caps_lock_press_made_in_hexs_window`
-│       (`windows/input/chord.rs`),
-│       `caps_lock_is_named_in_any_spelling_and_alone_is_a_windows_special_key`
-│       (`app_settings/shortcut_repair.rs`); no run on a Windows keyboard
+│   instead lets Insert, Home, End, Page Up, Page Down stand alone ("home alone
+│   needs Labs › Special keys alone" while off), and off puts a saved one back
 ├── macOS -> no toggle; a bare one still needs a modifier, as before
 ├── Window recorder (Linux) -> records them, alone too, while on (#1187);
 │   refuses them while off ("Add a modifier")
