@@ -96,8 +96,7 @@ nonisolated struct AdaptiveTouchGeometry: Equatable {
         var groups: [Int] = []
         let m = layout.metrics
         let rows = "\(Int((m.keyHeight * 4).rounded())):\(Int(((m.keyHeight + m.rowGap) * 4).rounded()))"
-        // The experiment uses its own key plane where the punctuation row is drawn: a
-        // QWERTY, non-letter page or URL-field Dvorak keyboard keeps what it learned.
+        // The experiment uses its own key plane where the punctuation row is drawn.
         let punctuation = layout.hasDvorakPunctuationRow ? "dvorakPunctuation|" : ""
         var signature = "\(layout.posture)|\(layout.orientation)|\(layout.isSplit)|\(layout.hexPlacement)|\(Int((layout.width / 10).rounded()))|\(rows)|\(punctuation)"
         for key in layout.keys {

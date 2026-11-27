@@ -47,8 +47,7 @@ extension FullKeyboardView {
         setNeedsLayout()
     }
 
-    /// Settings › Labs › Dvorak punctuation keys: English's Dvorak letters gain comma,
-    /// period and semicolon keys. No row changes height, so the host is asked for nothing.
+    /// Refreshes the Dvorak punctuation layout without changing the keyboard height.
     func syncDvorakPunctuation() {
         let on = FullKeyboardSettings().dvorakPunctuation
         guard engine.dvorakPunctuation != on else { return }

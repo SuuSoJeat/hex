@@ -769,10 +769,10 @@ nonisolated struct KeyboardLayout: Equatable, Sendable {
     var isSplit: Bool { split != nil }
     var bottomRowIndex: Int { metrics.keyRowCount - 1 }
 
-    /// Whether this layout draws the experiment's row: Dvorak letters in a text field (a URL,
-    /// email or web search field keeps its own `.`). Only then is its row 1 a key plane
-    /// Adaptive touch learns.
-    var hasDvorakPunctuationRow: Bool { dvorakPunctuation && layer == .letters && letters == .dvorak && field == .text }
+    /// Whether the experiment changes the top row that Adaptive touch learns.
+    var hasDvorakPunctuationRow: Bool {
+        dvorakPunctuation && layer == .letters && (!isSplit || field == .text)
+    }
 
     /// The Duo folded draws Apple's key labels smaller: its 123 is 70 px wide there against
     /// Hex's 80 at 2.95 px per point (iOS 27.2), 0.875 of Hex's upright iPhone size, the same
@@ -977,11 +977,7 @@ nonisolated struct KeyboardLayout: Equatable, Sendable {
         let innerWidth = width - 2 * inset
         let rows = characterRows(for: layer, language: language, letters: letters)
         let dvorak = layer == .letters && letters == .dvorak
-        // Settings › Labs › Dvorak punctuation: a URL, email or web search field keeps
-        // its own `.` key by the space bar, so its row 1 stays Apple's rather than have a
-        // second one.
-        let punctuation = dvorak && dvorakPunctuation
-        let punctuationRow = punctuation && field == .text
+        let punctuationRow = dvorak && dvorakPunctuation
         // Modifiers and the bottom row keep the 10-key sizes; an 11-key layout narrows only
         // its character keys, and row 3's letters sit centred between shift and delete.
         let referenceW = letterWidth(innerWidth: innerWidth, metrics: m)
@@ -1121,6 +1117,9 @@ nonisolated struct KeyboardLayout: Equatable, Sendable {
             leading.append((.hex, functionW, "hex"))
         }
         var trailing = field.keysRightOfSpace(width: referenceW)
+        if punctuationRow {
+            trailing.removeAll { $0.0 == .character(".") }
+        }
         if placement == .rightOfSpace {
             trailing.append((.hex, modW, "hex"))
         }
@@ -1247,15 +1246,6 @@ nonisolated struct KeyboardLayout: Equatable, Sendable {
             }
         }
 
-        // In URL and email fields, add just the semicolon where the space bar has room.
-        if punctuation && !punctuationRow, let i = drawn.firstIndex(where: { $0.kind == .space && $0.row == 3 }) {
-            let space = drawn[i].frame
-            if space.width >= 2 * referenceW + m.gap {
-                drawn[i].frame = CGRect(x: space.minX + referenceW + m.gap, y: space.minY, width: space.width - referenceW - m.gap, height: space.height)
-                add(.character(";"), row: 3, x: space.minX, w: referenceW, label: ";", shifted: ":")
-            }
-        }
-
         // Settings › Labs › Comma and period keys: a comma just left of the space bar and
         // a period just right of it, taking their width from it, where the bar still holds a
         // letter-wide key and a space besides both.
@@ -1338,8 +1328,7 @@ extension KeyboardLayout {
             : khmerLetters.map { $0.map(\.text) }
         let footerRow = m.keyRowCount - 1
         let modifierRow = footerRow - 1
-        // Settings › Labs › Dvorak punctuation, as on the joined keyboard: a URL, email or
-        // web search field keeps its own `.` key, so its row 1 stays Apple's.
+        // Split URL, email and web search fields keep their period next to space.
         let punctuation = layer == .letters && letters == .dvorak && dvorakPunctuation
         let punctuationRow = punctuation && field == .text
         let left = inset + m.side
