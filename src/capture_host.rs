@@ -1,6 +1,6 @@
-//! The `capture` experiment (macOS, Linux, and Windows): Scrawl's capture
-//! engine, the `scrawl-capture` crate, hosted inside Hex. Step 3 of
-//! `docs/plans/capture-in-hex.md`. Everything here is shared; what differs
+//! Annotate (macOS, Linux, and Windows): Scrawl's capture engine, the
+//! `scrawl-capture` crate, hosted inside Hex (`docs/features/capture.md`,
+//! `docs/hex-annotation.md`). Everything here is shared; what differs
 //! by OS is the engine's own platform adapter (ScreenCaptureKit; the portal,
 //! PipeWire and VA-API; or Windows.Graphics.Capture), where the audio
 //! timeline comes from (`DictationAudio` on macOS, the Linux and Windows
@@ -1820,10 +1820,6 @@ pub enum Tapped {
 /// The capture is recording and its engine took input: the tap reports.
 static TAP_RECORDING: AtomicBool = AtomicBool::new(false);
 
-/// Whether this process records a capture now, on every OS: set when the
-/// host takes its bundle and cleared when it stops or cancels. The
-/// dictation HUD reads it to keep clear of the capture capsule.
-static RECORDING: AtomicBool = AtomicBool::new(false);
 static TAP_INPUT: OnceLock<SyncSender<(CaptureInstant, Tapped)>> = OnceLock::new();
 static DROPPED_INPUT: AtomicUsize = AtomicUsize::new(0);
 
@@ -1839,13 +1835,6 @@ pub fn tapped_while(f: impl FnOnce()) -> Vec<Tapped> {
     TEST_TAP.set(Some(Vec::new()));
     f();
     TEST_TAP.take().unwrap_or_default()
-}
-
-/// Whether a capture records now, on every OS. The dictation HUD reads it
-/// while a dictation shows, so a dictation during a capture sits at the
-/// bottom edge, clear of the capture capsule at the screen's top.
-pub fn recording() -> bool {
-    RECORDING.load(Ordering::Acquire)
 }
 
 #[cfg_attr(not(target_os = "macos"), allow(dead_code))]
@@ -2001,7 +1990,6 @@ impl LiveInput {
         };
         set_ink(None);
         TAP_RECORDING.store(false, Ordering::Release);
-        RECORDING.store(bundle.is_some(), Ordering::Release);
         drawing::reset();
         let dropped = DROPPED_INPUT.swap(0, Ordering::Relaxed);
         if dropped > 0 {
@@ -2055,6 +2043,7 @@ impl LiveInput {
     /// rules (Hex's windows are this process's).
     fn forward(&self, received: Receiver<(CaptureInstant, Tapped)>) {
         let mut pill = CapsulePill::default();
+        let mut picker = drawing::Picker::default();
         for (at, tapped) in received {
             let mut state = self.state();
             let InputState::Attached(target) = &mut *state else {
@@ -2077,7 +2066,8 @@ impl LiveInput {
                 #[cfg(not(target_os = "macos"))]
                 Tapped::Key { .. } => continue,
             };
-            let Some(event) = target.rules.translate(t_ms, input).map(drawing::as_pen) else {
+            let event = target.rules.translate(t_ms, input);
+            let Some(event) = event.and_then(|e| picker.pen(e)) else {
                 continue;
             };
             // A press or scroll on the capsule's pill is Hex's; anywhere
@@ -5276,7 +5266,7 @@ mod tests {
                 word_lag(*model),
                 Some(lag),
                 "{} has a new pinned file: measure its word lag again \
-                 (docs/plans/capture-in-hex.md) before keeping the correction",
+                 (docs/features/capture.md) before keeping the correction",
                 model.as_str()
             );
         }

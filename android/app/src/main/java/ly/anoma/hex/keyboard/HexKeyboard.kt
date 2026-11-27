@@ -10,6 +10,7 @@ import android.content.SharedPreferences
 import android.content.pm.PackageManager
 import android.content.res.Configuration
 import android.database.ContentObserver
+import android.graphics.drawable.Icon
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
@@ -28,9 +29,11 @@ import android.view.inputmethod.InputMethodSubtype
 import android.widget.inline.InlinePresentationSpec
 import androidx.autofill.inline.UiVersions
 import androidx.autofill.inline.common.TextViewStyle
+import androidx.autofill.inline.common.ViewStyle
 import androidx.autofill.inline.v1.InlineSuggestionUi
 import androidx.core.content.ContextCompat
 import kotlin.math.roundToInt
+import ly.anoma.hex.BuildConfig
 import ly.anoma.hex.MainActivity
 import ly.anoma.hex.R
 import ly.anoma.hex.diagnostics.Diagnostics
@@ -325,7 +328,7 @@ class HexKeyboard : InputMethodService() {
         view?.status(capture.phase, idleHint())
         // Hex Preview's update line (Play builds have none); never in a password field.
         Updates.keyboardShown(this, engine.secure) { view?.notice(it) }
-        Diagnostics.keyboardShown(this, info.packageName, engine.secure) { view?.notice(it) }
+        if (BuildConfig.DIAGNOSTICS) Diagnostics.keyboardShown(this, info.packageName, engine.secure) { view?.notice(it) }
         viewing = true
         watchClipboard()
         offerKept()
@@ -357,8 +360,14 @@ class HexKeyboard : InputMethodService() {
         val height = InlineAutofill.chipHeight(strip.roundToInt(), density)
         val widths = InlineAutofill.chipWidths(density)
         // Password managers draw their own chip only when the style bundle carries the androidx
-        // UiVersions they know; its text follows the strip's.
+        // UiVersions they know; its text follows the strip's. The chip's background is set too,
+        // tinted with the key colour: left out, the service draws its own white pill, and the
+        // strip's light dark-mode text on it was unreadable (#2888).
+        val chip = ViewStyle.Builder().setBackground(
+            Icon.createWithResource(this, R.drawable.autofill_chip).setTint(getColor(R.color.key)))
+            .build()
         val style = InlineSuggestionUi.newStyleBuilder()
+            .setChipStyle(chip)
             .setTitleStyle(TextViewStyle.Builder().setTextColor(getColor(R.color.ink))
                 .setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f).build())
             .setSubtitleStyle(TextViewStyle.Builder().setTextColor(getColor(R.color.quiet))
@@ -429,7 +438,7 @@ class HexKeyboard : InputMethodService() {
      * starts, a tap or its ✕ (in place of Hex Preview's update line, which comes back in the next field). */
     private fun swipeUnavailable() {
         val language = swipeUnreadableIn(feedback.layout, preferences.spoken) ?: return
-        view?.notice(StripNotice(getString(R.string.keyboard_note_swipe, language.label), getString(R.string.keyboard_note_dismiss),
+        view?.notice(StripNotice(getString(R.string.keyboard_note_swipe, language), getString(R.string.keyboard_note_dismiss),
             tap = {}, dismiss = {}))
     }
     internal fun beginSpeech(): Boolean {

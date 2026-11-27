@@ -24,8 +24,7 @@ window, and its OSes `labs::Feature::oses`.
 
 **On the web.** Every `Everyone` lab (not Dev ones, nor the labs that only
 matter once Annotate is on: Screenshots, Annotate last 15 seconds, Record the
-screen under the pointer, Copy a capture as one file, Agent tools for captures,
-Dictate while annotating)
+screen under the pointer, Copy a capture as one file, Agent tools for captures)
 has a page at `anoma.ly/hex/labs/<id>` (`dev.anoma.ly` for
 the dev site), listed newest first at `/hex/labs`, with a 1200 × 630 social
 card. The pages come from `site/src/labs.json`, which only the registry
@@ -163,7 +162,7 @@ Feature             Pane  Toggle (settings.json, hex settings)   On: what it doe
 ├── Sort and filter models no labs.picker_sort_filter   the Local transcription picker sorts by recommendation, size, or name and can show only models for the saved language (#645)
 ├── Model test details no  labs.benchmark_details        picker rows show raw WER/CER (lower is better), language, dataset, source, and conditions; incomparable "Most accurate" badges drop (#647)
 ├── Parakeet Ultra  no    labs.parakeet_ultra          the picker offers Moondream's Parakeet Ultra (pinned Q8_0, CC BY 4.0) with a details view; stays on while it dictates (#648)
-├── Special keys alone no labs.standalone_special_keys (Linux, Windows) Linux: Menu, Pause, Scroll Lock may be a shortcut's key, alone or with modifiers (#767); Windows: Insert, Home, End, Page Up, Page Down may stand alone (#794)
+├── Special keys alone no labs.standalone_special_keys (Linux, Windows) Linux: Menu, Pause, Scroll Lock may be a shortcut's key, alone or with modifiers (#767); Windows: Caps Lock, Insert, Home, End, Page Up, Page Down may stand alone (#794)
 ├── § key alone no  labs.section_key_alone       (Linux, macOS) the key left of 1 on ISO keyboards, § or a dead key such as ^, may be a shortcut with no modifier (#1050)
 ├── Microphone key alone no labs.microphone_key        (macOS) the microphone (dictation) key in a laptop keyboard's top row, always reported as Fn with key code 176, may be a shortcut with no modifier (#181)
 ├── Dictation stats no    labs.history_stats           History's Stats button opens a summary of retained dictations, with headline tiles, a typing-speed slider and time saved, the busiest-hour strip, a daily chart, app and Output bars, and Output time; an owner-only daily rollup (counts only, no text or app names) outlives retention, so the dialog also charts a 53-week heatmap and its headline totals cover all time; Clear all history deletes the rollup even with no entries; hex history stats prints it (#790)
@@ -408,15 +407,6 @@ Feature             Pane  Toggle (settings.json, hex settings)   On: what it doe
 │                                        // lines, every refusal), control::cli::annotate_read's clap conflicts, and
 │                                        // agent_tools_for_captures_is_its_own_switch_and_everywhere (labs.rs); the video decode
 │                                        // path is unverified on a real bundle, and no capture was recorded for this change
-├── Dictate while annotating no labs.dictate_while_annotating (every OS)
-│                                        while an Annotate capture records, the dictation shortcut dictates as usual: hold,
-│                                        toggle, or lock it and the text pastes into the app in front, History and Paste Last keep
-│                                        it, and the capture goes on recording and keeps the dictated words in its own track
-│                                        (both copies of the same microphone timeline). Off, a press during a capture starts
-│                                        nothing, as before
-│                                        // checks: dictate_while_annotating_is_its_own_switch_and_everywhere (labs.rs);
-│                                        // a_dictation_during_a_capture_shows_at_the_bottom_clear_of_the_capsule (rune_hud);
-│                                        // not observed with a real Mac, Linux session, or Windows PC recording while dictating
 ├── Install agent skill from Annotate no labs.annotate_agent_install (every OS)
 │                                        Annotate gains an Agents section: one row per coding agent writes the
 │                                        hex-annotate skill into its own skills folder (Claude Code, OpenCode; Codex and
@@ -2506,8 +2496,16 @@ hex settings set dictation_hotkey menu        // labs.special-keys
 │   └── Wayland portal -> preferred trigger Menu, Pause, Scroll_Lock
 ├── Toggle off -> "menu needs Labs › Special keys alone: hex labs on special-keys"
 ├── Windows -> Menu, Pause, Scroll Lock always allowed, alone too; the toggle
-│   instead lets Insert, Home, End, Page Up, Page Down stand alone ("home alone
-│   needs Labs › Special keys alone" while off), and off puts a saved one back
+│   instead lets Caps Lock, Insert, Home, End, Page Up, Page Down stand alone
+│   ("home alone needs Labs › Special keys alone" while off), and off puts a
+│   saved one back
+│   └── Caps Lock (`capslock`) -> the recorder's hook keeps a press made in
+│       Hex's window, and a shortcut keeps every press it fires on, so the lock
+│       never flips; Caps Lock with other modifiers held still reaches Windows.
+│       Checks: `the_recorder_keeps_a_whole_caps_lock_press_made_in_hexs_window`
+│       (`windows/input/chord.rs`),
+│       `caps_lock_is_named_in_any_spelling_and_alone_is_a_windows_special_key`
+│       (`app_settings/shortcut_repair.rs`); no run on a Windows keyboard
 ├── macOS -> no toggle; a bare one still needs a modifier, as before
 ├── Window recorder (Linux) -> records them, alone too, while on (#1187);
 │   refuses them while off ("Add a modifier")
@@ -3997,6 +3995,15 @@ embedded service when Hex isn't running ([control-cli.md](control-cli.md)).
 `hex labs on|off transcribe-files` still answers with that and exits 0
 (`labs::GRADUATED`); the saved `labs.transcribe_files` key is ignored.
 
+Dictate while annotating (`dictate-while-annotating`) graduated: while an
+Annotate capture records, the dictation shortcut (and Caps Lock and middle-mouse
+dictation) dictates as usual on every OS, the text pastes into the app in front,
+and the capture keeps recording with the same words in its narration
+([capture.md](capture.md)). The dictation HUD keeps its edge and moves past the
+capture capsule through the overlay dock ([capture.md](capture.md#overlay-dock)).
+`hex labs on|off dictate-while-annotating` still answers with that and exits 0
+(`labs::GRADUATED`); the saved `labs.dictate_while_annotating` key is ignored.
+
 Meeting platform icons (`meeting-platform-icons`, issue 1290) graduated:
 each recording in the Meetings list always shows its call service's icon, or
 a neutral one ([meetings.md](meetings.md)). `hex labs on|off
@@ -4927,10 +4934,8 @@ Checks: `labs_is_one_flat_list_of_toggles_off_by_default`,
 `voice_filter_shows_only_while_its_labs_toggle_is_on`, and
 `an_installed_driver_keeps_the_voice_filter_on` in
 [panes.rs](../../src/rune_ui/tests/panes.rs);
-`app_model_switching_is_a_labs_toggle_on_macos_and_windows`,
-`a_mode_picks_an_installed_speech_model_and_language`, and
-`the_speech_row_needs_the_lab_and_a_capable_os` in
-[speech_model_tests.rs](../../src/rune_ui/speech_model_tests.rs);
+`app_model_switching_is_named_and_modes_validate_their_speech_choice` in
+[control/settings.rs](../../src/control/settings.rs);
 `every_feature_is_off_by_default_and_round_trips` and
 `the_old_master_switch_is_read_and_ignored` in [labs.rs](../../src/labs.rs);
 `a_dev_feature_in_a_stable_build_is_unlisted_refused_and_off` in [labs.rs](../../src/labs.rs) (a stand-in for a Dev feature, since none exists yet); `labs_parse_as_a_read_command` in [main.rs](../../src/main.rs);

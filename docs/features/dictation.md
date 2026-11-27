@@ -79,7 +79,8 @@ than a few points (panning, autoscroll) never counts, and every middle click,
 long or short, still reaches the app in front. A mouse-started capture is the dictation
 shortcut's, so its next press finishes it too; a long press finishes a capture
 the shortcut (or Caps Lock) locked, keeping that capture's output settings. A
-held press, a pending double tap, or an Annotate recording is left alone. While
+held press or a pending double tap is left alone; an Annotate recording never
+holds one back (it records on beside the dictation). While
 the lab is on, Escape cancels any hands-free dictation in every shortcut mode
 and is kept from the app in front, a terminal included; off, the usual cancel
 rules apply. Not verified on hardware; details and checks in
@@ -122,6 +123,20 @@ reach X11 grabs as keysyms 0xff67/0xff13/0xff14 and the portal as `Menu`,
 recorder refuses them, and a saved shortcut on one goes back to its default
 when settings load or the toggle turns off. On, the window's recorder takes
 them too (#1187). Details and checks in [labs.md](labs.md).
+
+Windows with the same toggle on: Caps Lock may be a shortcut's key alone, as
+Insert, Home, End, Page Up, and Page Down may (`hex settings set
+dictation_hotkey capslock`, or press it in the window's recorder). The
+listener keeps every Caps Lock press the shortcut fires on, and the recorder's
+own hook keeps a press made in Hex's window, so the lock never flips; with
+other modifiers held, Caps Lock still reaches Windows. Off, the recorder
+shows "Add a modifier", `hex settings` refuses it, and a saved one goes back
+to its default. Caps Lock with a modifier needs no toggle. Implemented
+November 26, 2026 from a user report; not yet run on a Windows keyboard.
+Checks: `the_recorder_keeps_a_whole_caps_lock_press_made_in_hexs_window`
+(`windows/input/chord.rs`) and
+`pause_and_scroll_lock_stand_alone_but_numpad_keys_need_a_modifier`
+(`windows/input.rs`).
 
 Linux and macOS with Labs › § key alone on (`labs.section_key_alone`,
 off by default; issue 1050): the ISO section key, left of 1, may be a
@@ -847,8 +862,16 @@ picker (closing one that is open) and the writer. Check:
 
 ```ts
 Tap, Paste Last menu, or hex paste-last → newest ready, noncancelled dictation or marked annotation
-Hold 200 ms on the Mac event tap → up to eight recent items, without taking focus
-├── Rows are read from the press, so the picker fades in as the hold passes
+Hold 200 ms on the Mac event tap → recent items, without taking focus
+├── Rows are read from the press, so the picker fades in as the hold passes: the
+│   newest 16 first, then up to 300 read after it opens, the selection kept on its
+│   item (each capture is a manifest read, so the deep list never delays opening)
+├── The rail shows eight rows and scrolls through the rest: wheel, trackpad, and
+│   ↑/↓ (the selection scrolls into view); only rows in view are built, so only
+│   their pictures load. With ⌥⇧ still held a mouse wheel turns sideways (macOS
+│   turns it before Rune sees it), and the rail turns it back (paste_picker/wheel.rs)
+├── Works while an Annotate capture or a meeting records: neither stops, and the
+│   capture records none of the picker's clicks, scrolls, or keys (nor inks them)
 ├── Centred on the display under the pointer; stays open once the keys come up
 ├── Rows down a rail (a capture's picture or a dictation's mark, first words, kind · age)
 │   beside the selected row's preview: a capture's first keyframe (else its contact
@@ -865,16 +888,27 @@ Hold 200 ms on the Mac event tap → up to eight recent items, without taking fo
 └── Escape, a click outside the card, another key, or changed focus → close without touching the clipboard
 ```
 
-Check: `a_tap_pastes_and_a_hold_opens_a_picker_that_stays_until_escape` and
-`a_click_selects_a_second_pastes_and_a_capture_opens_in_its_editor` in
-[paste/browse.rs](../../src/paste/browse.rs). Scenes: `mac-paste-picker` (a
+Check: `a_tap_pastes_and_a_hold_opens_a_picker_that_stays_until_escape`,
+`a_click_selects_a_second_pastes_and_a_capture_opens_in_its_editor`,
+`the_deep_list_replaces_the_first_rows_and_keeps_the_selection_on_its_item` and
+`an_open_picker_keeps_its_clicks_scrolls_and_keys_out_of_a_capture` in
+[paste/browse.rs](../../src/paste/browse.rs);
+`the_first_rows_open_and_the_deep_list_reaches_far_back` in
+[paste/recent.rs](../../src/paste/recent.rs); the rail's wheel, Shift-turned
+wheel, click, and key-reveal tests in
+[rune_ui/paste_picker/tests.rs](../../src/rune_ui/paste_picker/tests.rs);
+`paste_last_taps_and_holds_while_annotate_records` in
+[recognition/paste_picker.rs](../../src/recognition/paste_picker.rs) and
+`the_paste_picker_works_over_annotate_and_meetings` in
+[recognition.rs](../../src/recognition.rs). Not run on a real Mac: a physical
+wheel with ⌥⇧ held over the panel, and ⌥⇧V over a live capture or meeting. Scenes: `mac-paste-picker` (a
 capture selected) and `mac-paste-picker-dictation`, on fixture rows and drawn
 pictures. Not yet run natively: a real capture's picture loading from its
 bundle, Copy, and Open in Editor from the picker.
 
 With it on, the Mac History puts dictations, annotations, screenshots and
 screen recordings in one list. All types is the default. Search works inside the
-selected type and beyond the eight picker rows. Capture files keep their
+selected type and beyond the picker's rows. Capture files keep their
 editor, copy, reveal, drag and Trash actions. Clear dictation history affects
 the dictation owner only. A shared-library bundle can be visible without
 being eligible for global paste; that needs the Hex writer's ready receipt.
@@ -2832,6 +2866,9 @@ The X11 grab and the hooks' suppression have no automated end-to-end check.
 ```ts
 Record -> Release -> Transcribing/processing/paste -> Finished // dictate.feedback
   HUD + tones distinguish capture from pending work          // never take focus
+  HUD on its edge -> past any meeting capsule or Annotate surface there, 8 pt clear
+     (overlay dock, ranks last; in the bar or notch it comes out under the bar
+      first; beside the pointer it is on no edge) // capture.md#overlay-dock
   Pending processing/paste -> Still unfinished, not recording
   Shortcut press -> Start tone ~50 ms later                  // dictate.start-tone
      -> Chord within 40 ms (e.g. Option-Command-I) -> Silent

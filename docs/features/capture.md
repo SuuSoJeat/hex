@@ -1,9 +1,8 @@
 # Annotate (macOS, Linux, and Windows)
 
 Annotate is Scrawl's capture engine hosted inside Hex (code and settings keep
-the name `capture`), steps 3 to 5 of
-[the plan](../plans/capture-in-hex.md). It runs the real
-`scrawl-capture` crate, imported into `crates/capture`: it records the active
+the name `capture`), running the `scrawl-capture` crate (`crates/capture`) with
+`SharedResources::none()` (no separate ingest server or global shortcut tap): it records the active
 display with ScreenCaptureKit, on Linux the screen-cast portal and
 PipeWire (`capture.linux`), on Windows Windows.Graphics.Capture
 (`capture.windows`), (or a cabled iPhone through `scrawl-helper`'s
@@ -151,9 +150,22 @@ On Linux                                 // capture.linux
 │   hardware
 ├── Frames -> the portal's PipeWire stream, libpipewire-0.3 loaded at run
 │   time (`maxFramerate` 60/1); 32-bit RGB as a linear DMA-BUF (niri, GNOME,
-│   KDE) or shared memory. A stream that ends or fails before its first frame
-│   ends the capture with that reason, keeping no voice; a stream with no frame
-│   yet when the person stops is saved with its voice and marks, the summary
+│   KDE) or shared memory, preferred in that order. A desktop with neither
+│   (#2899: niri 26.04 on NVIDIA offers only tiled DMA-BUFs) fails the
+│   stream with `no more input formats`; only then, once per capture, is
+│   EGL loaded (libEGL/libGLESv2 at run time) and every DRM EGL device (then
+│   Mesa's surfaceless platform) asked for the tiled layouts it imports
+│   (`eglQueryDmaBufModifiersEXT` minus external-only ones, merged across
+│   devices), each display terminated right after, and the stream reconnects
+│   offering those too (`Stream::offer_tiled`; several modifiers carry
+│   DONT_FIXATE so the producer picks one it can allocate; a format whose
+│   modifier is still unfixated isn't taken, Hex waits for the producer's
+│   settled one). Desktops that take linear or shared memory never touch EGL.
+│   A later renegotiation that changes only the modifier is followed on the
+│   CPU path; on the GPU encoder, or for a new size, it is only logged. No
+│   EGL or no device listing a tiled layout -> the original error. A stream
+│   that ends or fails before its first frame ends the capture with that
+│   reason, keeping no voice; a stream with no frame yet when the person stops is saved with its voice and marks, the summary
 │   saying the stream sent no frames
 ├── Encoding -> VA-API (libva loaded at run time): each DMA-BUF imported, scaled
 │   to a 2560 px long edge (1920 for a window, exact even sides padded to 16 px
@@ -170,14 +182,32 @@ On Linux                                 // capture.linux
 │   VA-API refusing the first frame's buffer (#1179: Intel Arc on the xe
 │   driver) -> the same CPU path instead of failing. The negotiated DRM
 │   modifier goes to the import and the log; the CPU never reads a tiled
-│   buffer as rows. A first frame neither path can read (a DMA-BUF the CPU
-│   can't map, or tiled) fails the capture with why, never a capture without
+│   buffer as rows: on the CPU path EGL imports it as a GL texture and
+│   `glReadPixels` copies it out as rows in the stream's byte order
+│   (`linux::egl::Reader`; one plane only). The reader opens nothing until
+│   the first tiled frame, then tries each device that lists the agreed
+│   layout and keeps the first that reads it (on two GPUs, whichever the
+│   compositor's buffer imports on); its context and display are destroyed
+│   and terminated when the recording ends, so no GPU stays awake for Hex
+│   between captures. A first frame neither path can
+│   read (a DMA-BUF the CPU can't map, a tiled one EGL can't import, or a
+│   multi-plane one) fails the capture with why, never a capture without
 │   a picture or a crash. Buffers PipeWire removes mid-stream (a
 │   renegotiation) are never queued again, and Hex maps buffers itself and
 │   unmaps a removed one only after the recorder's copy, so a renegotiation
 │   can't crash Hex. Check: vaapi render_nodes_in_order,
 │   level_and_sps_crop_match_resolution_and_60fps, pipewire
-│   offered_formats_parse_back, a_negotiated_tiled_modifier_is_read,
+│   offered_formats_parse_back, a_negotiated_tiled_modifier_is_read, egl
+│   only_renderable_tiled_layouts_are_offered, red_and_blue_trade_places,
+│   pipewire a_modifier_the_producer_has_yet_to_fixate_is_not_settled,
+│   capture::platform only_a_new_buffer_layout_is_followed_on_the_cpu,
+│   only_a_format_refusal_offers_tiled_buffers; locally (not committed): EGL
+│   readback of a linear 4x3 buffer kept bytes and row order on Mesa llvmpipe
+│   (surfaceless), and a display terminated and reopened read again; against
+│   PipeWire 1.4.2 a videotestsrc node (RGB/UYVY) refused the stream with
+│   `no more input formats` and `offer_tiled` renegotiated on the same node
+│   (refused again, as expected). Tiled readback on NVIDIA + niri, and the
+│   DONT_FIXATE handshake with niri, not observed,
 │   capture::platform output_sizes_stay_exact_even_dimensions… and
 │   cpu_x264_uses_superfast…; PipeWire 1920x1080 SHM -> x264 recorded 60/1 fps
 │   (598 frames in 9.97 s, 594 delivered) on hex-linux-nvidia; VA-API 60 fps
@@ -229,10 +259,9 @@ On Linux                                 // capture.linux
 │   edge states that return to Selecting (Window starts the portal's picker,
 │   Area isn't offered), and takes the same opt-in whenever it does. Check:
 │   labs gnome_annotate_is_its_own_bit_*; not run on a GNOME session
-├── While it records, dictation starts nothing (the portal
-│   or grab already took their keys, so nothing reaches the app), unless Labs ›
-│   Dictate while annotating is on: then the shortcut dictates as usual and the
-│   capture keeps recording, hearing the words too
+├── While it records, the dictation shortcut dictates as usual and the
+│   capture keeps recording, hearing the words too (the portal or grab already
+│   took the keys, so nothing reaches the app)
 ├── Pane -> no Screen Recording row, no transcriber choice, no "Show in screen
 │   recordings" (the portal asks; Wayland can't keep overlays out)
 ├── Sending -> OpenCode's sessions and prompts over HTTP to the running
@@ -260,8 +289,8 @@ On Windows                               // capture.windows
 │   records every pointer move, click, wheel turn, and modifier change
 │   (capture_host::report_input, as the macOS tap): Shift alone inks, the
 │   laser follows the pointer, clicks are logged. Injected events are skipped
-├── While it records, dictation starts nothing, unless Labs › Dictate while
-│   annotating is on
+├── While it records, the dictation shortcut dictates as usual and the capture
+│   keeps recording
 ├── While dictating -> General's setting through windows/audio_control, one
 │   suppressor per capture, restored when it ends
 ├── Copy and paste -> the engine's own clipboard and Ctrl+V (handoff): the
@@ -442,8 +471,15 @@ First launch with Annotate on            // capture.import
 ├── Esc while a capture records -> nothing: it reaches the app being recorded,
 │   and Hex's tap lets it through; a dictation under it goes on too (#786)
 ├── The binding is swallowed, never chord evidence for dictation
-├── Hold the dictation shortcut mid-capture -> dictation pastes as usual
-│   (only with Labs › Dictate while annotating on; without it, nothing starts)
+├── Hold the dictation shortcut mid-capture -> dictation pastes as usual into
+│   the app in front, History and Paste Last keep it, and the capture goes on
+│   recording with the same words in its own narration (both read one
+│   microphone timeline; dictation keeps priority over the capture's word
+│   chunks). Caps Lock and middle-mouse dictation start there too. The HUD
+│   stays on its edge and moves past the capsule (overlay dock, below)
+│   // checks: holding_option_dictates_while_a_capture_records and
+│   // escape_during_a_capture_ends_nothing (suppression); not observed on a
+│   // real Mac, Linux session, or Windows PC
 └── Another app holds Secure Event Input -> ⌥⇧S still starts and stops (a
     Carbon hotkey while it lasts; Esc doesn't arrive). See dictation.md's
     Shortcuts Under Secure Input
@@ -455,6 +491,9 @@ While a capture records                  // capture.quiet
 │   assertion, and it never counts as an intentional dictation
 ├── Stop, cancel, discard, failed start, captures off, quit -> released; a
 │   switch carries it to the next capture without restoring in between
+├── Paste Last (⌥⇧V) -> pastes on a tap, and a hold opens Labs › Paste Last
+│   picker, as without a capture; the capture records on, and the open
+│   picker's clicks, scrolls, and keys never reach it (drawing::Picker)
 ├── Dictation shortcut -> starts nothing while it records
 │   (macOS: recognition.rs swallows it in the tap; Linux: linux/dictation
 │   ignores Start). Nothing leaks to the app in front. With Labs › Dictate
@@ -1575,6 +1614,44 @@ from a folder name. They remain available through their existing actions.
 The [Mac picker](dictation.md#paste-last-picker-labs-macos) (Labs › Paste Last
 picker) reads the mark; failure to write it does not fail the capture or affect
 its send.
+
+## Overlay dock
+
+Meeting capsules, Annotate's capsule and recording toolbar, and the dictation
+HUD share one coordinator, `desktop::overlay_dock`. Each claims the body it
+draws on its screen edge (display, edge, alignment, size, distance from the
+edge); a surface asks how far past its natural place it must sit to clear every
+surface that outranks it on that edge of that display, 8 pt apart
+(`overlay_dock::GAP`, the spatial scale's step).
+
+```ts
+Rank  Surface                          Moves?
+0     meeting pill / panel (corners)   never: stays where it was thrown
+1     Annotate capsule (under the bar) drops below a meeting it would meet
+      Annotate capsule (notch)         never: the notch doesn't move
+      recording toolbar (bottom)       claims only
+2     dictation HUD                    clears all of them on its own edge
+      ├── under the bar / above the Dock -> moves along its edge, past each
+      ├── in the menu bar or the notch   -> meets one: comes out under the bar, then clears
+      └── beside the pointer (lab)       -> on no edge: claims nothing
+```
+
+- Displays are told apart by `NSScreenNumber` on macOS and the monitor's device
+  name on Windows; a surface on another display never moves anything. Linux
+  names no displays, so its claims are the primary display's.
+- A centred surface and a cornered one meet only when their spans do on that
+  display's width, so on a laptop the default top-right meeting pill and the
+  centred capsule leave each other alone; a narrow display, the finished
+  meeting panel, or a capsule list wide enough to reach the corner moves the
+  capsule down.
+- Reflow: the HUD asks every frame on macOS and every 250 ms on Linux and
+  Windows; the capsule as it polls (at least once a second while recording);
+  a meeting capsule re-claims as it shows, opens, moves, or hides. A surface
+  that hides lets the others fall back to their natural places.
+- Checks: `overlay_dock` (meeting + Annotate, meeting + dictation, all three,
+  bottom edge, notch and flat, different displays, hiding and showing again,
+  unmeasured displays), `capture_capsule::dock`, `rune_hud::dock`. Not
+  observed on a real display with all three up.
 
 ## Repeated recording resources (`capture.encoder-memory`)
 
