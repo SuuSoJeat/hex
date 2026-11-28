@@ -365,6 +365,89 @@ the final transcript of a run Hex quit during, is refused with its own code
 works whether or not Meetings is on, so a caller should ask the person first
 and offer the same two-step confirmation the pane does.
 
+## `hex dev call-window` (dev builds, macOS)
+
+`hex dev call-window` reads another app's windows through Accessibility and
+reports what is there. It exists to measure, before Hex names speakers from a
+call app's tiles, what those tiles expose and what a read costs
+([features/accessibility.md](features/accessibility.md#reading-another-app-dev-builds-macos)).
+It is not a control command and has no `/control` wire form.
+
+Dev builds only: a stable `hex` leaves it out of `hex dev --help` and refuses
+it as an unknown command (exit 2), and a stable Hex answers its route with
+`404 accessibility-probe-unavailable`. macOS only: Windows and Linux Hex have
+no Accessibility client (UI Automation, AT-SPI) to read another app with.
+
+```ts
+hex dev call-window
+├── dump  (--app <bundle-id> | --pid <pid>) --out <file>   one snapshot of every window's tree, as JSON
+└── watch (--app <bundle-id> | --pid <pid>) --out <file>   one JSON line per read, then a summary
+    ├── --interval-ms N (250, at least 50)   --duration SECONDS (60, at most 3600)
+    ├── --id-prefix P | --class-contains S | --label REGEX   report the elements any of these match
+    └── --cue-every SECONDS                  print "Speak now" and mark the moment in the file
+both:  --enable-web-accessibility            ask a Chromium or Electron app for its web tree
+       --max-nodes N (dump 20000, watch 4000; at most 20000)
+       --max-depth N (80; at most 200)       --deadline-ms N (dump 5000, watch 1000; at most 5000)
+```
+
+- **Where the read runs.** In the running Hex, on one of its local API workers,
+  not in the `hex` command. macOS grants Accessibility to the app; a command
+  started from a terminal is judged by that terminal's grant, and one over SSH
+  has none. The command posts each read to `POST /dev/accessibility-probe`
+  with the same discovery file and bearer token as every other route, and
+  writes the reply to the file itself. Hex not running, or not allowed to use
+  Accessibility, is an error (exit 1) that says which; nothing prompts.
+- **It only reads.** It never clicks, focuses, raises or types, and it reads
+  every window the app lists, in front or not. Hex's own window is refused
+  (`own-process`).
+- **Web content is off until asked.** A Chromium or Electron app (Slack, Teams,
+  Chrome, Arc, Brave, Edge) builds its web accessibility tree only when an
+  assistive app asks. The command asks only with
+  `--enable-web-accessibility`, and only on its first read: that sets
+  `AXManualAccessibility` on the app, which changes how it behaves until it
+  quits (it keeps computing the tree, and may act as it does for a screen
+  reader). Without the flag, a read with no web content says so and names the
+  flag. With it, `dump` waits up to 3 s for the tree to appear.
+- **Privacy.** The output holds other people's names and on-screen text. It is
+  written only to `--out`, created or replaced with mode 0600; a path that is
+  a symbolic link is refused. Hex's logs get counts and timings (`pid`,
+  elements, elapsed, matches), never the tree, and no event is recorded. A
+  password field's value is never asked for, nor anything below it; a value
+  over 4,096 characters is not asked for, and other strings keep their first
+  512 UTF-16 units.
+- **Budgets.** One read asks at most `--max-nodes` elements across all windows,
+  breadth first, `--max-depth` levels below a window, for `--deadline-ms`
+  (checked between elements), with the Accessibility client's 0.25 s timeout on
+  each message. An element costs two messages: its attributes and children
+  together, then its value. One read runs at a time (`busy` otherwise).
+
+`dump` writes one JSON object: `time_ms` (Unix), `pid`, `frontmost`,
+`elapsed_ms` (the read alone, measured in Hex), `windows`, `nodes` (elements
+asked), `unreadable` (elements that did not answer), `cut_short` (the budgets
+that stopped it: `nodes`, `depth`, `deadline`; empty for a whole tree),
+`web_areas`, `web_nodes` (elements below a web area), and `tree`: each window
+as nested elements with `role`, `subrole`, `title`, `description`, `value`,
+`dom_id`, `dom_classes` and `children`, empty ones left out.
+
+`watch` writes one line per read, `{"type":"read", …}` with the same fields
+but `matches` in place of `tree`: each matching element without its children,
+and its `path` (the window's index, then each child's index on the way down,
+so an element is below another when its path starts with the other's). A read
+that fails after the first is `{"type":"error","code":…}` and is counted;
+the first read's failure ends the watch. `--cue-every` adds
+`{"type":"cue","time_ms":…}` lines. A read that overruns the interval skips
+ticks rather than queueing reads. It ends by printing reads and failures,
+median and worst elapsed milliseconds, median element count, reads cut short,
+and reads with a match. Ctrl-C ends it without the summary; the lines written
+stay.
+
+```sh
+hex dev call-window dump --app com.tinyspeck.slackmacgap --enable-web-accessibility --out ~/huddle-tree.json
+hex dev call-window watch --app com.tinyspeck.slackmacgap --out ~/huddle-watch.jsonl \
+  --duration 120 --interval-ms 100 --cue-every 15 \
+  --id-prefix huddle-grid-gridcell- --class-contains active_speaker --label "profile|audio is"
+```
+
 ## Exit codes
 
 ```ts
@@ -417,11 +500,11 @@ audio/wav`. The route answers each piece's transcript
 Requests are flat objects tagged by `command` (kebab-case):
 
 ```json
-{"version": 4, "command": "meeting-record", "title": "Design sync"}
-{"version": 4, "command": "settings-set", "key": "sound_effects", "value": "off"}
-{"version": 4, "command": "dictation", "action": "start"}
-{"version": 4, "command": "dictation", "action": "start", "print": true}
-{"version": 4, "command": "dictation", "action": "stop", "print": true}
+{"version": 5, "command": "meeting-record", "title": "Design sync"}
+{"version": 5, "command": "settings-set", "key": "sound_effects", "value": "off"}
+{"version": 5, "command": "dictation", "action": "start"}
+{"version": 5, "command": "dictation", "action": "start", "print": true}
+{"version": 5, "command": "dictation", "action": "stop", "print": true}
 ```
 
 ```ts
@@ -450,28 +533,28 @@ it sends the WAV itself to `POST /transcriptions` (see Transport above).
 Replies are tagged by `status`:
 
 ```json
-{"version": 4, "status": "done", "message": "Recording “Design sync”; …", "changed": true}
-{"version": 4, "status": "error", "code": "feature-off", "message": "Meetings are off; …"}
-{"version": 4, "status": "settings", "settings": [{"key": "sound_effects", "value": true,
+{"version": 5, "status": "done", "message": "Recording “Design sync”; …", "changed": true}
+{"version": 5, "status": "error", "code": "feature-off", "message": "Meetings are off; …"}
+{"version": 5, "status": "settings", "settings": [{"key": "sound_effects", "value": true,
   "kind": "bool", "writable": true, "about": "Play recording and error tones"}]}
-{"version": 4, "status": "models", "models": [{"id": "parakeet_v3", "name": "…",
+{"version": 5, "status": "models", "models": [{"id": "parakeet_v3", "name": "…",
   "languages": ["en", "…"], "size": "…", "installed": true, "selected": true,
   "streams": true, "vocabulary": "bias", "supports_recognition_hints": false}]}
-{"version": 4, "status": "vocabulary", "entries": [{"term": "OpenCode",
+{"version": 5, "status": "vocabulary", "entries": [{"term": "OpenCode",
   "sounds_like": ["open code"]}, {"term": "Rune"}]}
-{"version": 4, "status": "scrawl-capture", "changed": true, "state": "idle",
+{"version": 5, "status": "scrawl-capture", "changed": true, "state": "idle",
   "bundle": "…/captures/1792933491953.scrawl", "elapsed_ms": null,
   "finishing": ["…/captures/1792933491953.scrawl"], "last": null}
-{"version": 4, "status": "scrawl-captures", "captures": [{"id": "1792933491953.scrawl",
+{"version": 5, "status": "scrawl-captures", "captures": [{"id": "1792933491953.scrawl",
   "bundle": "…", "created_at_ms": 1792933491953, "duration_ms": 4000, "mode": "window",
   "app": "Brave", "words": 12, "sent_to": {"session": "ses_…", "title": "Hex"},
   "queued": false}]}
-{"version": 4, "status": "scrawl-capture-detail", "id": "…", "…": "the list's fields",
+{"version": 5, "status": "scrawl-capture-detail", "id": "…", "…": "the list's fields",
   "window_title": "…", "transcript": "…", "note": null, "missing_transcript": null,
   "marks": 2, "keyframes": 3, "video": "…/video.mp4", "audio": null,
   "contact_sheet": "…/contact-sheet.jpg"}
-{"version": 4, "status": "scrawl-capture-route", "explanation": "Capture   …"}
-{"version": 4, "status": "transcript", "text": "Ship it."}
+{"version": 5, "status": "scrawl-capture-route", "explanation": "Capture   …"}
+{"version": 5, "status": "transcript", "text": "Ship it."}
 ```
 
 `done.changed` is `false` when the command found things already so ("Already
@@ -483,7 +566,7 @@ recording", "The window isn't open"). Setting `kind` is one of `bool`,
 
 ```json
 {
-  "version": 4, "status": "status",
+  "version": 5, "status": "status",
   "app_version": "2.3.1", "pid": 31708, "memory_footprint_bytes": 412000000,
   "listener": {"running": true, "status": "Listening"},
   "capture": {"state": "idle", "recording": null, "pending_jobs": 0},
@@ -634,10 +717,11 @@ support this lab.
   Off, they are refused with `invalid-value`, and turning the toggle off puts
   a shortcut on one back to its default. Elsewhere one alone still needs a
   modifier.
-- On Windows with the same toggle on, `capslock`, `insert`, `home`, `end`,
-  `pageup`, or `pagedown` may be a shortcut alone, for example
+- On Windows, `capslock` may be a shortcut alone out of the box, for example
   `hex settings set dictation_hotkey capslock`. Hex keeps the Caps Lock
-  presses the shortcut fires on, so the lock does not flip.
+  presses it records or the shortcut fires on, so the lock does not flip.
+  Only `insert`, `home`, `end`, `pageup`, and `pagedown` alone need
+  Labs › Special keys alone.
 - `second_dictation_hotkey` (unbound by default; `none` clears it) is a
   second shortcut that dictates exactly as `dictation_hotkey` does, such as a
   key on an external keyboard. It acts only while
@@ -679,8 +763,6 @@ support this lab.
   `capture.media_days`, `capture.bundle_days`, `capture.routing`,
   `capture.show_overlays_in_recordings` (default off; on lets screen
   recordings, Hex's captures included, show its overlays), and
-  `capture.capsule_flow` (`list`, the default, `toast`, `menu_bar`, `cursor`
-  or `notch`: the capsule's flow after a capture, prototypes to compare). Both
   capture shortcuts need a key, and `capture.enabled on` needs both free; on
   a Mac whose Paste Last is still ⌥⇧V, rebind one of the two first.
 - `meetings.retention` is `day`, `week`, `month`, `forever`, or `none` (the
@@ -752,11 +834,12 @@ fails when a new persisted setting has no key here.
 
 ## Compatibility
 
-`CONTROL_VERSION` is 4. A change that breaks a request or reply shape
+`CONTROL_VERSION` is 5. A change that breaks a request or reply shape
 increments it; adding a command, an optional request field, or a reply field
 does not. A `hex` from a different version gets `version-mismatch`; use the
 `hex` inside the running Hex.app, or restart Hex after updating. Version 2
 removed `permissions.input_monitoring` from the status reply; version 3 removed
 `voice-action` and `features.voice_action`; version 4 removed `commands-retry`,
 `settings-set.confirm`, `window-show` `commands`, `capture.recording` `voice`,
-`features.commands`, and `features.command_model`.
+`features.commands`, and `features.command_model`; version 5 removed
+`capture.capsule_flow`, the capsule prototypes' switch.

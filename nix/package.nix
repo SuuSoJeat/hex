@@ -87,8 +87,8 @@ let
       hash = "sha256-MJJiug3LfbKsuHcL2+LJk95+j5kk/MWzb5ihdBlHLmE=";
     };
     "rune-0.0.1" = {
-      rev = "9d4b4636f1f7e6d172053a0b6469a334c0bfc227";
-      hash = "sha256-h7g5m6MAQ+7SjmZjLfXbKaTvbCyBLcEGwop3oFzL4qg=";
+      rev = "dacf5d89ba56939c5ff2565c7e6a2983f7f7e276";
+      hash = "sha256-atUXPY9sLwdeoTm0yrl80LrIT+gQfSJ36eeX3P5yAmc=";
     };
     "transcribe-cpp-sys-0.4.1" = {
       rev = "60bed89dab84f7c1fddc3a17ad7fa8a27ddfba19";
@@ -123,6 +123,15 @@ rustPlatform.buildRustPackage (finalAttrs: {
       ../skills
       # The iOS cleaner's instructions, compared by a test.
       ../ios/HEXMobile/TranscriptCleanup.swift
+      # The iOS cleanup tagger's vocabulary and fixtures: Rust tests run the
+      # desktop cleanup against them.
+      ../ios/HEXKeyboard/CleanupTagger/HexCleanupTaggerVocab.txt
+      ../ios/HEXMobileTests/Fixtures/cleanup-reconstruct.json
+      ../ios/HEXMobileTests/Fixtures/cleanup-tagger-handwritten.json
+      ../ios/HEXMobileTests/Fixtures/cleanup-tokenizer.json
+      # The iOS cleanup model download script: a Rust test checks the desktop
+      # model pin names the same release asset.
+      ../ios/scripts/fetch-cleanup-model.sh
       # The Labs registry's published copy: a Rust test compares it to the registry.
       ../site/src/labs.json
       ../macos/HexMicrophoneDriver/Info.plist

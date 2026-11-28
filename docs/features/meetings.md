@@ -26,7 +26,8 @@ Checks: `retention_expires_meetings_by_when_they_ended_and_skips_active_ones`,
 
 ```ts
 Labs > Meetings switch (macOS)                       // meetings.opt-in; off by default
-├── Off -> only the Labs switch -> Turn on -> meetings.enabled = true
+├── Off -> the Labs switch (Turn on -> meetings.enabled = true), or the pane's
+│   setup screen Turn on Meetings; off, the pane shows that setup screen
 ├── On -> Meetings joins the sidebar; header switch Recordings | Settings;
 │   menu-bar items, call detection
 │   Settings view: When a call starts, After a meeting, Export, Advanced ▸
@@ -1063,6 +1064,12 @@ Lead time reached (or Mac wakes within 5 min of the start)   // meetings.reminde
      meeting is cancelled, moved, or reminders are turned off. One at a time: an
      overlapping meeting's reminder waits until this one is answered or closes.
      Waits while Hex records; a recording that starts closes it.
+Detected or manual recording with no calendar event already attached
+  -> the one matching active meeting names it: a link to the call's own
+     service first, else the only meeting in progress, then the only one
+     starting within 15 min. Overlapping meetings with nothing to tell them
+     apart leave it unnamed; a title the user typed or a named call's own
+     title stays. Works with reminders off while a calendar is connected.
 Detected call during a calendar meeting on the same service
   -> recording takes the calendar title and attendees
 ```
@@ -1096,7 +1103,10 @@ from the link's service until the meeting ends; without a link it covers only
 the next detected call, and only until 5 min after the start (or the end, if
 sooner). The manifest's `calendar` field and the
 Markdown's Attendees line carry the calendar title and attendees, and the notes
-prompt gets them as context.
+prompt gets them as context. The same read titles and fills detected and
+manual recordings whose start carries no calendar event yet, so a call
+answers by name even when reminders are off; matching uses the meetings
+already read for reminders, never a fresh EventKit query at the start.
 
 Checks: `meetings_need_other_people_or_a_call_link`,
 `all_day_declined_free_and_cancelled_events_are_skipped`,
@@ -1112,14 +1122,28 @@ Checks: `meetings_need_other_people_or_a_call_link`,
 `a_showing_reminder_closes_when_its_meeting_is_cancelled_or_long_started`,
 `a_moved_meeting_is_reminded_at_its_new_time`, `back_to_back_meetings_each_remind`,
 `reminded_occurrences_are_forgotten_after_they_end`,
-`turning_reminders_off_withdraws_the_showing_one`, and
-`a_detected_call_belongs_to_the_current_meeting_on_its_service` in
+`turning_reminders_off_withdraws_the_showing_one`,
+`a_call_matches_the_one_meeting_its_link_names`,
+`a_link_wins_even_when_another_meeting_is_already_under_way`,
+`one_active_or_starting_meeting_matches_without_a_provider`,
+`a_meeting_linked_to_another_service_never_matches`,
+`a_linkless_meeting_matches_a_call_only_when_nothing_contradicts_it`,
+`two_overlapping_meetings_leave_an_unlinked_call_unmatched`,
+`a_meeting_in_progress_wins_over_one_starting_soon`, and
+`excluded_calendars_never_match_a_call` in
 [calendar.rs](../../src/calendar.rs);
 `a_call_answered_from_its_calendar_reminder_is_not_offered_again` and
 `a_reminder_without_a_call_link_covers_only_the_next_call` in
 [meeting/detection.rs](../../src/meeting/detection.rs);
-`no_reminder_shows_over_a_recording` and
-`a_dismissed_reminder_without_a_link_snoozes_only_around_its_start` in
+`no_reminder_shows_over_a_recording`,
+`a_dismissed_reminder_without_a_link_snoozes_only_around_its_start`,
+`a_manual_recording_takes_the_one_active_meetings_title_and_attendees`,
+`a_detected_call_takes_the_title_of_the_meeting_its_service_names`,
+`a_call_never_takes_a_meeting_linked_to_another_service`,
+`two_overlapping_meetings_leave_a_recording_unnamed_by_the_calendar`,
+`a_title_the_user_gave_is_kept_beside_the_calendar_context`,
+`a_named_call_keeps_its_title_and_still_takes_the_attendees`, and
+`a_connected_calendar_is_read_for_matching_with_reminders_off` in
 [meeting/watcher.rs](../../src/meeting/watcher.rs);
 `calendar_reminders_stay_off_until_connected_and_survive_older_files` in
 [app_settings.rs](../../src/app_settings.rs);
@@ -1205,7 +1229,7 @@ Checks: `an_in_progress_meeting_reads_now`,
 `joining_elsewhere_while_showing_withdraws_it_for_good` in
 [calendar.rs](../../src/calendar.rs);
 `joining_from_the_menu_withdraws_its_reminder_and_starts_nothing`,
-`only_reminders_keep_the_titling_and_reminder_list`, and
+`the_menu_alone_never_keeps_the_titling_and_reminder_list`, and
 `a_menu_only_read_and_a_new_lab_both_force_an_immediate_read` in
 [meeting/watcher.rs](../../src/meeting/watcher.rs);
 `calendar_menu_is_its_own_switch_and_macos_only` in
@@ -1294,9 +1318,9 @@ Record (offer, menu bar "Record Meeting", Meetings pane, or voice command)
      │   │   `either_track_can_interrupt_the_release_in_place` (synthetic levels)
      │   ├── Its corners are the capsules' 14 pt at rest and open, so opening
      │   │   changes its size and never its silhouette
-     │   ├── The pill is 165 × 36 pt: its field 78 pt wide (31 columns), then
-     │   │   an 8 pt red dot 6 pt before the time, with the rows' 14 pt inset on
-     │   │   both sides (`the_header_keeps_the_rows_inset_at_rest_open_and_finished`)
+     │   ├── The pill is 150 × 36 pt: its field 78 pt wide (31 columns) and
+     │   │   the time, with the rows' inset on both sides and no recording dot
+     │   │   (`the_header_keeps_the_rows_inset_at_rest_open_and_finished`)
      │   └── "Microphone is silent" (warning), "Microphone muted" (Labs ›
      │       Mute the microphone while recording, in its place), or, for its
      │       first 10 s, "Started automatically" shows beside the meter
@@ -1312,23 +1336,23 @@ Record (offer, menu bar "Record Meeting", Meetings pane, or voice command)
      │   │   oldest fading out, and the panel grows 28 pt for them
      │   │   (panel/peek.rs; `the_open_recordings_foot_opens_the_live_meeting`;
      │   │   not observed on a real call)
-     │   ├── A quiet 28 pt ✕ (Discard recording) on the rows' icon spine, on
-     │   │   the field's free side -> "Discard recording?" / "Deletes its
-     │   │   audio and transcript" over Keep and Discard (Danger), equal
-     │   │   width; the panel hugs it (126 pt) and the ✕ fades and takes no
-     │   │   input while asked. Discard stops capture, skips the final pass,
-     │   │   and moves the recording folder to the Trash; no finished panel.
-     │   │   Leaving the pill answers Keep
+     │   ├── No bare ✕ sits in the open header: Discard waits behind Stop's
+     │   │   confirmation -> "Discard recording?" / "Deletes its audio and
+     │   │   transcript" over Keep and Discard (Danger), equal width; the panel
+     │   │   hugs it (126 pt) and takes no other input while asked. Discard
+     │   │   stops capture, skips the final pass, and moves the recording
+     │   │   folder to the Trash; no finished panel. Leaving the pill answers
+     │   │   Keep
      │   │   (`a_discarded_recording_dismisses_the_pill_and_shows_no_finished_panel`)
-     │   ├── The field widens with the wall, from the rows' 14 pt inset to the
-     │   │   time, clear of the ✕: 143 pt, 56 columns at the same 2.6 pt
-     │   │   pitch, 8 pt fewer for each further digit on the time. It is one field: its free end
+     │   ├── The field widens with the wall, from its resting 12 pt tuck to the
+     │   │   time: 180 pt, 70 columns at the same 2.6 pt pitch, 8 pt fewer for
+     │   │   each further digit on the time. It is one field: its free end
      │   │   is the wall's motion every frame, in whole columns counted from
      │   │   the held end, no dot is drawn outside its place, the dots that
      │   │   stay keep their light, and a column that arrives is lit from the
      │   │   voice's history. In a right corner it is held beside the time,
      │   │   which stays put; in a left corner it is held at the wall and the
-     │   │   time rides the moving wall 14 pt inside it, with the ✕ beyond. A
+     │   │   time rides the moving wall inside it. A
      │   │   notice in the header keeps its place and its cut while the
      │   │   field's end, or on the left the time, wipes over it, and has gone
      │   │   by the time the field is halfway.
@@ -1352,7 +1376,7 @@ Record (offer, menu bar "Record Meeting", Meetings pane, or voice command)
      │       `an_interrupted_panel_turns_round_without_a_stop_or_a_jump`,
      │       `reduced_motion_lands_the_surface_and_only_fades`). Offscreen
      │       Rune with a synthetic pointer; not seen in a native window
-     ├── Stop -> the icon, label and whitespace use the same 242 × 44 pt row
+     ├── Stop -> the icon, label and whitespace use the same 240 × 32 pt row
      │   and hover/focus bounds as the copies. An enabled row shows the
      │   pointer, a row with nothing to do keeps the arrow, and the meter
      │   band shows the grab hand. Dragging the band repositions the
@@ -1389,8 +1413,8 @@ Record (offer, menu bar "Record Meeting", Meetings pane, or voice command)
      │   │   whatever the meters read. Check:
      │   │   `after_capture_ends_the_time_holds_and_the_field_only_cools`
      │   └── Not done: the length can change by a second, in one frame, when
-     │       the finished meeting's own length replaces the recording's; a
-     │       summary line's first words wipe on but its removal is one frame.
+     │       the finished meeting's own length replaces the recording's. The
+     │       notes' summary is not drawn, so their arrival moves nothing.
      ├── Closing any capsule (✕, Not now, the offer's timeout, a refused
      │   start, a withdrawn reminder or call-ended notice, the indicator
      │   turned off) -> it is closed at once: nothing in it takes input and
@@ -2324,7 +2348,8 @@ Final publication                                   // meetings.output
 │   // a_meeting_with_speech_or_a_failure_is_never_discarded,
 │   // a_meeting_that_dropped_echo_is_kept_even_with_no_entries
 └── Markdown copy -> <folder>/<YYYY-MM-DD HHMM> <title>.md
-    ├── Title, date, duration, app, You / Them turns
+    ├── Title, date, duration, app, You / Them turns (a named remote
+    │   speaker's turn carries the name; see [Speaker names](#speaker-names))
     ├── Never overwrites; adds " (2)"
     ├── Export › Descriptive meeting file names on (off by default;
     │   meetings.export.descriptive_filenames) -> applying notes, refining chapters, or a rename renames it in place to
@@ -2397,13 +2422,24 @@ Detail (a raised card beside the list)
     empty Complete meeting, or one whose automatic Trash move failed (a lock
     race or a Trash error leaves it listed)
 Under "Summary" and "Transcript" headings; the list's icons keep one column
-Empty: "No meetings yet" with a one-line hint, Start recording, and a note
-that meetings are kept in Hex on this Mac for 7 days before moving to the
-Trash while exported Markdown stays; "No meetings match." while searching
+Empty: "No meetings yet" with a hint from the default answer (Ask each time
+offers to record, Record automatically starts, Don't offer asks for a call),
+Start recording, and a note that transcripts stay in Hex on this Mac for 7
+days before moving to the Trash while exported Markdown stays; "No meetings
+match." while searching
 System Audio Recording not allowed -> a warning above the list ("Hex can't
 hear the other participants") with Open System Settings
-Meetings off (macOS) -> the sidebar still lists Meetings; its pane is
-"Record your calls" with Turn on Meetings (unless a policy locks it)
+Meetings off (macOS) -> the sidebar still lists Meetings; its pane is one
+setup screen: "Transcribe your meetings", "Records your mic and call audio
+locally. No bots join your calls.", Turn on Meetings, and where transcripts
+are kept
+├── System audio -> Allow where the OS asks for it; Allowed once granted
+│   (macOS only, where the tour asks for the permission)
+├── When a call starts -> the same Ask each time / Record automatically /
+│   Don't offer answer Settings › Calls edits // meetings.default_policy
+├── Calendar -> Connect / Connected, then Remind me before meetings; each
+│   acts in place, so nothing waits for a second screen // meetings.calendar
+└── A policy that locks Meetings shows the switch card instead
 
 Rename -> inline field; Enter or Save          // meetings.rename
   -> manifest title; Markdown heading only while it reads the old title
@@ -2411,6 +2447,9 @@ Rename -> inline field; Enter or Save          // meetings.rename
      names on it follows a changed title only when the heading did too,
      keeping the date and time prefix
   -> empty title refused
+  -> busy refusal while notes or transcript edits hold the process-local
+     writer slot; rename claims before reading and holds through export and
+     manifest publication. Active-recording rename remains available.
 Delete… (overflow menu) -> "Trash recording & Markdown" (or "Trash recording")
   / Cancel, under the title in place of the icons until answered
   -> exported Markdown, then its tracked notes file, then
@@ -2431,7 +2470,7 @@ Agents -> hex meetings delete <id>                 // exact `meetings list --jso
   -> done -> "Deleted “<title>”; moved to the Trash"; an open pane drops the
      row at its next 1 s rescan
   // checks: deleting_a_meeting_answers_its_refusal_code; JSON shape
-  // {"version":4,"command":"meeting-delete","id":"…"} (control.rs)
+  // {"version":5,"command":"meeting-delete","id":"…"} (control.rs)
 ```
 
 Choice: Delete trashes the Markdown copy too, since it holds the transcript;
@@ -2449,6 +2488,9 @@ path automatically and never appears in the pane (check:
 `renaming_updates_the_manifest_and_an_unedited_markdown_heading`,
 `a_rename_follows_the_title_when_descriptive_file_names_are_on`,
 `a_rename_without_descriptive_names_still_retitles_the_notes_file`,
+`rename_and_notes_refuse_both_publication_windows_then_preserve_all_metadata`,
+`rename_claims_before_read_and_releases_after_read_failure`,
+`active_recording_rename_still_saves_the_user_title`,
 `notes_rename_the_export_only_with_descriptive_file_names`,
 `retitling_replaces_only_a_matching_first_heading`,
 `the_exported_markdown_is_the_reveal_target_only_while_it_exists`,
@@ -2588,7 +2630,8 @@ Final publication complete                               // meetings.notes
      │   may appear: …" (≤30 vocabulary terms, read at each generation,
      │   Regenerate included) ahead of the calendar context; its length comes
      │   out of the budget. No vocabulary -> no line
-     ├── Lines "[mm:ss] You|Them: text" (long turns split at 600 chars)
+     ├── Lines "[mm:ss] You|Them: text" (long turns split at 600 chars); a
+     │   named remote speaker's lines carry the name instead of Them
      ├── Whole transcript when it fits; otherwise opening 30 %, up to six
      │   evenly spaced middle passages, ending 20 %, "[…]" between them
      ├── Budget = min(12,000 chars, (context − 1,000 tokens) × 3 chars)
@@ -2671,6 +2714,23 @@ transcript link follow notes, a rename, or chapter retitles
 keeps its own `<!-- hex:notes -->` summary block and footer throughout. A notes
 file the user deletes stops being tracked and is never written back, even by a
 later regeneration.
+
+Markdown updates share an observed-bytes recheck after the temporary file is
+synced. A separate notes file is replaced whole only while its ownership hash
+matches; transcript heading/notes merges preserve other sections even in an
+edited file, without advancing its ownership hash. A detected editor save
+leaves the external bytes and ownership hash untouched and removes the
+temporary. This is best-effort protection: the final read and rename are not
+a filesystem compare-and-swap. The meeting writer claim is process-local,
+not cross-process locking. Deterministic checks inject saves during rendering
+and after temporary-file sync:
+`notes_file_refresh_preserves_an_editor_save_during_temporary_write`,
+`merge_preserves_an_editor_save_during_temporary_write_and_its_ownership`,
+`a_save_during_render_preserves_the_external_bytes_and_hash`, and
+`a_new_notes_file_does_not_replace_an_editor_save_at_the_selected_path`.
+`merge_keeps_user_sections_without_acquiring_their_ownership` covers the
+distinct merge policy. These are filesystem fixtures, not a physical-editor
+or multi-process proof.
 
 Action items and decisions are gone: other agents read the transcript for
 details (MCP). Older manifests still decode: a list summary is joined into one
@@ -2802,6 +2862,315 @@ The second change landed at 11:02 in 3 runs and one line late (11:24) in 2; the
 first at 05:32 in 2 runs and stayed at the live 06:38 in 3. The model's
 same-topic flag was close to random ("same" for unrelated names, "new" for the
 current one), which is why Rust's name overlap decides.
+
+### Speaker Names
+
+Implemented on macOS behind Labs › Speaker names
+(`labs.meeting_speaker_names`, off by default): while a Slack huddle in
+Slack's desktop app records, a reader notes who Slack marks as speaking, and
+a remote line said while one person held the floor takes that person's name,
+in the in-call transcript and the final one
+([Working out names](#working-out-names)).
+With the lab off, in any other call app or a browser, and on Windows and
+Linux, nothing writes a `speaker` or a `speakers` table: every remote line
+is `Them` and every saved file, prompt, and JSON response is what it was
+before. Not implemented: an adapter for any other call app, the pane's
+corrections, any voice model.
+
+```ts
+manifest.json -> speakers?: [{ id, name, from }]     // omitted when empty
+├── id: per meeting, short and opaque ("s1", "s2"); a call app's own user id
+│   is never an id and never reaches the disk
+├── name: the display name, cleaned (below)
+└── from: "call_app" | "calendar" | "user"
+transcript.ndjson, transcript.rolling.ndjson -> speaker?: "s1"
+└── An id in that table; omitted when Hex is not sure. The schema versions
+    stay 1: both fields are additive
+What a line is called -> one rule (src/meeting/speakers.rs, Labels::of)
+├── A remote line whose speaker the table knows -> the name
+├── Otherwise exactly as before: You, Them, or Speaker where an imported
+│   file's one track already said Speaker
+├── A microphone line is always You, whatever its speaker field says
+├── An id the table does not know -> the track's label
+└── A saved speaker that is not an id Hex could have minted (`s` and a
+    number), or a table row whose id, name or origin does not parse -> read
+    as absent; the line is called by its track and the meeting still opens
+Turns -> adjacent lines join only on the same track and the same speaker; a
+         named line never merges into an unnamed one
+Readers that show the name
+├── Exported Markdown, Copy transcript, Copy section, the folder's own
+│   transcript.md
+├── Notes prompt lines "[mm:ss] Priya Nair: …"
+├── hex meetings show (Markdown; --json meeting.speakers and
+│   entries[].speaker; --srt and --vtt cues), list --json (meeting.speakers)
+├── MCP: get_transcript turns, search_transcripts speakers and context
+│   lines, list_meetings participants "You, Them, Priya Nair (Zoom)"
+└── Meetings pane turns (a name is shown as is, never translated)
+Readers that stay You / Them
+├── Chapter prompts: where a topic changes does not depend on who speaks,
+│   so no name goes to that model
+├── The provisional-title prompt and the recording capsule: they read the
+│   tracks, not the table
+└── get_transcript's speaker filter (you | them | all)
+Names are untrusted: other people choose them, and models and agents read them
+├── A name exists in the code only as a cleaned value (SpeakerName), made
+│   from call-app text or from a manifest the same way:
+│   one line, single spaces, no control characters, zero-width spaces,
+│   direction overrides or Unicode tags, none of * ` [ ] < > \, 64 characters
+├── Refused: nothing left, or You / Them / Speaker / Notes in any case, so
+│   nobody on a call can make their words read as You. The line stays Them
+└── Never logged: a table prints its ids and origins, not its names
+Debug Markdown parser (hex meeting summarize|chapters <path>) -> any turn
+    heading is a turn; You is the microphone, a name or Speaker is remote
+```
+
+Checks: `an_old_manifest_and_transcript_round_trip_byte_for_byte`,
+`speakers_are_saved_as_a_table_and_an_id_on_each_named_line`,
+`a_hostile_name_comes_out_clean`,
+`a_name_can_never_be_one_of_hexs_own_labels_or_nothing`,
+`a_table_read_from_disk_is_cleaned_like_one_built_here`,
+`a_saved_line_whose_speaker_is_not_an_id_reads_as_unnamed`,
+`printing_a_table_for_a_log_never_prints_a_name`,
+`a_line_is_called_by_its_speakers_name_or_else_what_it_always_was`,
+`a_turn_splits_where_the_speaker_changes`,
+`markdown_shows_the_name_in_the_export_a_section_and_the_folders_own_file`,
+`the_notes_prompt_gives_each_line_its_speaker`,
+`agents_and_the_cli_read_the_name_in_transcripts_search_and_the_list`,
+`a_named_speaker_shows_in_meeting_json_and_subtitles`,
+`a_named_speaker_gets_their_own_turn_under_their_name`, and
+`meeting_json_contract_snapshot` (unnamed JSON is unchanged). All run on
+hand-built tables.
+
+#### Working Out Names
+
+`src/meeting/speakers/`: the evidence a reader saves, a calibration, the
+resolver, the step that turns its answer into the table and ids above, and
+on macOS the reader, its adapter for Slack huddles, and the wiring that runs
+them beside a recording and names its transcripts, all behind Labs › Speaker
+names. Does not exist: an adapter for any other call app (each is written
+against a live read of that app), the pane's corrections (a correction line
+is read and obeyed, and nothing writes one), any voice model.
+
+```ts
+When it runs (macOS, Labs › Speaker names on; off, none of it starts)
+├── A recording starts -> one "meeting-speakers" thread beside it when its
+│   call app is one Hex has an adapter for. A recording that names no call
+│   app (started by hand) -> the thread checks every 5 s for such an app
+│   holding the microphone. Any other call app, or a browser -> no thread
+├── The thread shares nothing with audio capture: a slow or hung look costs
+│   that look (4,000 nodes, 80 deep, 0.4 s at most), never a packet
+├── Needs the Accessibility permission dictation context uses; without it
+│   every look is empty. Slack is asked for its web accessibility tree once
+│   each time it is found running; nothing else is written to it, and it is
+│   never clicked, focused, raised or typed into
+├── Times are the transcript's: both count from the recording's first
+│   audio, and no look is made before it
+├── Recording stops, or the lab is turned off -> the thread ends at its next
+│   wait and is joined before the final transcript is worked out
+├── In-call transcript -> each time it is written, the whole transcript so
+│   far is named again from the file so far, and the table goes to
+│   manifest.json when it changed
+├── Final transcript (wherever one is made: after Stop, when a stranded
+│   meeting is finished, when a meeting is transcribed again) -> named the
+│   same way from the whole file, with the lab on and a
+│   speakers.ndjson in the folder; otherwise unnamed and the table emptied
+├── Ids hold for the meeting: s1 is whoever was first given it, however
+│   often names are worked out, and an id is never handed to someone else.
+│   A reader that catches the table and the lines between their two writes
+│   sees Them, never another person's name
+├── Early in a call -> names start with the first remote line, on the
+│   assumed timing below, until the user's own tile has lit 5 times. A line
+│   can change its name as more is seen, in the in-call transcript; the
+│   final pass decides
+└── Word times -> a line keeps its start and end, not its words', so its
+    time is shared among its words by their length before the resolver runs
+Slack huddles (com.tinyspeck.slackmacgap; a pure function of one snapshot)
+├── A person -> an AXCell with the class p-huddle_peer_tile, in the gallery
+│   or the compact view. Who: the Slack user id that ends the tile's DOM id
+│   (in memory only). The user's own tile's id starts
+│   huddle-grid-gridcell-self_
+├── Name -> the text in the tile's name overlay, else the name in the tile's
+│   label ("View Alice's profile"); cleaned like every name
+├── Speaking -> a descendant with the class
+│   p-huddle_peer_tile__overlay--active_speaker
+├── Floor -> the lone remote person marked (even while the user's own tile
+│   is also marked, since the microphone is its own track), or the user when
+│   only they are marked. Nobody, two or more remote people, or a mark on a
+│   tile with no id -> nobody holds it; `local_speaking` still records the
+│   user's own tile for calibration
+└── Windows with tiles: none -> no call window; one -> the call; two or
+    more -> untrusted two_windows
+speakers.ndjson (meeting folder, owner-only, to the Trash with the folder)
+├── The one record of who spoke. The manifest's table and each line's
+│   speaker are rebuilt whole from it and are never edited themselves
+├── participant: key ("p1", "p2": opaque, per meeting, never a call app's
+│   user id), cleaned name or none, whether they are the user, first seen
+├── floor: one look at the call app -> who it marked as speaking, or nobody
+│   (plus optional `local_speaking` when the user's own tile is marked
+│   independently alongside remote tiles)
+├── untrusted: one look that counts as no look -> cut_short | window_hidden
+│   | two_windows | failed_health_check
+├── correction: the user says these words were this person's, or "not
+│   sure", or this person goes by this name here. Rewritten atomically; a
+│   later correction replaces the ones it covers
+└── Times are ms from the start of the recording. A line this build cannot
+    read is skipped and kept
+Calibration (pure) -> the user's own tile against the user's own microphone
+├── Fewer than 5 lit stretches -> unproven: names still worked out, on an
+│   assumed 0.5 s to come on and 1.5 s to go off
+├── 4 in 5 lit stretches have the user's speech under them -> healthy,
+│   with the middle lag and a long tail measured on this call
+└── Fewer, or 8 turns of 2 s with the tile never lit -> unhealthy: nobody
+    is named from what the reader saw
+Resolver (pure) -> (remote words' times, evidence, calibration, strictness)
+    -> spans of remote speech, each one person's or nobody's, with a reason
+├── 1. A correction stands, whatever else is true
+├── 2. An unhealthy call names nobody
+├── 3. One remote person on the whole call -> every remote word is theirs
+├── 4. Otherwise the floor decides. Looks become stretches (held, lingering,
+│      coming on, passing over, nobody, unknown), moved back by the lag; two
+│      looks more than 0.75 s apart leave the time between them unknown
+│   ├── as seen: each word takes the holder at its own moment
+│   ├── steady window (default): a span between pauses of 0.3 s is one
+│   │   person's when they alone show across it; where the floor changes
+│   │   inside continuous speech the words within 0.75 s go unnamed, and so
+│   │   do words under a mark that is only lingering
+│   └── whole segment: a stretch between pauses of 0.6 s (10 s at most) is
+│       named whole when one person holds 4 words in 5, else not at all
+└── 5. Everything else is nobody's (Them), with why: no evidence, untrusted
+       look, nobody held the floor, the user held it, floor changed, mixed
+Lines -> a remote line takes a speaker only when everything it overlaps was
+    said by one person the call app showed, with a usable name; ids s1, s2
+    in the order people first speak; a name the user gave is from "user"
+Reader (macOS only: it reads accessibility::tree snapshots) -> speakers.ndjson
+├── Adapter, one per call app (pure) -> a snapshot of the app's windows ->
+│   active { roster, floor, local_speaking } | no call window |
+│   untrusted(reason). Found by
+│   canonical bundle id or by the call page's host. Listed: Slack's
+│   desktop app; no page host yet
+├── Before any adapter is asked: a snapshot a budget cut short -> untrusted
+│   cut_short; an app with no window -> no call window
+├── Poll state (pure) -> one look in, the lines it adds out
+│   ├── The app's own id for a person never leaves memory: each gets the
+│   │   next key (p1, p2) when first seen, after any the meeting holds
+│   ├── participant: when first seen, and again when the app shows them
+│   │   differently (cleaned name, whether they are the user). Two tiles
+│   │   of one person are one person
+│   ├── floor: every look at a call read whole -> the one marked, or nobody
+│   ├── untrusted: the adapter's reason, or cut_short
+│   └── Nothing for no call window, or for a mark on someone never shown
+├── Loop -> a look every 0.5 s on the recording's clock, stamped when it
+│   starts; a look that overran -> a 0.25 s rest and one look, not the ones
+│   missed; ends with the recording, with nothing read or written after
+├── A write that fails -> those lines are lost and counted, and everyone
+│   is written again at their next look
+└── Logs -> what a look came to when that changes (debug), one warning for
+    a run of failed writes, counts at the end. Never a name or an app id
+```
+
+When the app shows someone differently the reader writes a second
+participant line, and the latest line with a usable name is who they are, so
+a name that arrives after the tile does is still used.
+
+A call is judged by the user's own tile against the user's own microphone,
+so a user who talks with their Slack microphone muted (dictating during a
+huddle, say) for 8 stretches of 2 s with the tile never lit makes the call
+unhealthy, and nobody on it is named.
+
+Not observed: a huddle window that is hidden or minimised (the Slack adapter
+never reports `window_hidden`; a window with no tiles in its tree reads as
+no call window, and the time it covers as no evidence), and a huddle too
+large for one look's budget (a look cut short names nobody).
+
+The accepted limit: a call app marks one speaker at a time, so words said
+over the person holding the floor take that person's name, at every
+strictness. A reply within half a second of someone stopping can too.
+
+Measured (research simulation, not this code and not a live call):
+`measurements-indicator-sim.md` ran this kind of rule over word timings from
+16 recorded in-room meetings with a modelled call app. Where one person
+talks at a time, its steady-window rule named 90.5% of words right and 0.1%
+wrong; on words spoken over someone else it was wrong on 27.2%. Over all
+words its rules ranged from 79.8% right / 11.9% wrong (as seen) to 61.3% /
+4.5% (whole segments). `measurements-voice-hybrid.md` added a per-meeting
+voice check on real audio: 85.1% right / 10.3% wrong against 80.8% / 8.5%,
+with 95.6% of its wrong names on overlapped words, so no voice model is
+planned here. The resolver's own constants have not been run against that
+corpus, and nothing has been measured on a real call: no accuracy figure
+exists for a Slack huddle.
+
+Checks: `people_taking_turns_are_each_named_for_every_word`,
+`a_change_of_floor_in_a_pause_keeps_the_words_on_both_sides`,
+`a_change_of_floor_inside_continuous_speech_leaves_the_words_beside_it_unnamed`,
+`words_said_over_the_person_holding_the_floor_take_that_persons_name` (the
+limit, as a test), `a_reply_under_a_lingering_mark_is_not_named_unless_read_as_seen`,
+`looks_that_could_not_be_trusted_count_as_no_look`,
+`a_reader_watching_the_wrong_tile_names_nobody`, and four properties over
+random calls: `with_no_evidence_nobody_is_named`,
+`taking_evidence_away_never_adds_a_name` (at the reader's pace of a look
+every half second), `an_unhealthy_calibration_names_nobody`,
+`a_correction_always_wins`. The call app in them is a port of the
+simulation's model, not a real one. File handling:
+`the_file_is_readable_by_its_owner_only_before_and_after_a_correction`,
+`a_line_cut_short_by_a_crash_spoils_only_itself`,
+`a_line_from_a_newer_build_is_skipped_and_survives_a_correction`.
+
+Reader checks (macOS; an invented call app read from hand-written snapshots,
+a clock that moves only when waited on, no real app):
+`people_are_written_once_under_keys_in_the_order_they_are_first_seen`,
+`someone_the_app_comes_to_show_differently_is_written_again_under_their_key`,
+`the_floor_is_written_at_every_look_as_it_passes_from_one_to_another`,
+`a_snapshot_cut_short_is_an_untrusted_look_and_names_nobody_new`,
+`two_call_windows_are_an_untrusted_look`,
+`a_hidden_call_window_is_an_untrusted_look_for_as_long_as_it_is_hidden`,
+`the_file_holds_keys_and_names_and_never_an_app_id` (the real file),
+`the_log_holds_counts_and_reasons_and_never_a_name_or_an_app_id` (everything
+logged at every level), `lines_that_were_not_saved_are_counted_and_everyone_is_written_again`,
+`a_slow_look_is_followed_by_a_rest_and_one_look_not_by_the_ones_it_missed`,
+`stopping_ends_the_reader_with_nothing_read_or_written_afterwards`, and one
+property over random looks:
+`whatever_an_app_shows_every_key_is_introduced_before_it_is_used_and_no_id_is_written`.
+Seam: `a_snapshot_cut_short_is_never_shown_to_an_adapter`,
+`an_app_is_read_by_the_adapter_listed_under_its_key`, `no_app_is_listed_twice`.
+
+Slack adapter checks (macOS; hand-written trees in the shape a live read
+of Slack's huddle gave, with invented people):
+`a_huddle_is_read_as_everyone_on_it_and_the_one_person_speaking`,
+`nobody_holds_the_floor_when_nobody_or_several_remote_people_are_marked`,
+`the_sole_remote_speaker_holds_the_floor_when_the_user_speaks_too`,
+`the_mark_counts_on_either_overlay_and_only_inside_a_tile`,
+`someone_who_reconnects_is_still_the_same_person`,
+`a_tile_is_told_apart_by_whatever_its_id_gives`,
+`a_name_is_the_overlays_text_or_else_the_one_in_the_tiles_label`,
+`only_a_grid_cell_with_the_tile_class_is_a_tile`,
+`slack_with_no_huddle_on_screen_has_no_call_window`,
+`the_huddle_is_read_wherever_its_one_window_is_and_however_deep`,
+`two_windows_with_tiles_are_not_believed`,
+`slack_is_read_by_this_adapter_under_its_bundle_id`,
+`what_the_reader_saves_of_a_huddle_holds_names_and_never_a_slack_id`, and
+`someone_written_again_keeps_the_latest_usable_name`.
+
+Naming checks (every OS; evidence and transcripts written by hand):
+`a_call_is_named_from_its_first_remote_line_on_the_assumed_timing`,
+`once_the_users_own_tile_has_lit_enough_the_call_is_judged_by_it`,
+`a_line_said_across_a_change_of_floor_stays_them`,
+`a_meeting_with_nothing_seen_names_nobody`,
+`the_words_of_a_line_share_its_time_by_their_length`,
+`microphone_lines_that_run_on_are_one_stretch_of_talking`,
+`nothing_is_named_with_the_lab_off_or_without_evidence`,
+`the_final_transcript_and_the_manifests_table_are_named_together`,
+`the_final_pass_keeps_the_ids_the_recording_saved`,
+`the_in_call_transcript_is_named_as_it_grows_and_its_table_handed_on_when_it_changes`,
+and `a_meeting_worked_out_again_keeps_the_ids_it_gave`.
+
+Thread checks (macOS; an invented call app and a hand-built window, no real
+app): `the_clock_counts_from_the_first_audio_and_waits_for_it`,
+`the_clock_stops_with_the_recording_or_the_lab`,
+`only_a_call_app_hex_can_read_gets_a_reader`,
+`a_reader_saves_what_it_sees_and_dropping_it_stops_and_joins_it` (the real
+thread and the real owner-only file), `an_app_that_is_not_running_reads_as_no_windows`.
+
+No automated check reads a real Slack huddle or records one end to end.
 
 ### Agent Access (MCP)
 

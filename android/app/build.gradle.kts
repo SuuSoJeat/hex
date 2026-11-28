@@ -45,6 +45,18 @@ val prepareSpeechModel by tasks.registering {
     }
 }
 
+// Labs › Dictation sounds plays desktop Hex's own sound sets, read from the repository rather than copied: the
+// dictation sounds of each set only (none of the onboarding sounds), as assets/sounds/<set>/<sound>.wav.
+val soundAssets = layout.buildDirectory.dir("generated/sounds/assets")
+val prepareDictationSounds by tasks.registering(Sync::class) {
+    val sets = listOf("classic", "signature", "click", "soft", "wood", "analog", "thock")
+    val sounds = listOf("start", "stop", "done", "cancel", "error")
+    from(rootProject.file("../resources/audio/sounds")) {
+        sets.forEach { set -> sounds.forEach { include("$set/$it.wav") } }
+    }
+    into(soundAssets.map { it.dir("sounds") })
+}
+
 // Resolve the key relative to its private properties file, never to a checked-in path.
 val uploadProperties = providers.environmentVariable("HEX_ANDROID_KEYSTORE_PROPERTIES").orNull
     ?.let(::file) ?: File(System.getProperty("user.home"), ".config/hex-android/keystore.properties")
@@ -150,8 +162,11 @@ android {
     sourceSets["preview"].assets.srcDir("src/diagnostics/assets")
     packaging.resources.excludes += "DebugProbesKt.bin"
     buildFeatures { compose = true; buildConfig = true }
-    androidResources { noCompress += listOf("bin", "hextm", "valid", "capitals") }
+    // TypingModel.asset maps each typing file through openFd, which fails on a compressed asset (TypingAssetsTest).
+    // Labs › Dictation sounds hands SoundPool each sound through openFd too.
+    androidResources { noCompress += listOf("bin", "hextm", "valid", "capitals", "spellings", "wav") }
     sourceSets["main"].assets.srcDir(modelAssets)
+    sourceSets["main"].assets.srcDir(soundAssets)
     // The same plain-text Android policy ships in Settings and in the Play listing drafts.
     sourceSets["main"].assets.srcDir(rootProject.file("play/policy"))
     // The Hex words file's shared cases, read by path rather than copied (docs/specs/hex-words.md).
@@ -187,7 +202,7 @@ val verifyTypingModels by tasks.registering {
     val dir = file("src/main/assets/typing")
     val names = listOf("en.hextm", "es.hextm", "de.hextm", "nb.hextm", "fr.hextm", "it.hextm", "pt.hextm", "en.valid",
         "es.valid", "de.valid", "nb.valid", "fr.valid", "it.valid", "pt.valid",
-        "en.capitals", "es.capitals", "de.capitals", "fr.capitals", "it.capitals", "pt.capitals")
+        "en.capitals", "es.capitals", "de.capitals", "fr.capitals", "it.capitals", "pt.capitals", "en.spellings")
     val manifest = dir.resolve("SHA256SUMS")
     inputs.files(names.map(dir::resolve) + manifest)
     doLast {
@@ -199,7 +214,7 @@ val verifyTypingModels by tasks.registering {
         }
     }
 }
-tasks.named("preBuild").configure { dependsOn(prepareSpeechModel, verifyInter, verifyTypingModels) }
+tasks.named("preBuild").configure { dependsOn(prepareSpeechModel, prepareDictationSounds, verifyInter, verifyTypingModels) }
 // Every native library the APK ships, Hex's own and AndroidX's prebuilt ones, gets the check Hex's get when they are built
 // (src/main/cpp/check-imports.cmake): no call that starts, replaces or traces a process or loads a shared object, and
 // nothing exported but JNI entry points.

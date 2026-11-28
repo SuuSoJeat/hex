@@ -64,6 +64,9 @@ impl Feature {
             Self::NeutralVoice => {
                 "Rewrite dictations in chosen modes into plain, neutral wording on this Mac, so your writing style doesn't show"
             }
+            Self::CleanupTagger => {
+                "Remove ums, repeated words, false starts, and things you correct out loud from English dictations with Hex's own small model, downloaded once (26 MB) and run on this Mac; it only removes words, and keeps names, numbers, negations, and vocabulary terms (macOS)"
+            }
             Self::ModelSwitchShortcut => {
                 "One shortcut that swaps dictation to another model and language (model_switch_other), and back"
             }
@@ -99,7 +102,7 @@ impl Feature {
                 "Offer Parakeet Ultra, a tuned Parakeet v3 from Moondream, in the speech model list"
             }
             Self::StandaloneSpecialKeys if cfg!(target_os = "windows") => {
-                "Use Caps Lock, Insert, Home, End, Page Up, or Page Down as a shortcut by itself"
+                "Use Insert, Home, End, Page Up, or Page Down as a shortcut by itself"
             }
             Self::StandaloneSpecialKeys => {
                 "Use Menu, Pause, or Scroll Lock as a shortcut by itself, such as Caps Lock remapped to Menu"
@@ -278,6 +281,9 @@ impl Feature {
             }
             Self::MiddleMouseDictation => {
                 "Hold the middle mouse button for half a second to start a hands-free dictation and long-press again to finish; the dictation shortcut can finish it too, and a long press finishes a hands-free dictation the shortcut started. Clicks still reach the app, and Escape cancels a hands-free dictation and stays out of the app (macOS)"
+            }
+            Self::MeetingSpeakerNames => {
+                "While a meeting records a Slack huddle, Hex reads who Slack shows speaking, through Accessibility, and names their turns in the transcript as the call goes and in the saved copy. A turn is named only when one person clearly held the floor; everything else stays Them, and something said over another person can land in that person's turn. What Hex saw is kept in the meeting's folder (speakers.ndjson) and goes with it; no voice is analysed and nothing is kept across meetings (macOS)"
             }
         }
     }

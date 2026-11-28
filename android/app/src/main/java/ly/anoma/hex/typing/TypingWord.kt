@@ -102,7 +102,7 @@ internal class TypingWord(val decoder: SpatialDecoder, val spatial: Boolean) {
      * as shift would be, by default at a sentence's start. */
     fun predictions(before: String, capitalize: Boolean? = null): List<String> {
         if (standIn) return emptyList()
-        val text = if (before.lastOrNull()?.let { it.isLetter() || it == '\'' || it == '\u2019' } == true) "$before " else before
+        val text = if (endsBareWord(before)) "$before " else before
         val words = when {
             startsSentence(text) -> sentenceStarters[model.language]
             !text.last().isWhitespace() -> return emptyList()
@@ -364,12 +364,14 @@ internal class TypingWord(val decoder: SpatialDecoder, val spatial: Boolean) {
         }
         if (allCaps || !spatial) return null
         // A name, day or place typed in lowercase takes its capital ("mary" -> "Mary"), and so does a
-        // German noun ("haus" -> "Haus"), as the capitals list beside the model says.
+        // German noun ("haus" -> "Haus"), as the capitals list beside the model says, and a word with a
+        // spelling of its own takes it ("github" -> "GitHub").
         val fix = decision().replace?.let { if (decoder.personal?.owns(it) == true) yours(it) else cased(it) } ?: return capitalised(token)
         // A missed space after English "i" ("iwant") gives "I want", as "i" alone does.
         if (model.language == "en" && ' ' in fix) return fix.split(' ').joinToString(" ") { if (it == "i") "I" else it }
-        // German's model is lowercase: a noun it corrects to takes its capital ("hsus" -> "Haus").
-        return if (model.language == "de" && ' ' !in fix) capitalised(fix) ?: fix else fix
+        // The German and English models are lowercase: a name or German noun they correct to takes its
+        // capital ("mray" -> "Mary", "hsus" -> "Haus"), a word with a spelling its spelling.
+        return if ((model.language == "de" || model.language == "en") && ' ' !in fix) capitalised(fix) ?: fix else fix
     }
 
     /** A swiped reading ([SwipeReader]'s: the model's lowercase spelling, a contraction such as "I'm", or your own
@@ -384,6 +386,7 @@ internal class TypingWord(val decoder: SpatialDecoder, val spatial: Boolean) {
         val lower = reading.lowercase()
         if (model.language == "en" && (lower == "i" || lower.startsWith("i'"))) return "I" + lower.drop(1)
         if (lower.length < 2) return lower
+        model.spellings?.of(lower)?.let { return it }
         val share = model.capitals?.percent(lower) ?: return lower
         val capital = share >= 95 || (model.language == "de" && share >= 50 && previous in germanDeterminers)
         val first = lower.first().uppercase()
@@ -391,15 +394,19 @@ internal class TypingWord(val decoder: SpatialDecoder, val spatial: Boolean) {
     }
 
     private fun capitalisedName(word: String): String? {
-        if (word.length < 2 || word != word.lowercase() || (model.capitals?.percent(word) ?: -1) < 95) return null
+        if (word.length < 2 || word != word.lowercase()) return null
+        model.spellings?.of(word)?.let { return it }
+        if ((model.capitals?.percent(word) ?: -1) < 95) return null
         val first = word.first().uppercase()
         return if (first.length == 1) first + word.drop(1) else null
     }
 
     // `word` with its capital when it is all lowercase and the books nearly always write it with one
-    // (95%), or, in German, half the time after an article or determiner ("das leben"); else null.
+    // (95%), or, in German, half the time after an article or determiner ("das leben"); its own spelling
+    // when it has one ("chatgpt" -> "ChatGPT"); else null.
     private fun capitalised(word: String): String? {
         if (word.length < 2 || word != word.lowercase()) return null
+        model.spellings?.of(word)?.let { return it }
         val share = model.capitals?.percent(word) ?: return null
         if (share < 95 && !(model.language == "de" && share >= 50 && previousText in germanDeterminers)) return null
         val first = word.first().uppercase()
@@ -460,7 +467,8 @@ internal class TypingWord(val decoder: SpatialDecoder, val spatial: Boolean) {
         return if (addsCapitals || text.first().isUpperCase()) choice else choice.lowercase().takeIf { it != key }
     }
 
-    private fun knows(spelling: String) = lookup(spelling.lowercase()).let {
+    /** Whether a dictionary has this spelling: the model's words, its spellings list, its shorthand or your own words. */
+    fun knows(spelling: String) = lookup(spelling.lowercase()).let {
         model.index(it) >= 0 || model.known(it) || it in shorthand || (decoder.personal?.index(it) ?: -1) >= 0
     }
 
@@ -577,5 +585,8 @@ internal class TypingWord(val decoder: SpatialDecoder, val spatial: Boolean) {
             "it" to setOf("c", "d", "l", "m", "n", "s", "t", "v", "un", "all", "dall", "dell", "nell", "sull", "coll",
                 "quest", "quell", "bell", "sant", "tutt", "nessun", "buon"))
         fun boundary(c: Char?) = c == null || c.isWhitespace() || c in "([{“‘\",;!?"
+        /** Whether [before] ends in a word with no space after it yet ("up to", "you'll"): next words
+         * follow it as if the space were typed, and a next word picked there puts that space in first. */
+        fun endsBareWord(before: String) = before.lastOrNull()?.let { it.isLetter() || it == '\'' || it == '\u2019' } == true
     }
 }

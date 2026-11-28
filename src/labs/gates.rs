@@ -51,6 +51,16 @@ pub fn meeting_microphone_mute() -> bool {
     feature_on(Feature::MeetingMicrophoneMute)
 }
 
+/// Labs › Speaker names: while a meeting records a call in an app Hex can
+/// read (Slack huddles), a reader saves who the app shows speaking, and the
+/// transcript's remote lines take those names (macOS; read where a
+/// recording would start its speaker reader and at each of the reader's
+/// looks, so nothing is read through Accessibility with the lab off, and
+/// each time a transcript is named, in the call and after it).
+pub fn meeting_speaker_names() -> bool {
+    feature_on(Feature::MeetingSpeakerNames)
+}
+
 /// Labs › Indicator on any display: a released meeting capsule lands in
 /// the corner of the display under the pointer, and the capsules show on the
 /// display they were dragged to instead of only the primary display (macOS
@@ -188,6 +198,14 @@ pub fn clean_up() -> bool {
 /// processing stage).
 pub fn neutral_voice() -> bool {
     feature_on(Feature::NeutralVoice)
+}
+
+/// Labs › Clean up what I say: Hex's cleanup tagger takes ums, repeats, false
+/// starts, and spoken corrections out of each English dictation on this Mac
+/// (macOS; read as each capture starts, which fetches and loads the model,
+/// and as each dictation's processing starts).
+pub fn cleanup_tagger() -> bool {
+    feature_on(Feature::CleanupTagger)
 }
 
 /// A pasted dictation gets one leading space when the character before the

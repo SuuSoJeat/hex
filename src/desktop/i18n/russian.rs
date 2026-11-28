@@ -13,9 +13,15 @@ pub(super) fn table() -> &'static HashMap<&'static str, &'static str> {
     TABLE.get_or_init(|| merged(TRANSLATIONS, Language::Russian))
 }
 
+#[cfg(test)]
+pub(super) fn entries() -> impl Iterator<Item = (&'static str, &'static str)> {
+    super::screenshots::entries(TRANSLATIONS, Language::Russian)
+}
+
 #[rustfmt::skip]
 const TRANSLATIONS: &[(&str, &str)] = &[
     ("macOS isn't letting Hex paste. Add Hex in System Settings > Privacy & Security > System & App Protection Override, then restart Hex.", "macOS не разрешает Hex вставлять текст. Добавьте Hex в «Системные настройки» > «Конфиденциальность и безопасность» > «Переопределение защиты системы и приложений», затем перезапустите Hex."),
+    ("Windows blocked Hex's paste. Your words are on the clipboard: press Ctrl+V. Security software or an app running as administrator can cause this.", "Windows заблокировала вставку из Hex. Ваши слова в буфере обмена: нажмите Ctrl+V. Причиной может быть защитное ПО или приложение, запущенное от имени администратора."),
     ("Sent to", "Отправлено в"),
     ("Nothing here yet", "Здесь пока ничего нет"),
     ("Dictations, annotations, and captures show here.", "Здесь появляются диктовки, аннотации и снимки."),
@@ -205,30 +211,18 @@ const TRANSLATIONS: &[(&str, &str)] = &[
     ("Its file changed since it was imported. Check it again, import it again, or remove it.", "Её файл изменился после импорта. Проверьте его снова, импортируйте заново или удалите."),
     ("The imported model", "Импортированная модель"),
     ("{model} is missing, so Hex uses {fallback} until you import it again or choose another model", "{model} не найдена, поэтому Hex использует {fallback}, пока вы не импортируете её снова или не выберете другую модель"),
-    ("{model} changed since it was imported, so Hex uses {fallback} until you import it again or choose another model", "{model} изменилась после импорта, поэтому Hex использует {fallback}, пока вы не импортируете её снова или не выберете другую модель"),
     ("Remove {}?", "Удалить {}?"),
     ("Import again…", "Импортировать снова…"),
     ("Choose a speech model", "Выберите модель речи"),
     ("Hex found speech models already on this computer.", "Hex нашёл модели речи, которые уже есть на этом компьютере."),
-    ("Hex's recommended model", "Модель, рекомендованная Hex"),
-    ("Tested by Hex for quality and reliability", "Проверена Hex на качество и надёжность"),
-    ("Already downloaded, no download needed", "Уже загружена, скачивать не нужно"),
-    ("Use a model already on this computer", "Использовать модель, которая уже есть на этом компьютере"),
     ("Not tested by Hex", "Не проверена Hex"),
     ("Compatible doesn't mean accurate: a model that loads can still transcribe poorly.", "Совместимая — не значит точная: модель, которая загружается, всё равно может плохо распознавать."),
-    ("{revision} · {compression} · {source}", "{revision} · {compression} · {source}"),
     ("Found on this computer", "Найдена на этом компьютере"),
     ("Model could not be used.", "Не удалось использовать модель."),
     ("It may be too big for this computer's GPU memory.", "Возможно, она слишком велика для памяти GPU этого компьютера."),
     ("Forget", "Забыть"),
     ("Forget it?", "Забыть её?"),
     ("Checking the model stopped.", "Проверка модели остановлена."),
-    ("Use the copy already on this computer", "Использовать копию, которая уже есть на этом компьютере"),
-    ("Download instead", "Лучше загрузить"),
-    ("Download recommended model", "Загрузить рекомендуемую модель"),
-    ("Already on this computer: {source}", "Уже есть на этом компьютере: {source}"),
-    ("Known model", "Известная модель"),
-    ("Not verified by Hex · Not benchmarked", "Не проверена Hex · Без тестов"),
     ("Imported", "Импортирована"),
     ("Not benchmarked", "Без тестов"),
     ("{} languages", "Языков: {}"),
@@ -373,9 +367,6 @@ const TRANSLATIONS: &[(&str, &str)] = &[
     ("Shortcuts", "Сочетания клавиш"),
     ("Your desktop granted {}", "Окружение рабочего стола назначило {}"),
     ("Your desktop did not grant this shortcut", "Окружение рабочего стола не назначило это сочетание"),
-    ("Last dictation discarded: {}", "Последняя диктовка отброшена: {}"),
-    ("too quiet, check your mic level", "слишком тихо, проверьте уровень микрофона"),
-    ("no speech heard, check your mic level", "речь не услышана, проверьте уровень микрофона"),
     ("GNOME keyboard shortcuts", "Сочетания клавиш GNOME"),
     ("Add GNOME keyboard shortcuts", "Добавить сочетания клавиш GNOME"),
     ("Adds dictation, paste last and Annotate to GNOME Settings › Keyboard › Custom Shortcuts with your shortcuts. GNOME runs them on the key press, so dictation toggles.", "Добавляет диктовку, вставку последней диктовки и Annotate в Настройки GNOME › Клавиатура › Особые комбинации клавиш с вашими сочетаниями. GNOME запускает их при нажатии клавиши, поэтому диктовка переключается."),
@@ -1434,7 +1425,7 @@ const TRANSLATIONS: &[(&str, &str)] = &[
     ("Show each speech model's error rate, language, and how it was tested, in the model list", "Показывайте в списке моделей долю ошибок каждой модели речи, её язык и способ проверки"),
     ("Offer Parakeet Ultra, a tuned Parakeet v3 from Moondream, in the speech model list", "Предлагайте Parakeet Ultra, настроенный Moondream вариант Parakeet v3, в списке моделей речи"),
     ("Use Menu, Pause, or Scroll Lock as a shortcut by itself, such as Caps Lock remapped to Menu", "Используйте Menu, Pause или Scroll Lock как сочетание сами по себе, например Caps Lock, переназначенный на Menu"),
-    ("Use Caps Lock, Insert, Home, End, Page Up, or Page Down as a shortcut by itself", "Используйте Caps Lock, Insert, Home, End, Page Up или Page Down как сочетание сами по себе"),
+    ("Use Insert, Home, End, Page Up, or Page Down as a shortcut by itself", "Используйте Insert, Home, End, Page Up или Page Down как сочетание сами по себе"),
     ("Shorten long pauses before the recording is turned into text, so slow computers paste sooner", "Сокращайте длинные паузы до превращения записи в текст, чтобы медленные компьютеры вставляли быстрее"),
     ("Add your own speech model files saved in smaller formats (Q6_K, Q5_K, or Q4_K). They take less space, but Hex hasn't checked them, so accuracy may vary.", "Добавляйте свои файлы моделей речи, сохранённые в меньших форматах (Q6_K, Q5_K или Q4_K). Они занимают меньше места, но Hex их не проверял, поэтому точность может отличаться."),
     ("Show only downloaded speech models in the list, with the space they take", "Показывайте в списке только загруженные модели речи и занимаемое ими место"),
@@ -1495,38 +1486,7 @@ const TRANSLATIONS: &[(&str, &str)] = &[
     ("Also stop an offered or by-hand call recording 30 s after its call app leaves the microphone, even with Stop when the call ends off", "Также останавливает запись, начатую по предложению или вручную, через 30 с после того, как её приложение звонка отпускает микрофон, даже если «Останавливать по окончании звонка» выключено"),
     ("Indicator on any display", "Индикатор на любом экране"),
     ("Drag the meeting recording indicator to another display and it stays there", "Перетащите индикатор записи встречи на другой экран, и он останется там"),
+    ("Suggested", "Предложенные"),
+    ("Recent", "Недавние"),
+    ("Search sessions…", "Искать сессии…"),
 ];
-
-#[cfg(test)]
-mod tests {
-    use super::TRANSLATIONS;
-
-    #[test]
-    fn every_interface_string_has_a_russian_translation() {
-        let russian = super::table();
-        let missing: Vec<&str> = super::super::all_translations()
-            .map(|(english, _)| *english)
-            .filter(|english| russian.get(english).is_none_or(|text| text.is_empty()))
-            .collect();
-        assert!(missing.is_empty(), "no Russian for {missing:?}");
-    }
-
-    #[test]
-    fn russian_keys_are_unique_and_keep_their_placeholders() {
-        let mut seen = std::collections::HashSet::new();
-        for (english, russian) in TRANSLATIONS {
-            assert!(seen.insert(english), "duplicate key {english:?}");
-            let names = english
-                .split('{')
-                .skip(1)
-                .filter_map(|part| part.split_once('}'))
-                .map(|(name, _)| name);
-            for name in names {
-                assert!(
-                    russian.contains(&format!("{{{name}}}")),
-                    "translation of {english:?} lost {{{name}}}: {russian:?}"
-                );
-            }
-        }
-    }
-}

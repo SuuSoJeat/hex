@@ -2,6 +2,8 @@ package ly.anoma.hex.typing
 
 import android.content.Context
 import java.security.MessageDigest
+import ly.anoma.hex.keyboard.HeldDeleteWords
+import ly.anoma.hex.keyboard.KeyClick
 import ly.anoma.hex.keyboard.KeyboardHeight
 import ly.anoma.hex.keyboard.KeyColor
 import ly.anoma.hex.speech.Spoken
@@ -65,6 +67,21 @@ internal class TypingPreferences(context: Context) {
     var swipeDeleteLetters: Boolean
         get() = prefs.getBoolean(SWIPE_DELETE_LETTERS, false)
         set(value) { prefs.edit().putBoolean(SWIPE_DELETE_LETTERS, value).apply() }
+    /** Labs › Keyboard › Delete words when held: a held Delete removes whole words, slowly at first and faster the
+     * longer it is held ([ly.anoma.hex.keyboard.HeldDeleteWords]), as SwiftKey's does (#3007). Off by default. */
+    var deleteWords: Boolean
+        get() = prefs.getBoolean(DELETE_WORDS, false)
+        set(value) { prefs.edit().putBoolean(DELETE_WORDS, value).apply() }
+    /** Labs › Keyboard › Delete words when held › Initial delay: the gap after the first word, in ms (#3032). Kept
+     * while the lab is off. */
+    var deleteWordsDelay: Int
+        get() = HeldDeleteWords.clampDelay(prefs.getInt(DELETE_WORDS_DELAY, HeldDeleteWords.FIRST_GAP))
+        set(value) { prefs.edit().putInt(DELETE_WORDS_DELAY, HeldDeleteWords.clampDelay(value)).apply() }
+    /** Labs › Keyboard › Delete words when held › Acceleration: how much shorter each next gap is, in % (#3032). Kept
+     * while the lab is off. */
+    var deleteWordsSpeedup: Int
+        get() = HeldDeleteWords.clampSpeedup(prefs.getInt(DELETE_WORDS_SPEEDUP, HeldDeleteWords.SPEEDUP))
+        set(value) { prefs.edit().putInt(DELETE_WORDS_SPEEDUP, HeldDeleteWords.clampSpeedup(value)).apply() }
     /** Labs › Keyboard › SwiftKey words: the words imported from another keyboard's export ([ImportedWords])
      * join your own words in suggestions. Off by default; the imported list stays on the phone while off. */
     var importedWords: Boolean
@@ -75,6 +92,33 @@ internal class TypingPreferences(context: Context) {
     var marksTakeFixSpace: Boolean
         get() = prefs.getBoolean(MARKS_TAKE_FIX_SPACE, false)
         set(value) { prefs.edit().putBoolean(MARKS_TAKE_FIX_SPACE, value).apply() }
+    /** Labs › Keyboard › Space after punctuation: outside URL fields, a clause mark that takes a pick's space (or, with
+     * Punctuation after autocorrect, a fix's) puts it back after itself ("here", ",", gives "here, "), and a space typed
+     * straight after is swallowed as one after a pick is (#3000). Off by default. */
+    var marksKeepSpace: Boolean
+        get() = prefs.getBoolean(MARKS_KEEP_SPACE, false)
+        set(value) { prefs.edit().putBoolean(MARKS_KEEP_SPACE, value).apply() }
+    /** Labs › Keyboard › Click when a hold opens: with Haptics on, a held key plays a key press's click the moment its
+     * symbols or accents open (#3006). Off by default. */
+    var holdClick: Boolean
+        get() = prefs.getBoolean(HOLD_CLICK, false)
+        set(value) { prefs.edit().putBoolean(HOLD_CLICK, value).apply() }
+    /** Labs › Keyboard › Closing quotes take the space: a " or ” typed while a quote is open in the paragraph takes
+     * the space before it, however it got there (#3001). Off by default. */
+    var closingQuoteTakesSpace: Boolean
+        get() = prefs.getBoolean(CLOSING_QUOTE_TAKES_SPACE, false)
+        set(value) { prefs.edit().putBoolean(CLOSING_QUOTE_TAKES_SPACE, value).apply() }
+    /** Labs › Keyboard › SwiftKey layout: Microsoft SwiftKey's held letter symbols, bottom row (emoji before the
+     * comma), one-row held period with flicks, a held comma that dictates, and its 123 and {&= pages (#3021). Off by
+     * default. */
+    var swiftKeyLayout: Boolean
+        get() = prefs.getBoolean(SWIFTKEY_LAYOUT, false)
+        set(value) { prefs.edit().putBoolean(SWIFTKEY_LAYOUT, value).apply() }
+    /** Labs › Keyboard › Learn new words: a spelling no dictionary knows that you keep as typed (its chip tapped over a
+     * correction, or the correction undone) joins Android's personal dictionary ([LearnedWords], #3020). Off by default. */
+    var learnWords: Boolean
+        get() = prefs.getBoolean(LEARN_WORDS, false)
+        set(value) { prefs.edit().putBoolean(LEARN_WORDS, value).apply() }
     /** Labs › Keyboard › Adaptive touch: the decoder reads taps with your own key centres once it has learned them
      * ([AdaptiveTouch], kept by [AdaptiveTouchStore]). Off by default. */
     var adaptiveTouch: Boolean
@@ -100,6 +144,17 @@ internal class TypingPreferences(context: Context) {
     var volumeInMenu: Boolean
         get() = prefs.getBoolean(VOLUME_IN_MENU, false)
         set(value) { prefs.edit().putBoolean(VOLUME_IN_MENU, value).apply() }
+    /** Labs › Keyboard › Key click volume: the key click at [keyClickPercent] instead of the phone's own level (#3005).
+     * Off by default. */
+    var keyClickVolume: Boolean
+        get() = prefs.getBoolean(KEY_CLICK_VOLUME, false)
+        set(value) { prefs.edit().putBoolean(KEY_CLICK_VOLUME, value).apply() }
+    /** Labs › Keyboard › Key click volume's slider, [KeyClick.MIN]–[KeyClick.MAX]%; kept while the lab is off. */
+    var keyClickPercent: Int
+        get() = KeyClick.clamp(prefs.getInt(KEY_CLICK_PERCENT, KeyClick.DEFAULT))
+        set(value) { prefs.edit().putInt(KEY_CLICK_PERCENT, KeyClick.clamp(value)).apply() }
+    /** The percent the keys click at, or null for the phone's own level (the lab off). */
+    val clickPercent: Int? get() = if (keyClickVolume) keyClickPercent else null
     /** Labs › Keyboard › Voice-only mode: a "voice" subtype other keyboards switch to for dictation
      * alone, off by default. */
     var voiceOnly: Boolean
@@ -151,7 +206,15 @@ internal class TypingPreferences(context: Context) {
         const val KEYBOARD_TOOLS = "keyboardTools"
         const val SMART_QUOTES = "smartQuotes"
         const val SWIPE_DELETE_LETTERS = "swipeDeleteLetters"
+        const val DELETE_WORDS = "deleteWords"
+        const val DELETE_WORDS_DELAY = "deleteWordsDelay"
+        const val DELETE_WORDS_SPEEDUP = "deleteWordsSpeedup"
         const val MARKS_TAKE_FIX_SPACE = "marksTakeFixSpace"
+        const val MARKS_KEEP_SPACE = "marksKeepSpace"
+        const val HOLD_CLICK = "holdClick"
+        const val CLOSING_QUOTE_TAKES_SPACE = "closingQuoteTakesSpace"
+        const val SWIFTKEY_LAYOUT = "swiftKeyLayout"
+        const val LEARN_WORDS = "learnWords"
         const val ADAPTIVE_TOUCH = "adaptiveTouch"
         const val USE_IMPORTED_WORDS = "importedWords"
         /** A counter [ImportedWords] bumps whenever the imported list changes, so the keyboard reads it again. */
@@ -165,6 +228,8 @@ internal class TypingPreferences(context: Context) {
         const val HEIGHT = "keyboardHeight"
         const val HEX_KEY_LEFT = "hexKeyLeft"
         const val VOLUME_IN_MENU = "volumeInMenu"
+        const val KEY_CLICK_VOLUME = "keyClickVolume"
+        const val KEY_CLICK_PERCENT = "keyClickPercent"
         const val KEY_COLORS = "keyColors"
         const val KEY_COLOR = "keyColor"
         const val TEST_KEYBOARD_ON_HOME = "testKeyboardOnHome"

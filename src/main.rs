@@ -158,15 +158,6 @@ enum Command {
         #[command(subcommand)]
         command: DevCommand,
     },
-    /// The Scrawl capture capsule in a window of its own, driven by a fake
-    /// host, with live tuning. Records and sends nothing.
-    #[cfg(hex_capture)]
-    #[command(name = "capsule-playground", hide = true)]
-    CapsulePlayground {
-        /// Rune's flags, such as `--snap out.png --scene rule`.
-        #[arg(last = true)]
-        rune_args: Vec<String>,
-    },
     #[cfg(debug_assertions)]
     /// Record, transcribe, and browse local meetings.
     Meeting {
@@ -232,33 +223,15 @@ enum DevCommand {
     /// Render offline audio through the Hex Microphone voice filter.
     VoiceFilter {
         #[command(subcommand)]
-        command: VoiceFilterCommand,
+        command: control::developer_control::VoiceFilterCommand,
     },
-}
-
-#[cfg(target_os = "macos")]
-#[derive(Subcommand)]
-enum VoiceFilterCommand {
-    /// Apply a voice-filter mode across one or more dictation spans in a WAV file.
-    Render {
-        /// Input WAV path (16-bit PCM or 32-bit float).
-        input: PathBuf,
-        /// Voice filter mode id (muffled, muted, quiet, normal, chipmunk, robot, walkie, underwater, far).
-        #[arg(long, default_value = "muffled")]
-        mode: String,
-        /// Optional JSON mode spec override (matching presets.json).
-        #[arg(long)]
-        params: Option<String>,
-        /// Dictation span(s) in milliseconds, e.g. `1000-3500`.
-        #[arg(long = "dictation")]
-        dictation: Vec<String>,
-        /// Effect strength (`0.0` to `1.0`).
-        #[arg(long, default_value_t = 1.0)]
-        strength: f64,
-        /// Output WAV path.
-        #[arg(short = 'o', long = "output")]
-        output: PathBuf,
-    },
+    /// Read a call app's windows through Accessibility and report what is there.
+    #[command(
+        name = "call-window",
+        long_about = accessibility::probe::cli::ABOUT,
+        hide = !dev_build::is_dev_build()
+    )]
+    CallWindow(accessibility::probe::cli::Args),
 }
 
 #[cfg(debug_assertions)]
@@ -325,14 +298,6 @@ fn main() -> Result<()> {
     if opens_app(cli.command.as_ref(), bundled_watcher) {
         rune::prewarm_gpu();
     }
-    // A window of its own: no data folder, log, lock, or settings, so it
-    // runs beside the installed Hex.
-    #[cfg(hex_capture)]
-    if let Some(Command::CapsulePlayground { rune_args }) = &cli.command {
-        keyboard::initialize_layout()?;
-        rune_ui::capture_capsule::playground::run(rune_args.clone());
-        return Ok(());
-    }
     // Control and read commands (status, settings, history, meetings, mcp,
     // labs, …) talk to the running Hex or read files: no data folder, log,
     // lock, GUI, or permission setup of their own, so an agent may run them
@@ -370,29 +335,16 @@ fn main() -> Result<()> {
         }
         _ => {}
     }
-    if let Some(Command::Dev {
-        command:
-            DevCommand::VoiceFilter {
-                command:
-                    VoiceFilterCommand::Render {
-                        input,
-                        mode,
-                        params,
-                        dictation,
-                        strength,
-                        output,
-                    },
-            },
-    }) = &cli.command
-    {
-        return audio::voice_filter::render_wav_command(
-            input,
-            mode,
-            params.as_deref(),
-            dictation,
-            *strength,
-            output,
-        );
+    // `hex dev` commands that run here: no data folder, log, lock, or
+    // settings (call-window asks the running Hex and writes one file).
+    match &cli.command {
+        Some(Command::Dev {
+            command: DevCommand::VoiceFilter { command },
+        }) => return command.run(),
+        Some(Command::Dev {
+            command: DevCommand::CallWindow(arguments),
+        }) => return accessibility::probe::cli::run(arguments, Cli::command),
+        _ => {}
     }
     // A headless render (`hex app -- --snap …`) draws fixtures: no data
     // folder, log, lock, or settings, so it never touches the user's Hex.
@@ -451,8 +403,6 @@ fn main() -> Result<()> {
             local_api::run_service(&log_dir, event_path, embedded, &SHUTDOWN)
         }
         Command::Control(_) => unreachable!("handled before startup"),
-        #[cfg(hex_capture)]
-        Command::CapsulePlayground { .. } => unreachable!("handled before startup"),
         Command::Dev { command } => {
             #[cfg(debug_assertions)]
             {
@@ -472,7 +422,9 @@ fn main() -> Result<()> {
                         println!("{}", bundle.display());
                         return Ok(());
                     }
-                    DevCommand::VoiceFilter { .. } => unreachable!("handled before startup"),
+                    DevCommand::VoiceFilter { .. } | DevCommand::CallWindow(_) => {
+                        unreachable!("handled before startup")
+                    }
                 };
                 let reply = local_api::call_developer(&command)?;
                 if let DeveloperReply::Error { code, message } = &reply {
@@ -484,7 +436,9 @@ fn main() -> Result<()> {
             #[cfg(not(debug_assertions))]
             {
                 match command {
-                    DevCommand::VoiceFilter { .. } => unreachable!("handled before startup"),
+                    DevCommand::VoiceFilter { .. } | DevCommand::CallWindow(_) => {
+                        unreachable!("handled before startup")
+                    }
                 }
             }
         }

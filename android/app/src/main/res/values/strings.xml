@@ -143,6 +143,7 @@
     <string name="settings_privacy_lab_model">Only how long your recent dictations took to transcribe against how long you spoke, and a few counts, never words or audio. Turning it off deletes them.</string>
     <string name="settings_privacy_lab_clipboard">Reads what you copy and keeps the last 20 texts, each for an hour unless you pin it, skipping text an app marks as sensitive and anything copied while a password field is open. Turning it off deletes them.</string>
     <string name="settings_privacy_lab_words">The words from a file you choose to import. Turning it off stops the suggestions; Remove imported words deletes them.</string>
+    <string name="settings_privacy_lab_learned">Words you keep as typed, added to Android’s personal dictionary, which other keyboards can read too. Remove them there, or tap the line Hex shows when it adds one; uninstalling Hex leaves them.</string>
     <string name="settings_privacy_feedback">Feedback leaves the phone only when you tap Send in Send feedback: then your message, the pictures you keep, your email if you add one and details about Hex and this phone go to Anomaly’s feedback inbox (Bellhop). Your dictations, recordings, vocabulary and corrections are never included.</string>
     <string name="settings_privacy_updates"></string>
     <string name="settings_privacy_policy">Privacy policy</string>
@@ -231,8 +232,24 @@
         <item quantity="one">%s word imported</item>
         <item quantity="other">%s words imported</item>
     </plurals>
+    <string name="delete_words">Delete words when held</string>
+    <string name="delete_words_detail">A held Delete removes whole words, faster the longer you hold it</string>
+    <string name="delete_words_delay">Initial delay</string>
+    <string name="delete_words_delay_ms">%1$d ms</string>
+    <string name="delete_words_speedup">Acceleration</string>
+    <string name="delete_words_speedup_percent">%1$d%%</string>
     <string name="marks_take_fix_space">Punctuation after autocorrect</string>
     <string name="marks_take_fix_space_detail">A period or comma right after an autocorrection goes against the word</string>
+    <string name="marks_keep_space">Space after punctuation</string>
+    <string name="marks_keep_space_detail">A comma or period right after a picked word goes against it with a space after it</string>
+    <string name="hold_click">Click when a hold opens</string>
+    <string name="hold_click_detail">With Haptics on, a held key clicks as its symbols or accents appear</string>
+    <string name="closing_quote_takes_space">Closing quotes take the space</string>
+    <string name="closing_quote_takes_space_detail">A closing quote typed while a quote is open goes against the word before it</string>
+    <string name="swiftkey_layout">SwiftKey layout</string>
+    <string name="swiftkey_layout_detail">SwiftKey\'s held symbols, bottom row and symbol pages; hold comma to talk</string>
+    <string name="learn_words">Learn new words</string>
+    <string name="learn_words_detail">A word you keep as typed, when no dictionary knows it, joins your personal dictionary</string>
     <string name="adaptive_touch">Adaptive touch</string>
     <string name="adaptive_touch_detail">Learns where you tap each key. Stays on this phone and keeps averages, never what you type.</string>
     <string name="adaptive_touch_learning">Learning: %1$d of %2$d taps</string>
@@ -246,12 +263,17 @@
     <string name="password_manager_suggestions_detail">Show logins, codes and cards from your autofill service in the suggestion strip</string>
     <string name="voice_only_mode">Voice-only mode</string>
     <string name="voice_only_detail">Lets you switch to Hex just to dictate from another keyboard, then switches back</string>
+    <string name="speech_requests">Answer apps’ speech requests</string>
+    <string name="speech_requests_detail">When another keyboard’s mic, such as SwiftKey’s, or an app asks Android for voice input, Hex listens and sends back the text. The first time, Android asks which app to use: choose Hex and Always.</string>
     <string name="voice_bar_from_menu">Voice bar from the Hex menu</string>
     <string name="voice_bar_from_menu_detail">Adds Voice only to the Hex menu, which folds the keys into a small dictation bar in the same field</string>
     <string name="hex_key_left">Hex key on the left</string>
     <string name="hex_key_left_detail">Moves the Hex key you hold to talk to the left end of the suggestion strip</string>
     <string name="volume_in_menu">Volume in the Hex menu</string>
     <string name="volume_in_menu_detail">Adds Volume to the Hex menu, which opens the phone’s volume controls</string>
+    <string name="key_click_volume">Key click volume</string>
+    <string name="key_click_volume_detail">Plays the key click at the level you set instead of the phone’s. Follows Touch sounds</string>
+    <string name="key_click_volume_percent">%1$d%%</string>
     <!-- Labs › Keyboard › Key colors, iPhone Hex's words. -->
     <string name="key_colors">Key colors</string>
     <string name="key_color">Color</string>
@@ -368,6 +390,24 @@
     <!-- Labs › Dictate from Quick Settings: the Labs row, the tile's label and the sheet's lines. -->
     <string name="quick_dictation">Dictate from Quick Settings</string>
     <string name="quick_dictation_detail">Adds a Hex tile to Quick Settings. Tap it in any app, speak, and Hex copies the text for you to paste. For apps where Hex can’t be your keyboard, such as work apps.</string>
+    <!-- Labs › Dictation sounds: desktop Hex's sound sets, with its names. -->
+    <string name="dictation_sounds">Dictation sounds</string>
+    <string name="dictation_sounds_detail">A sound when Hex starts listening, when you finish, when you cancel and when a dictation fails, and another when slow text arrives. Silent and vibrate mute them.</string>
+    <string name="dictation_sound">Sound</string>
+    <string name="sound_set_classic">Classic keys</string>
+    <string name="sound_set_classic_detail">Two clicks to start, a swish to stop</string>
+    <string name="sound_set_signature">Kalimba</string>
+    <string name="sound_set_signature_detail">A kalimba motif that rises and comes home</string>
+    <string name="sound_set_click">Click</string>
+    <string name="sound_set_click_detail">Mechanical key clicks</string>
+    <string name="sound_set_soft">Soft tone</string>
+    <string name="sound_set_soft_detail">Warm, rounded blips</string>
+    <string name="sound_set_wood">Wood</string>
+    <string name="sound_set_wood_detail">Soft marimba and hollow wood blocks</string>
+    <string name="sound_set_analog">Warm synth</string>
+    <string name="sound_set_analog_detail">A mellow analogue synth</string>
+    <string name="sound_set_thock">Thock</string>
+    <string name="sound_set_thock_detail">A deep, creamy keyboard key</string>
     <string name="quick_tile">Hex dictation</string>
     <string name="quick_hint">Speak, then tap Finish dictation</string>
     <string name="quick_copied">Copied. Paste it where you were typing.</string>

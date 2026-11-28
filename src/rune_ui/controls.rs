@@ -21,6 +21,10 @@ use super::Ui;
 pub(super) const DESCRIPTION: TextStyle = TextStyle::new(12.0, 440.0).lh(16.0);
 /// User-content detail titles (such as a meeting's name) and headline stat numbers.
 pub(super) const DISPLAY: TextStyle = TextStyle::new(18.0, 600.0).lh(24.0);
+/// A document's title where it leads its own column at full width: a
+/// meeting's name over its summary and transcript. Above [`DISPLAY`], and
+/// tracked in a touch as large type wants.
+pub(super) const HEADLINE: TextStyle = TextStyle::new(22.0, 600.0).lh(28.0).tracking(-0.3);
 const SELECT_WIDTH: f32 = 220.0;
 /// A select whose rows carry a description: wide enough for a full choice
 /// name beside the hint under it, which takes whatever is left.
@@ -70,6 +74,8 @@ pub(super) struct Metrics {
     pub(super) fact_label_w: f32,
     /// Centred empty-state and option copy width.
     pub(super) copy_w: f32,
+    /// The Meetings setup column: its header, card, and action.
+    pub(super) setup_w: f32,
 }
 
 pub(super) const METRICS: Metrics = Metrics {
@@ -89,6 +95,7 @@ pub(super) const METRICS: Metrics = Metrics {
     detail_pad: 24.0,
     fact_label_w: 120.0,
     copy_w: 280.0,
+    setup_w: 480.0,
 };
 
 /// Standard modal sheet widths. A modal is a small page and reuses the page's
@@ -154,12 +161,14 @@ pub(crate) const CAPSULE: Capsule = Capsule {
     window_inset: 4.0,
     chip_inset: 4.0,
     row_inset: 6.0,
-    button_inset: 8.0,
+    // One 6 pt inset for rows, buttons and the ✕ box: every inner shape
+    // rounds 8 pt (14 − 6), the capsules' one concentric rule.
+    button_inset: 6.0,
     row_px: 10.0,
     icon: 16.0,
     icon_gap: 8.0,
     header_h: 36.0,
-    row_h: 44.0,
+    row_h: 32.0,
     row_gap: 2.0,
     island_h: 40.0,
     banner_h: 44.0,
@@ -186,7 +195,7 @@ impl Capsule {
 // The concentric radius table, checked at compile time.
 const _: () = assert!(CAPSULE.inner(CAPSULE.chip_inset) == 10.0); // radius.xl
 const _: () = assert!(CAPSULE.inner(CAPSULE.row_inset) == 8.0); // radius.lg
-const _: () = assert!(CAPSULE.inner(CAPSULE.button_inset) == 6.0); // radius.md
+const _: () = assert!(CAPSULE.inner(CAPSULE.button_inset) == 8.0); // radius.lg
 const _: () = assert!(CAPSULE.text_rail() == METRICS.row_px);
 
 /// A settings page's column of sections: cards hang `row_px` past the
@@ -1337,6 +1346,24 @@ pub(crate) fn capsule_confirm<S: 'static>(
     }
 }
 
+/// Wraps modal body items in a scrollable column that hugs its content while
+/// it fits and shrinks to scroll inside `modal_sheet` when the window is
+/// shorter than the body. Spans the modal's full width so card shadows stay
+/// unclipped and the scroll bar runs down the modal's right edge.
+pub(super) fn modal_scroll_body(p: Paint, key: &str, items: Vec<El>) -> El {
+    let card_edge = METRICS.gutter - METRICS.row_px;
+    const SHADOW_ROOM: f32 = 4.0;
+    let content = col()
+        .key("body-content")
+        .px(card_edge)
+        .py(SHADOW_ROOM)
+        .gap(MODAL.gap)
+        .children(items);
+    super::list_detail::fit_scroll_body(p.k, key, content)
+        .mx(-card_edge)
+        .my(-SHADOW_ROOM)
+}
+
 /// Wraps `panel` in a modal sheet's overlay elevation, scrim, and centered
 /// modal layer: keys stay inside, Escape or a press outside runs `close`, and
 /// focus returns to the control that opened it.
@@ -1345,7 +1372,8 @@ pub(super) fn modal_sheet(p: Paint, prefix: &str, mut panel: El, close: fn(&mut 
         panel = panel.box_shadow(*shadow);
     }
     let layer = |key: String| {
-        el().key(key)
+        col()
+            .key(key)
             .role("none")
             .absolute(0.0, 0.0)
             .w_full()
@@ -1357,9 +1385,10 @@ pub(super) fn modal_sheet(p: Paint, prefix: &str, mut panel: El, close: fn(&mut 
             .on_press(close)
             .transition(modal_scrim_transition(p)),
         layer(format!("{prefix}-layer"))
+            .py(MODAL.margin)
             .center()
             .transition(modal_transition(p))
-            .child(panel.modal(true, close)),
+            .child(panel.shrink().min_h(0.0).modal(true, close)),
     ]
 }
 
