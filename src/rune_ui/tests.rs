@@ -117,12 +117,19 @@ fn pick(rt: &mut Runtime<Ui>, key: &str, index: usize) {
     tap_option(rt, index);
 }
 
+fn open_listbox(rt: &Runtime<Ui>) -> rune::ElementInfo {
+    rt.elements()
+        .into_iter()
+        .find(|e| !e.exiting && e.role == "listbox")
+        .expect("the open select has a listbox")
+}
+
 /// Scrolls an open select's list to option `index` and presses it.
 fn tap_option(rt: &mut Runtime<Ui>, index: usize) {
     let key = format!("option{index}");
     for _ in 0..400 {
         let option = element(rt, &key).rect;
-        let list = element(rt, "listbox").rect;
+        let list = open_listbox(rt).rect;
         let middle = option[1] + option[3] / 2.0;
         if middle > list[1] && middle < list[1] + list[3] {
             break;
@@ -3163,7 +3170,7 @@ fn the_language_menu_opens_on_its_chosen_language() {
     .position(|code| *code == "fr")
     .unwrap();
     let row = element(&rt, &format!("option{french}")).rect;
-    let list = element(&rt, "listbox").rect;
+    let list = open_listbox(&rt).rect;
     assert!(
         row[1] >= list[1] - 0.5 && row[1] + row[3] <= list[1] + list[3] + 0.5,
         "row {row:?} outside list {list:?}"

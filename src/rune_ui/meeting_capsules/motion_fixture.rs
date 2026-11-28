@@ -481,22 +481,23 @@ fn row_swipes_do_not_move_the_panel_or_fire_actions_but_small_clicks_work() {
         });
         rt.frame(0.);
         for key in ["stop", "copy-prompt", "copy-all"] {
-            let Some(([x, y, w, h], _)) = rt.presented(key) else {
+            let Some(row) = rt
+                .elements()
+                .into_iter()
+                .find(|e| e.key.as_deref() == Some(key) && !e.exiting)
+            else {
                 continue;
             };
+            let [x, y, w, h] = row.rect;
             for px in [x + 16., x + 35., x + w - 20.] {
                 let py = y + h / 2.;
                 rt.pointer_move(px, py);
                 rt.frame(0.);
                 // An enabled row is a button; a disabled one is not a target
                 // and falls through to the panel's arrow.
-                let focusable = rt
-                    .elements()
-                    .iter()
-                    .any(|e| e.key.as_deref() == Some(key) && e.focusable);
                 assert_eq!(
                     rt.cursor(),
-                    if focusable {
+                    if row.focusable {
                         Cursor::Pointer
                     } else {
                         Cursor::Default
