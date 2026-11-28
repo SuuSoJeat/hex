@@ -466,10 +466,15 @@ fn result(
     });
     // Reveal the words within the growing surface, never over the copy buttons.
     let summary = col().key("summary-lane").clip_rounded(0.).children(summary);
-    let rows = col()
-        .key("rows")
-        .px(PANEL_PAD)
-        .children(copy_rows(p, capsule, false));
+    let copy_actions = copy_rows(p, capsule, false).into_iter().map(|action| {
+        // While transcription finishes, the dimmed controls are unavailable.
+        if manifest.is_none() {
+            action.cursor(Cursor::Default)
+        } else {
+            action
+        }
+    });
+    let rows = col().key("rows").px(PANEL_PAD).children(copy_actions);
     // The lead copy is as far from the title's row as from the next copy.
     let rows = if top {
         rows.pt(ROW_GAP).pb(PANEL_PAD)
