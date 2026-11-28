@@ -14,12 +14,13 @@ pub(super) enum Language {
     Hungarian,
 }
 
-/// A one-language table with these strings added.
-pub(super) fn merged(
-    table: &[(&'static str, &'static str)],
+/// Every `(english, translated)` entry for a one-language table plus all
+/// overflow sections, preserving duplicates so tests can catch them.
+pub(super) fn entries(
+    table: &'static [(&'static str, &'static str)],
     language: Language,
-) -> HashMap<&'static str, &'static str> {
-    let sections: &[&[(&'static str, &'static str)]] = match language {
+) -> impl Iterator<Item = (&'static str, &'static str)> {
+    let sections: &'static [&'static [(&'static str, &'static str)]] = match language {
         Language::French => &[
             FRENCH,
             super::agents::FRENCH,
@@ -35,6 +36,7 @@ pub(super) fn merged(
             super::meeting_audio_source::FRENCH,
             super::meeting_mute::FRENCH,
             super::middle_mouse::FRENCH,
+            super::speaker_names::FRENCH,
             super::model_switch::FRENCH,
             super::confirm_cancel::FRENCH,
         ],
@@ -53,6 +55,7 @@ pub(super) fn merged(
             super::meeting_audio_source::PORTUGUESE,
             super::meeting_mute::PORTUGUESE,
             super::middle_mouse::PORTUGUESE,
+            super::speaker_names::PORTUGUESE,
             super::model_switch::PORTUGUESE,
             super::confirm_cancel::PORTUGUESE,
         ],
@@ -71,6 +74,7 @@ pub(super) fn merged(
             super::meeting_audio_source::RUSSIAN,
             super::meeting_mute::RUSSIAN,
             super::middle_mouse::RUSSIAN,
+            super::speaker_names::RUSSIAN,
             super::model_switch::RUSSIAN,
             super::confirm_cancel::RUSSIAN,
         ],
@@ -89,6 +93,7 @@ pub(super) fn merged(
             super::meeting_audio_source::HUNGARIAN,
             super::meeting_mute::HUNGARIAN,
             super::middle_mouse::HUNGARIAN,
+            super::speaker_names::HUNGARIAN,
             super::model_switch::HUNGARIAN,
             super::confirm_cancel::HUNGARIAN,
         ],
@@ -98,7 +103,14 @@ pub(super) fn merged(
         .iter()
         .chain(sections.iter().flat_map(|section| section.iter()))
         .copied()
-        .collect()
+}
+
+/// A one-language table with these strings added.
+pub(super) fn merged(
+    table: &'static [(&'static str, &'static str)],
+    language: Language,
+) -> HashMap<&'static str, &'static str> {
+    entries(table, language).collect()
 }
 
 /// Columns: Polish, Chinese (Simplified), Japanese, German, Spanish, Ukrainian.
@@ -125,6 +137,12 @@ pub(super) const TRANSLATIONS: &[(&str, [&str; 6])] = &[
     ("Display {}", ["Ekran {}", "显示器 {}", "ディスプレイ {}", "Display {}", "Pantalla {}", "Дисплей {}"]),
     ("Export size", ["Rozmiar eksportu", "导出尺寸", "書き出しサイズ", "Exportgröße", "Tamaño de exportación", "Розмір експорту"]),
     ("Pause", ["Wstrzymaj", "暂停", "一時停止", "Pause", "Pausar", "Пауза"]),
+    ("Open in Preview", ["Otwórz w Podglądzie", "在“预览”中打开", "プレビューで開く", "In Vorschau öffnen", "Abrir en Vista Previa", "Відкрити в Оглядачі"]),
+    ("Open in default viewer", ["Otwórz w domyślnej przeglądarce", "在默认查看器中打开", "デフォルトのビューアで開く", "Im Standardprogramm öffnen", "Abrir en el visor predeterminado", "Відкрити в стандартному переглядачі"]),
+    ("Delete image", ["Usuń obraz", "删除图片", "画像を削除", "Bild löschen", "Eliminar imagen", "Видалити зображення"]),
+    ("Couldn't open", ["Nie udało się otworzyć", "无法打开", "開けませんでした", "Öffnen fehlgeschlagen", "No se pudo abrir", "Не вдалося відкрити"]),
+    ("No image on clipboard", ["Brak obrazu w schowku", "剪贴板中没有图片", "クリップボードに画像がありません", "Kein Bild in der Zwischenablage", "No hay ninguna imagen en el portapapeles", "У буфері обміну немає зображення"]),
+    ("Couldn't paste image", ["Nie udało się wkleić obrazu", "无法粘贴图片", "画像を貼り付けられませんでした", "Bild konnte nicht eingefügt werden", "No se pudo pegar la imagen", "Не вдалося вставити зображення"]),
 ];
 
 #[rustfmt::skip]
@@ -150,6 +168,12 @@ pub(super) const FRENCH: &[(&str, &str)] = &[
     ("Display {}", "Écran {}"),
     ("Export size", "Taille d’export"),
     ("Pause", "Pause"),
+    ("Open in Preview", "Ouvrir dans Aperçu"),
+    ("Open in default viewer", "Ouvrir dans la visionneuse par défaut"),
+    ("Delete image", "Supprimer l’image"),
+    ("Couldn't open", "Ouverture impossible"),
+    ("No image on clipboard", "Aucune image dans le presse-papiers"),
+    ("Couldn't paste image", "Impossible de coller l’image"),
 ];
 
 #[rustfmt::skip]
@@ -175,6 +199,12 @@ pub(super) const PORTUGUESE: &[(&str, &str)] = &[
     ("Display {}", "Tela {}"),
     ("Export size", "Tamanho da exportação"),
     ("Pause", "Pausar"),
+    ("Open in Preview", "Abrir na Pré-Visualização"),
+    ("Open in default viewer", "Abrir no visualizador padrão"),
+    ("Delete image", "Excluir imagem"),
+    ("Couldn't open", "Não foi possível abrir"),
+    ("No image on clipboard", "Nenhuma imagem na área de transferência"),
+    ("Couldn't paste image", "Não foi possível colar a imagem"),
 ];
 
 #[rustfmt::skip]
@@ -200,6 +230,12 @@ pub(super) const RUSSIAN: &[(&str, &str)] = &[
     ("Display {}", "Дисплей {}"),
     ("Export size", "Размер экспорта"),
     ("Pause", "Пауза"),
+    ("Open in Preview", "Открыть в Просмотре"),
+    ("Open in default viewer", "Открыть в просмотрщике по умолчанию"),
+    ("Delete image", "Удалить изображение"),
+    ("Couldn't open", "Не удалось открыть"),
+    ("No image on clipboard", "В буфере обмена нет изображения"),
+    ("Couldn't paste image", "Не удалось вставить изображение"),
 ];
 
 /// Hungarian, for the strings above.
@@ -226,4 +262,10 @@ pub(super) const HUNGARIAN: &[(&str, &str)] = &[
     ("Display {}", "Képernyő {}"),
     ("Export size", "Export mérete"),
     ("Pause", "Szünet"),
+    ("Open in Preview", "Megnyitás a Megtekintőben"),
+    ("Open in default viewer", "Megnyitás az alapértelmezett megjelenítőben"),
+    ("Delete image", "Kép törlése"),
+    ("Couldn't open", "Nem sikerült megnyitni"),
+    ("No image on clipboard", "Nincs kép a vágólapon"),
+    ("Couldn't paste image", "Nem sikerült beilleszteni a képet"),
 ];

@@ -640,7 +640,7 @@ A O E U I D H T N S from the edge, shift and Q J K X B M W V Z, on keys narrowed
 row fits (38.3 pt pitch on a 402 pt iPhone); split on the Duo it keeps delete on row 3
 (Apple's split Dvorak unobserved). Settings › Labs › Dvorak punctuation keys
 (off by default, `experiments.dvorakPunctuation`) adds an alternate joined layout for plain text,
-web search, URL and email fields. The [feature map](../../docs/features/README.md#developer-and-prototype-surfaces)
+web search, URL and email fields. The [feature map](../../docs/features/README.md#iphone-keyboard)
 lists its key positions and the layouts used in split, URL and email fields. Kept per
 language in the App Group
 (`settings.keyboardLanguages.layouts`, `LanguageSettings.letterLayout(for:)`); unset,

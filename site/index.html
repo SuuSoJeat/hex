@@ -41,15 +41,112 @@
     <script type="application/ld+json">
       {
         "@context": "https://schema.org",
-        "@type": "SoftwareApplication",
-        "name": "Hex",
-        "description": "Local voice dictation for Mac, Windows, and Linux.",
-        "url": "__ORIGIN__/",
-        "applicationCategory": "UtilitiesApplication",
-        "operatingSystem": "macOS 15, Windows 10, Windows 11, Linux, iOS 18, Android 12",
-        "softwareVersion": "__HEX_VERSION__",
-        "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
-        "author": { "@type": "Person", "name": "Kit Langton" }
+        "@graph": [
+          {
+            "@type": "SoftwareApplication",
+            "@id": "__ORIGIN__/#app",
+            "name": "Hex",
+            "description": "Free, open-source, local voice dictation and no-bot meeting transcription for Mac, Windows, and Linux.",
+            "url": "__ORIGIN__/",
+            "downloadUrl": "__ORIGIN__/download/macos-arm64-dmg",
+            "applicationCategory": "UtilitiesApplication",
+            "applicationSubCategory": "Voice dictation",
+            "operatingSystem": "macOS 15, Windows 10, Windows 11, Linux, iOS 18, Android 12",
+            "softwareVersion": "__HEX_VERSION__",
+            "inLanguage": "en",
+            "isAccessibleForFree": true,
+            "license": "https://github.com/anomalyco/hex/blob/dev/LICENSE",
+            "screenshot": "__ORIGIN__/og.png",
+            "featureList": [
+              "Local voice dictation with Parakeet and Whisper models",
+              "Offline meeting transcription without a bot",
+              "Annotate screenshots, windows, regions, and a connected iPhone",
+              "Deterministic transforms in hex.config.ts",
+              "Command line control and a read-only MCP server (hex mcp)"
+            ],
+            "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+            "sameAs": ["https://github.com/anomalyco/hex"],
+            "author": { "@type": "Person", "name": "Kit Langton" },
+            "publisher": { "@id": "__ORIGIN__/#org" }
+          },
+          {
+            "@type": "Organization",
+            "@id": "__ORIGIN__/#org",
+            "name": "Anomaly",
+            "url": "https://anoma.ly"
+          },
+          {
+            "@type": "WebSite",
+            "@id": "__ORIGIN__/#site",
+            "name": "Hex",
+            "url": "__ORIGIN__/",
+            "inLanguage": "en",
+            "publisher": { "@id": "__ORIGIN__/#org" }
+          },
+          {
+            "@type": "VideoObject",
+            "name": "Hex: local voice dictation",
+            "description": "A short demo of Hex turning speech into text on the machine it runs on.",
+            "thumbnailUrl": "__ORIGIN__/og.png",
+            "contentUrl": "__ORIGIN__/og.mp4",
+            "uploadDate": "2026-10-21T12:14:56-07:00",
+            "publisher": { "@id": "__ORIGIN__/#org" }
+          },
+          {
+            "@type": "FAQPage",
+            "@id": "__ORIGIN__/#faq",
+            "mainEntity": [
+              {
+                "@type": "Question",
+                "name": "Is Hex free?",
+                "acceptedAnswer": {
+                  "@type": "Answer",
+                  "text": "Yes. Hex is free and open source under the MIT license, with no account, subscription, or word limit."
+                }
+              },
+              {
+                "@type": "Question",
+                "name": "Does Hex work offline?",
+                "acceptedAnswer": {
+                  "@type": "Answer",
+                  "text": "Yes. After a one-time model download, dictation and meeting transcription run entirely on your machine."
+                }
+              },
+              {
+                "@type": "Question",
+                "name": "Which speech models does Hex run?",
+                "acceptedAnswer": {
+                  "@type": "Answer",
+                  "text": "Local Parakeet and Whisper models, Apple Speech on the Mac, or your own GGUF model."
+                }
+              },
+              {
+                "@type": "Question",
+                "name": "Does a bot join my meetings?",
+                "acceptedAnswer": {
+                  "@type": "Answer",
+                  "text": "No. Hex records your microphone and system audio itself, so there is no bot in the call."
+                }
+              },
+              {
+                "@type": "Question",
+                "name": "Can my coding agent read my meetings?",
+                "acceptedAnswer": {
+                  "@type": "Answer",
+                  "text": "Yes. hex mcp is a read-only MCP server for OpenCode, Claude Code, Claude Desktop, and Cursor."
+                }
+              },
+              {
+                "@type": "Question",
+                "name": "Where does my data go?",
+                "acceptedAnswer": {
+                  "@type": "Answer",
+                  "text": "Nowhere. Audio, transcripts, and history stay on your machine."
+                }
+              }
+            ]
+          }
+        ]
       }
     </script>
     <title>Hex: voice dictation for Mac, Windows, and Linux</title>

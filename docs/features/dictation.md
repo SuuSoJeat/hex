@@ -701,7 +701,9 @@ Corrected transcript (speech Labs, then Global's and the mode's corrections)
      │   Neutral voice, a voice prompt   -> skipped, nothing recorded
      ├── Words -> chunks -> tagger (Core ML, CPU only, 150 ms)
      │   -> guard (keeps names, numbers, and vocabulary terms that were not
-     │      corrected out loud) -> render
+     │      corrected out loud, comparative "like", and distinct parallel items;
+     │      keeps a correction when it would lose an anaphoric noun or strand
+     │      a contradictory "Yes," / "No,") -> render
      ├── Model still downloading, late, or failing
      │   -> the corrected words as heard, and History says why
      └── Only ever removes words that were heard
@@ -1040,6 +1042,14 @@ takes the paste.
 Windows paste                                     // dictate.windows-paste-target
 ├── Capture starts -> The window in front is remembered, with its process
 ├── Target is an app -> Ctrl+V goes there
+│   └── Windows rejects the chord (SendInput accepts fewer events: an
+│       elevated window, or security software such as 360 Total Security
+│       blocking Hex's simulated input, #2975) -> the job fails with the error
+│       tone, the transcript stays on the clipboard (no restore), and the HUD
+│       notice says to press Ctrl+V and names both likely causes. Like the
+│       macOS refused-paste notice, it shows even with Labs › Failure notices
+│       off; the sent/total counts go to the log only. A YOLO Return rejected
+│       the same way fails with a short "Windows blocked Hex's Return key"
 ├── Target is the shell
 │   ├── The remembered window is still its process's, alive, visible, not
 │   │   minimized, not Hex's, not the shell
@@ -1075,7 +1085,12 @@ Checks: `the_desktop_and_taskbars_take_no_paste`,
 `another_process_using_a_shell_class_is_not_the_shell` in
 [paste_target.rs](../../src/dictation/paste_target.rs), and
 `a_copied_dictation_completes_the_practice_like_a_paste` in
-[practice.rs](../../src/rune_ui/practice.rs). Proof limits: the classification
+[practice.rs](../../src/rune_ui/practice.rs). The blocked-paste notice:
+`a_refused_paste_is_shown_with_failure_notices_off` in
+[live_text.rs](../../src/rune_ui/live_text.rs),
+`known_microphone_failures_get_an_actionable_explanation` in [activity.rs](../../src/desktop/activity.rs), and
+`the_blocked_windows_paste_notice_has_every_language` in
+[i18n.rs](../../src/desktop/i18n.rs). Proof limits: the classification
 and the practice mapping are unit-tested only; the foreground read, the return
 attempt, and the copy fallback have not run on a real Windows PC.
 
@@ -1813,15 +1828,18 @@ Keep ready -> Press shortcut                          // dictate.boundaries
   -> Linux: press and release placed on the stream clock (newest chunk's end
      plus the time since it arrived), so large chunks add no pre-press audio
   -> Delayed handling still uses original event boundaries
-  -> Release excludes audio captured after physical release + 200 ms
+  -> Release keeps a silence-aware tail; sustained trailing speech can grow it
 
 Release or locked finishing press                     // dictate.release-tail
   -> Hold threshold judged on the physical release alone
-  -> Wait for audio through release + 200 ms (POST_RELEASE_TAIL)
-     ├── Arrives -> Clip ends exactly at release + 200 ms
+  -> Base tail: 200 ms (POST_RELEASE_TAIL)
+     ├── Already quiet for 60+ ms -> Credit complete pre-release quiet frames,
+     │   keeping max(40 ms, 200 ms - quiet time) after release
+     │   └── All frames through that end must arrive and still be quiet
+     ├── Active/ambiguous energy, renewed sound, missing audio -> Keep base tail
      └── Stream stalls/fails -> Finish within tail + 100 ms with what arrived
-  -> The live stream is capped there when the finish begins (limit_stream_to):
-     a tail that grows to 600 ms, or a wait for the stop tone to pass, is fed
+  -> The live stream is capped at release + 40 ms when the finish begins
+     (limit_stream_to): any longer tail, or a wait for the stop tone to pass, is fed
      to the stream as the finished clip's remainder, never as live audio
   -> Not short taps, voice controls, programmatic stop, or meetings
   -> Linux and Windows wait the same tail; Linux ends at the release it observes
@@ -1940,9 +1958,26 @@ silent), `restoring_without_a_mute_runs_its_callback_first`, and
 (unmute, then tone) is checked by reading the code, not on a muted device, and a
 physical F12 release has not been recorded.
 
+**Silence-aware release:** the existing frame-energy tracker distinguishes quiet
+from merely not meeting its speech threshold. Once at least 60 ms before key-up
+is confirmed quiet, complete quiet frames subtract from the 200 ms base tail,
+with a 40 ms minimum. Every frame through the shortened endpoint must also be
+quiet and already classified, including resampler delay. A quiet consonant above
+the noise floor, renewed speech, a captured stop tone, invalid samples, or missing
+audio prevents an early finish. Padded stream gaps are not silence evidence.
+The speech-path extension below remains unchanged. The live stream stops at the
+shortest possible tail while this is decided; the finished clip supplies any
+remainder.
+
+Automated checks use synthetic audio at 8, 16, 44.1, and 48 kHz, low-SNR endings,
+resumed speech, stream limits, missing frames, and bounded history.
+`release_tail_latency_budget` checks at least 120 ms saved on its already-quiet
+16 kHz cases. These are sample-timeline measurements; end-to-end release-to-paste
+latency and real-microphone consonant preservation are not established by them.
+
 **Growing tail, November 3, 2026 (issue 1101):** stopping while still saying
 the last word cut it partway, and the model guessed another word. The 200 ms
-tail is now the minimum: when sustained speech (100 ms of 20 ms frames 12 dB
+tail remains the speech-path minimum: when sustained speech (100 ms of 20 ms frames 12 dB
 over the noise floor, syllable gaps up to 40 ms) runs into its end, capture
 continues until 160 ms of quiet or 600 ms after the release
 (`DictationCapture::release_tail`, `MAX_RELEASE_TAIL`). A key click is too
@@ -1990,10 +2025,10 @@ Model advertises streaming, GPU device             // dictate.streaming
   Shortcut capture passes the hold threshold (Toggle on Windows and Linux: on press)
     -> Open one live stream; feed the 16 kHz backlog, then every 160 ms
        // same audio as the final clip, pre-roll included; never blocks capture
-  Release -> Collect the release tail (200 ms, up to 600 ms while speech goes on)
+  Release -> Collect the release tail (40–200 ms when already quiet; up to 600 ms during speech)
     -> Finish with the complete clip
     -> Feed any unfed remainder
-    -> The finish caps the stream at release + 200 ms when it begins
+    -> The finish caps the stream at release + 40 ms when it begins
        // audio captured while the tail decides is trimmed unless the tail grows
     -> Unified English: feed 400 ms of silence, as the whole clip gets (every OS)
     -> Finalize -> Final text

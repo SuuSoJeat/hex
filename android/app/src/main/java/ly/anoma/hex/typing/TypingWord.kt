@@ -102,7 +102,7 @@ internal class TypingWord(val decoder: SpatialDecoder, val spatial: Boolean) {
      * as shift would be, by default at a sentence's start. */
     fun predictions(before: String, capitalize: Boolean? = null): List<String> {
         if (standIn) return emptyList()
-        val text = if (before.lastOrNull()?.let { it.isLetter() || it == '\'' || it == '\u2019' } == true) "$before " else before
+        val text = if (endsBareWord(before)) "$before " else before
         val words = when {
             startsSentence(text) -> sentenceStarters[model.language]
             !text.last().isWhitespace() -> return emptyList()
@@ -467,7 +467,8 @@ internal class TypingWord(val decoder: SpatialDecoder, val spatial: Boolean) {
         return if (addsCapitals || text.first().isUpperCase()) choice else choice.lowercase().takeIf { it != key }
     }
 
-    private fun knows(spelling: String) = lookup(spelling.lowercase()).let {
+    /** Whether a dictionary has this spelling: the model's words, its spellings list, its shorthand or your own words. */
+    fun knows(spelling: String) = lookup(spelling.lowercase()).let {
         model.index(it) >= 0 || model.known(it) || it in shorthand || (decoder.personal?.index(it) ?: -1) >= 0
     }
 
@@ -584,5 +585,8 @@ internal class TypingWord(val decoder: SpatialDecoder, val spatial: Boolean) {
             "it" to setOf("c", "d", "l", "m", "n", "s", "t", "v", "un", "all", "dall", "dell", "nell", "sull", "coll",
                 "quest", "quell", "bell", "sant", "tutt", "nessun", "buon"))
         fun boundary(c: Char?) = c == null || c.isWhitespace() || c in "([{“‘\",;!?"
+        /** Whether [before] ends in a word with no space after it yet ("up to", "you'll"): next words
+         * follow it as if the space were typed, and a next word picked there puts that space in first. */
+        fun endsBareWord(before: String) = before.lastOrNull()?.let { it.isLetter() || it == '\'' || it == '\u2019' } == true
     }
 }

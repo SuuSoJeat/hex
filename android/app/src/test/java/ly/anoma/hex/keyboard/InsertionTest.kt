@@ -234,6 +234,16 @@ class InsertionTest {
         for (n in listOf(-1, -2, -3, -4, -5, -9, 1)) slide.moveTo(n)
         assertEquals(listOf(7, 6, 2, 1, 0, 8), moves)
     }
+    @Test fun aHeldDeleteTakesWordsFasterTheLongerItIsHeld() {
+        // Labs › Keyboard › Delete words when held: 500, 400, 320, 256… ms, never under 90 ms.
+        val gaps = generateSequence(HeldDeleteWords.FIRST_GAP.toLong()) { HeldDeleteWords.next(it) }.take(12).toList()
+        assertEquals(listOf(500L, 400L, 320L, 256L, 205L, 164L, 131L, 105L, 90L, 90L), gaps.take(10))
+        assertEquals(90L, gaps.last())
+        // Its sliders (#3032): no acceleration keeps the initial delay; the most halves each gap, still never under 90.
+        assertEquals(listOf(800L, 800L, 800L), generateSequence(800L) { HeldDeleteWords.next(it, 0) }.take(3).toList())
+        assertEquals(listOf(1000L, 500L, 250L, 125L, 90L), generateSequence(1000L) { HeldDeleteWords.next(it, 50) }.take(5).toList())
+        assertEquals(50, HeldDeleteWords.clampSpeedup(90)); assertEquals(200, HeldDeleteWords.clampDelay(10))
+    }
     @Test fun aDeleteSlideSelectsWholeWordsWithTheirSpaces() {
         assertEquals(listOf(4, 9, 14), DeleteSlide.wordLengths("far away from home").take(3))
         assertEquals(listOf(7, 14), DeleteSlide.wordLengths("Hello, world. ").toList())
@@ -426,6 +436,22 @@ class InsertionTest {
         shift.auto(true); assertEquals(true, shift.uppercase)
         shift.typed(); assertEquals(false, shift.uppercase)
     }
+    @Test fun aClosingQuoteTakesTheSpaceOnlyWhileAQuoteIsOpen() {
+        assertEquals(true, SpaceRules.closingQuoteTakesSpace("she said \"see you soon "))
+        assertEquals(true, SpaceRules.closingQuoteTakesSpace("she said “see you soon "))
+        assertEquals(true, SpaceRules.closingQuoteTakesSpace("\"a\" and “b, "))
+        // No quote open: an opening quote keeps its space.
+        assertEquals(false, SpaceRules.closingQuoteTakesSpace("she said "))
+        assertEquals(false, SpaceRules.closingQuoteTakesSpace("\"hi\" she said "))
+        assertEquals(false, SpaceRules.closingQuoteTakesSpace("“hi” she said "))
+        // Only this paragraph counts.
+        assertEquals(false, SpaceRules.closingQuoteTakesSpace("\"open\nnext line "))
+        // Only one space after a word, never right after the quote that opened.
+        assertEquals(false, SpaceRules.closingQuoteTakesSpace("\"soon  "))
+        assertEquals(false, SpaceRules.closingQuoteTakesSpace("say \" "))
+        assertEquals(false, SpaceRules.closingQuoteTakesSpace("\"soon"))
+        assertEquals(false, SpaceRules.closingQuoteTakesSpace(" "))
+    }
     @Test fun spacesAndMarksFollowGboard() {
         assertEquals(true, SpaceRules.periodFits("Hi "))
         assertEquals(true, SpaceRules.periodFits("at 5 "))
@@ -447,6 +473,17 @@ class InsertionTest {
         assertEquals(true, SpaceRules.takesPickedSpace('-', url = true))
         assertEquals(false, SpaceRules.takesPickedSpace('(', url = true))
         assertEquals(false, SpaceRules.takesPickedSpace('w', url = true))
+        // Labs › Keyboard › Space after punctuation (#3000): a clause mark puts the space back after itself ("here, "),
+        // except in a URL field, which keeps joining ("github.").
+        for (mark in ",.!?;:)") {
+            assertEquals("$mark", true, SpaceRules.movesPickedSpace(mark, url = false))
+            assertEquals("$mark", false, SpaceRules.movesPickedSpace(mark, url = true))
+        }
+        assertEquals(false, SpaceRules.movesPickedSpace('/', url = false))
+        assertEquals(false, SpaceRules.movesPickedSpace('-', url = false))
+        // Its space never makes a double-space period: a mark, not a letter or digit, is before it.
+        assertEquals(false, SpaceRules.periodFits("here, "))
+        assertEquals(false, SpaceRules.periodFits("here) "))
     }
     // iOS CleanupTaggerTests' English examples and its hand-written set, met with rules (no tagger).
     @Test fun englishCleanupRulesMeetTheTaggersExamples() {

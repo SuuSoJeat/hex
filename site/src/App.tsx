@@ -1,8 +1,8 @@
 import { useLayoutEffect, useRef, useState } from "react"
+import Below from "./Below"
 import Download, { OS_KEY_LEGENDS, OS_NAMES, OS_SHORTCUTS, osOf, type Os } from "./Download"
 import { guessPlatform, refinePlatform, type Platform } from "./platform"
 import { OptionKey, SoundToggle, useShout } from "./Shout"
-import signature from "./footer-signature.svg"
 
 function HexMark() {
   return (
@@ -111,18 +111,7 @@ export default function App() {
           <Download platform={platform} os={os} onChooseOs={setChosenOs} />
         </section>
       </main>
-      <footer className="site-footer">
-        <nav className="site-footer__links" aria-label="More about Hex">
-          <a href={`${import.meta.env.BASE_URL}meetings/`}>Meetings</a>
-          <a href={`${import.meta.env.BASE_URL}changelog`}>Changelog</a>
-        </nav>
-        <div className="copyright">
-          <img src={signature} alt="" aria-hidden="true" width={163} height={64} />
-          <p>
-            ©2026 <a href="https://anoma.ly">Anomaly</a>. All rights reserved.
-          </p>
-        </div>
-      </footer>
+      <Below />
     </>
   )
 }

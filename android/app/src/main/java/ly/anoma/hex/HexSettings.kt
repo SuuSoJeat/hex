@@ -65,9 +65,10 @@ private enum class Page(val title: Int) {
     Styles(R.string.settings_style),
     Policy(R.string.settings_privacy_policy), Licences(R.string.settings_licences), Licence(R.string.settings_licences),
     Feedback(R.string.feedback_send_feedback), Diagnostics(R.string.diagnostics),
-    Replacements(R.string.words_replacements), WordsFile(R.string.words_file), KeyColors(R.string.key_color);
+    Replacements(R.string.words_replacements), WordsFile(R.string.words_file), KeyColors(R.string.key_color),
+    Sounds(R.string.dictation_sound);
     val parent get() = when (this) {
-        Diagnostics, KeyColors -> Labs
+        Diagnostics, KeyColors, Sounds -> Labs
         Language, Styles, Replacements, WordsFile -> Dictation
         Layout, Height -> Keyboard
         Policy, Licences -> Privacy
@@ -172,6 +173,11 @@ internal fun HexSettings(setup: Setup, speech: SpeechPreferences, typing: Typing
     val smartQuotes = remember(revision) { typing.smartQuotes }
     val swipeDeleteLetters = remember(revision) { typing.swipeDeleteLetters }
     val marksTakeFixSpace = remember(revision) { typing.marksTakeFixSpace }
+    val marksKeepSpace = remember(revision) { typing.marksKeepSpace }
+    val holdClick = remember(revision) { typing.holdClick }
+    val closingQuoteTakesSpace = remember(revision) { typing.closingQuoteTakesSpace }
+    val swiftKeyLayout = remember(revision) { typing.swiftKeyLayout }
+    val learnWords = remember(revision) { typing.learnWords }
     val adaptiveTouch = remember(revision) { typing.adaptiveTouch }
     // Labs › Keyboard › Adaptive touch: how far it has learned (labelled taps on one key plane, and whether any reads your
     // own centres), and whether the phone keeps averages, which Reset touch learning removes even with the lab off.
@@ -187,6 +193,10 @@ internal fun HexSettings(setup: Setup, speech: SpeechPreferences, typing: Typing
     val volumeInMenu = remember(revision) { typing.volumeInMenu }
     // Labs › Dictate from Quick Settings is the tile service's enabled state, not a preference.
     var quickDictation by remember { mutableStateOf(QuickDictation.enabled(context)) }
+    // Labs › Keyboard › Answer apps' speech requests is the speech activity's enabled state, not a preference.
+    var speechRequests by remember { mutableStateOf(SpeechRequests.enabled(context)) }
+    val dictationSounds = remember(revision) { speech.dictationSounds }
+    val soundSet = remember(revision) { speech.soundSet }
     val keyColors = remember(revision) { typing.keyColors }
     val keyColor = remember(revision) { typing.keyColor }
     val testOnHome = remember(revision) { typing.testKeyboardOnHome }
@@ -418,7 +428,8 @@ internal fun HexSettings(setup: Setup, speech: SpeechPreferences, typing: Typing
                                 R.string.adaptive_touch to R.string.settings_privacy_lab_touch,
                                 R.string.pick_model to R.string.settings_privacy_lab_model,
                                 R.string.clipboard_history to R.string.settings_privacy_lab_clipboard,
-                                R.string.imported_words to R.string.settings_privacy_lab_words).forEachIndexed { i, (name, keeps) ->
+                                R.string.imported_words to R.string.settings_privacy_lab_words,
+                                R.string.learn_words to R.string.settings_privacy_lab_learned).forEachIndexed { i, (name, keeps) ->
                                 if (i != 0) Rule()
                                 Entry(stringResource(name), stringResource(keeps), titleLines = Int.MAX_VALUE, noteLines = Int.MAX_VALUE)
                             }
@@ -534,6 +545,9 @@ internal fun HexSettings(setup: Setup, speech: SpeechPreferences, typing: Typing
                                     quickDictation, noteLines = Int.MAX_VALUE) {
                                     QuickDictation.setEnabled(context, it); quickDictation = it
                                 }
+                                Rule()
+                                // Labs › Dictation sounds: off, dictation is silent and no sound is loaded.
+                                DictationSoundRows(dictationSounds, soundSet, { speech.dictationSounds = it }) { open(Page.Sounds) }
                             }
                             Label(stringResource(R.string.labs_output), muted = true, size = 14,
                                 mod = Modifier.padding(start = 16.dp))
@@ -586,10 +600,27 @@ internal fun HexSettings(setup: Setup, speech: SpeechPreferences, typing: Typing
                                 Toggle(stringResource(R.string.swipe_delete_letters), stringResource(R.string.swipe_delete_letters_detail),
                                     swipeDeleteLetters) { typing.swipeDeleteLetters = it }
                                 Rule()
+                                DeleteWordsRows(typing, revision)
+                                Rule()
                                 ImportedWordsRows(typing, revision)
                                 Rule()
                                 Toggle(stringResource(R.string.marks_take_fix_space), stringResource(R.string.marks_take_fix_space_detail),
                                     marksTakeFixSpace) { typing.marksTakeFixSpace = it }
+                                Rule()
+                                Toggle(stringResource(R.string.marks_keep_space), stringResource(R.string.marks_keep_space_detail),
+                                    marksKeepSpace) { typing.marksKeepSpace = it }
+                                Rule()
+                                Toggle(stringResource(R.string.hold_click), stringResource(R.string.hold_click_detail),
+                                    holdClick) { typing.holdClick = it }
+                                Rule()
+                                Toggle(stringResource(R.string.closing_quote_takes_space), stringResource(R.string.closing_quote_takes_space_detail),
+                                    closingQuoteTakesSpace) { typing.closingQuoteTakesSpace = it }
+                                Rule()
+                                Toggle(stringResource(R.string.swiftkey_layout), stringResource(R.string.swiftkey_layout_detail),
+                                    swiftKeyLayout) { typing.swiftKeyLayout = it }
+                                Rule()
+                                Toggle(stringResource(R.string.learn_words), stringResource(R.string.learn_words_detail),
+                                    learnWords) { typing.learnWords = it }
                                 Rule()
                                 // Labs › Keyboard › Adaptive touch: off, the keys read the drawn centres and learn nothing;
                                 // what was learned stays on the phone until Reset touch learning or Delete what Hex learned.
@@ -631,6 +662,11 @@ internal fun HexSettings(setup: Setup, speech: SpeechPreferences, typing: Typing
                                 Toggle(stringResource(R.string.voice_only_mode), stringResource(R.string.voice_only_detail),
                                     voiceOnly) { typing.voiceOnly = it; VoiceOnly.setEnabledFromSettings(context, it) }
                                 Rule()
+                                Toggle(stringResource(R.string.speech_requests), stringResource(R.string.speech_requests_detail),
+                                    speechRequests, noteLines = Int.MAX_VALUE) {
+                                    SpeechRequests.setEnabled(context, it); speechRequests = it
+                                }
+                                Rule()
                                 // Labs › Keyboard › Voice bar from the Hex menu: off, the Hex menu has no Voice only.
                                 Toggle(stringResource(R.string.voice_bar_from_menu), stringResource(R.string.voice_bar_from_menu_detail),
                                     voiceBarFromMenu) { typing.voiceBarFromMenu = it }
@@ -642,6 +678,9 @@ internal fun HexSettings(setup: Setup, speech: SpeechPreferences, typing: Typing
                                 // Labs › Keyboard › Volume in the Hex menu: off, the Hex menu has no Volume row.
                                 Toggle(stringResource(R.string.volume_in_menu), stringResource(R.string.volume_in_menu_detail),
                                     volumeInMenu) { typing.volumeInMenu = it }
+                                Rule()
+                                // Labs › Keyboard › Key click volume: off, the keys click at the phone's own level.
+                                KeyClickRows(typing, revision)
                                 Rule()
                                 // Labs › Keyboard › Key colors: iPhone Hex's key themes, the keys only. Off, the keys are
                                 // Automatic's whatever Color says; the choice is kept for the next time it is on.
@@ -679,6 +718,7 @@ internal fun HexSettings(setup: Setup, speech: SpeechPreferences, typing: Typing
                             Entry(stringResource(it.label), value = if (it == keyColor) "✓" else "", action = { typing.keyColor = it; open(Page.Labs) })
                         }
                     }
+                    Page.Sounds -> SoundSetPage(soundSet) { speech.soundSet = it }
                     Page.Styles -> Card {
                         Style.entries.forEachIndexed { i, it ->
                             if (i != 0) Rule()

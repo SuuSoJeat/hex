@@ -21,7 +21,8 @@ import kotlin.math.roundToInt
 
 /** One key. The whole view is its touch target; its padding places the drawn keycap (KeyRowLayout sets it). */
 internal class KeyCap(context: Context, fill: Int, private val paints: KeyPaints, description: String,
-                      private val haptics: () -> Boolean, click: () -> Unit) : FrameLayout(context) {
+                      private val haptics: () -> Boolean, private val clickPercent: () -> Int?,
+                      click: () -> Unit) : FrameLayout(context) {
     private val slop = ViewConfiguration.get(context).scaledTouchSlop
     var label: TextView? = null
     /** The label's size in dp at Gboard's letter keycap; the drawn size follows this key's keycap ([KeyLabels]). */
@@ -40,6 +41,7 @@ internal class KeyCap(context: Context, fill: Int, private val paints: KeyPaints
     var longClickLabel: String? = null
     private var downAt = 0L
     private var liftAt = 0L
+    private companion object { const val ICON_SCALE = 1.15f }
     init {
         contentDescription = description
         // The key click below replaces View's own, which would sound again as performClick runs on lifting.
@@ -58,12 +60,12 @@ internal class KeyCap(context: Context, fill: Int, private val paints: KeyPaints
         }
     }
     // A tap as each key goes down, as on Gboard. The click is the system's own, so it follows Touch
-    // sounds as iPhone Hex's follows Keyboard clicks (AudioManager.playSoundEffect checks the setting).
+    // sounds as iPhone Hex's follows Keyboard clicks; Labs › Keyboard › Key click volume sets its level ([KeyClick]).
     override fun dispatchTouchEvent(event: MotionEvent): Boolean {
         if (event.actionMasked == MotionEvent.ACTION_DOWN || event.actionMasked == MotionEvent.ACTION_POINTER_DOWN) {
             downAt = event.eventTime
             tap(context, haptics(), Tap.Press)
-            context.getSystemService(AudioManager::class.java)?.playSoundEffect(sound)
+            KeyClick.play(context, sound, clickPercent())
         }
         if (event.actionMasked == MotionEvent.ACTION_UP) liftAt = event.eventTime
         return super.dispatchTouchEvent(event)
@@ -82,6 +84,19 @@ internal class KeyCap(context: Context, fill: Int, private val paints: KeyPaints
         }.also { hint = it }
         if (h.text != text || h.visibility != VISIBLE) requestLayout()
         h.text = text; h.visibility = VISIBLE
+    }
+
+    private var hintImage: ImageView? = null
+    /** A small icon in the corner where [hint]'s text goes, in the same quiet colour (SwiftKey layout's microphone on
+     * the comma), or none for null. */
+    fun hintIcon(res: Int?) {
+        if (res == null) { if (hintImage?.visibility == VISIBLE) { hintImage?.visibility = GONE; requestLayout() }; return }
+        val image = hintImage ?: ImageView(context).apply {
+            imageTintList = ColorStateList.valueOf(paints.quiet)
+            face.addView(this, LayoutParams(0, 0, Gravity.TOP or Gravity.END))
+        }.also { hintImage = it }
+        image.setImageResource(res)
+        if (image.visibility != VISIBLE) { image.visibility = VISIBLE; requestLayout() }
     }
 
     // The label and hint are sized for the keycap here, before they are measured: KeyRowLayout has set the
@@ -111,6 +126,15 @@ internal class KeyCap(context: Context, fill: Int, private val paints: KeyPaints
             val top = sizes.hintTop.roundToInt(); val end = sizes.hintEnd.roundToInt()
             if (params.topMargin != top || params.marginEnd != end) { params.topMargin = top; params.marginEnd = end; h.layoutParams = params }
         }
+        hintImage?.takeIf { it.visibility == VISIBLE }?.let { image ->
+            // As tall as a hint's capitals would stand, a little more so its outline reads.
+            val side = (sizes.hint * ICON_SCALE).roundToInt()
+            val top = sizes.hintTop.roundToInt(); val end = sizes.hintEnd.roundToInt()
+            val params = image.layoutParams as LayoutParams
+            if (params.width != side || params.topMargin != top || params.marginEnd != end) {
+                params.width = side; params.height = side; params.topMargin = top; params.marginEnd = end; image.layoutParams = params
+            }
+        }
     }
     // View normally posts its click after UP. Letter gestures commit on UP itself;
     // posting space or shift behind the next letter can reorder fast input.
@@ -137,7 +161,7 @@ internal class KeyCap(context: Context, fill: Int, private val paints: KeyPaints
 
 /** Builds keys with the keyboard's colours and haptics setting. */
 internal class KeyCaps(private val context: Context, val paints: KeyPaints, private val labelBase: Float,
-                       private val haptics: () -> Boolean) {
+                       private val haptics: () -> Boolean, private val clickPercent: () -> Int? = { null }) {
     private fun dp(value: Int) = (value * context.resources.displayMetrics.density).roundToInt()
     val ink = paints.ink
     val key = paints.key
@@ -146,7 +170,7 @@ internal class KeyCaps(private val context: Context, val paints: KeyPaints, priv
     /** Letters are Gboard's size (19.4 dp capitals) on its Pixel 8 keycap; labels such as ?123 are smaller. [size]
      * is in dp at that keycap: the drawn size follows each key's own ([KeyLabels]). */
     fun cap(s: String, desc: String, fill: Int = key, size: Float = 26f, click: () -> Unit): KeyCap {
-        val c = KeyCap(context, fill, paints, desc, haptics, click)
+        val c = KeyCap(context, fill, paints, desc, haptics, clickPercent, click)
         c.labelSize = size; c.labelBase = labelBase
         c.label = TextView(context).apply {
             text = s; useInter(if (size >= 20f) 400 else 500)
@@ -157,7 +181,7 @@ internal class KeyCaps(private val context: Context, val paints: KeyPaints, priv
         return c
     }
     fun icon(res: Int, desc: String, fill: Int, click: () -> Unit, tint: Int = ink, size: Int = 24): KeyCap {
-        val c = KeyCap(context, fill, paints, desc, haptics, click)
+        val c = KeyCap(context, fill, paints, desc, haptics, clickPercent, click)
         val image = ImageView(context).apply {
             setImageResource(res); imageTintList = ColorStateList.valueOf(tint)
         }

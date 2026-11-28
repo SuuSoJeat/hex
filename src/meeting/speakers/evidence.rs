@@ -97,6 +97,10 @@ pub struct ParticipantKey(NonZeroU32);
 impl ParticipantKey {
     /// The key for someone `evidence` has not met: one past the highest it
     /// holds.
+    #[cfg_attr(
+        not(target_os = "macos"),
+        allow(dead_code, reason = "the reader is macOS only")
+    )]
     pub fn next(evidence: &[Evidence]) -> Self {
         let highest = evidence.iter().filter_map(|line| match line {
             Evidence::Participant(participant) => Some(participant.key),
@@ -106,6 +110,10 @@ impl ParticipantKey {
     }
 
     /// The key after this one, for the next person met.
+    #[cfg_attr(
+        not(target_os = "macos"),
+        allow(dead_code, reason = "the reader is macOS only")
+    )]
     pub fn following(self) -> Self {
         Self(self.0.saturating_add(1))
     }
@@ -206,6 +214,10 @@ pub enum Correction {
 
 impl Correction {
     /// Whether this correction leaves nothing of an `earlier` one standing.
+    #[cfg_attr(
+        not(test),
+        expect(dead_code, reason = "nothing records a correction yet")
+    )]
     fn replaces(&self, earlier: &Self) -> bool {
         match (self, earlier) {
             (
@@ -220,6 +232,10 @@ impl Correction {
     }
 }
 
+fn is_false(value: &bool) -> bool {
+    !*value
+}
+
 /// One line of the evidence.
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
@@ -231,6 +247,12 @@ pub enum Evidence {
     Floor {
         at_ms: u64,
         holder: Option<ParticipantKey>,
+        /// Whether the user's own tile was marked as speaking at this look,
+        /// when the call app marks local and remote tiles independently.
+        /// Omitted when false so older evidence files and non-overlapping
+        /// looks keep their existing shape.
+        #[serde(default, skip_serializing_if = "is_false")]
+        local_speaking: bool,
     },
     /// One look that could not be trusted. It counts as no look at all.
     Untrusted {
@@ -251,6 +273,10 @@ pub fn read(directory: &Path) -> Result<Vec<Evidence>> {
 
 /// Adds what the reader saw to the end of the file, creating it for its
 /// owner only.
+#[cfg_attr(
+    not(target_os = "macos"),
+    allow(dead_code, reason = "the reader is macOS only")
+)]
 pub fn append(directory: &Path, evidence: &[Evidence]) -> Result<()> {
     let path = directory.join(FILE);
     let mut file = OpenOptions::new()
@@ -284,6 +310,10 @@ pub fn append(directory: &Path, evidence: &[Evidence]) -> Result<()> {
 /// replaces. The file is rewritten whole under a temporary name and renamed
 /// into place, so a crash leaves either the old evidence or the new. Lines
 /// this build cannot read are carried over untouched.
+#[cfg_attr(
+    not(test),
+    expect(dead_code, reason = "nothing records a correction yet")
+)]
 pub fn correct(directory: &Path, correction: Correction) -> Result<()> {
     let existing = stored(directory)?;
     let temporary = directory.join(format!("{FILE}.tmp"));
@@ -366,10 +396,12 @@ mod tests {
             Evidence::Floor {
                 at_ms: 500,
                 holder: Some(key(2)),
+                local_speaking: false,
             },
             Evidence::Floor {
                 at_ms: 1_000,
                 holder: None,
+                local_speaking: false,
             },
             Evidence::Untrusted {
                 at_ms: 1_500,
@@ -469,6 +501,7 @@ mod tests {
         let floor = Evidence::Floor {
             at_ms: 500,
             holder: None,
+            local_speaking: false,
         };
         assert_eq!(read(&folder).unwrap(), std::slice::from_ref(&floor));
 
@@ -576,5 +609,32 @@ mod tests {
         assert!(word.contains(1_000) && word.contains(1_400) && !word.contains(1_401));
         let saved = r#"{"start_ms":1400,"end_ms":1000}"#;
         assert_eq!(serde_json::from_str::<Interval>(saved).unwrap(), word);
+    }
+
+    #[test]
+    fn local_speaking_is_omitted_when_false_and_defaults_to_false_for_older_files() {
+        let legacy = r#"{"kind":"floor","at_ms":500,"holder":"p2"}"#;
+        let parsed: Evidence = serde_json::from_str(legacy).unwrap();
+        assert_eq!(
+            parsed,
+            Evidence::Floor {
+                at_ms: 500,
+                holder: Some(key(2)),
+                local_speaking: false,
+            }
+        );
+        assert_eq!(serde_json::to_string(&parsed).unwrap(), legacy);
+
+        let overlap = Evidence::Floor {
+            at_ms: 500,
+            holder: Some(key(2)),
+            local_speaking: true,
+        };
+        let encoded = serde_json::to_string(&overlap).unwrap();
+        assert_eq!(
+            encoded,
+            r#"{"kind":"floor","at_ms":500,"holder":"p2","local_speaking":true}"#
+        );
+        assert_eq!(serde_json::from_str::<Evidence>(&encoded).unwrap(), overlap);
     }
 }
